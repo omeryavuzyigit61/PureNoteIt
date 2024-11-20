@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item android:title="@string/settings">
+        <menu>
+            <item
+                android:id="@+id/lock_menu"
+                android:icon="@drawable/lock"
+                android:title="Şifre" />
+            <item
+                android:id="@+id/thema_menu"
+                app:actionLayout="@layout/custom_drawer_switch"
+                android:icon="@drawable/theme"
+                android:title="@string/tema" />
+            <item
+                android:id="@+id/category_setting_menu"
+                android:icon="@drawable/category_alt"
+                android:title="@string/category_setting" />
+        </menu>
+    </item>
+    <item android:title="Kategoriler"
+        android:id="@+id/sub_menu">
+        <menu>
+            <item
+                android:id="@+id/category_menu"
+                android:icon="@drawable/house_crack"
+                android:title="Tümü" />
+            <item
+                android:id="@+id/category_note"
+                android:icon="@drawable/note"
+                android:title="Not" />
+            <item
+                android:id="@+id/category_diary"
+                android:icon="@drawable/diary"
+                android:title="Günlük" />
+            <item
+                android:id="@+id/category_important"
+                android:icon="@drawable/important"
+                android:title="Önemli" />
+        </menu>
+    </item>
+</menu>

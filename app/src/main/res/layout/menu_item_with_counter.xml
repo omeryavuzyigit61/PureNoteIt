@@ -1,0 +1,30 @@
+<!-- res/layout/menu_item_with_counter.xml -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <!-- Kategori Adı -->
+    <TextView
+        android:id="@+id/category_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Kategori Adı"
+        android:textSize="16sp"
+        android:textColor="@android:color/black" />
+
+    <!-- Not Sayısı -->
+    <TextView
+        android:id="@+id/note_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/circle_background"
+        android:gravity="center"
+        android:padding="4dp"
+        android:text="0"
+        android:textColor="@android:color/white"
+        android:textSize="14sp" />
+</LinearLayout>

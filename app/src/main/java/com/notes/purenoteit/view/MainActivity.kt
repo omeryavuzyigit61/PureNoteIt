@@ -1,0 +1,48 @@
+package com.notes.purenoteit.view
+
+import android.os.Bundle
+import android.view.MotionEvent
+import android.view.WindowManager
+import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.navigation.findNavController
+import com.notes.purenoteit.R
+import com.notes.purenoteit.databinding.ActivityMainBinding
+import com.notes.purenoteit.util.hideKeyboard
+import dagger.hilt.android.AndroidEntryPoint
+
+
+@AndroidEntryPoint
+class MainActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityMainBinding
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+        val window = this.window
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+        window.statusBarColor = ContextCompat.getColor(this, R.color.background_color)
+        binding.apply {
+
+        }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        val navController = findNavController(R.id.home_fragment)
+        return navController.navigateUp() || super.onSupportNavigateUp()
+    }
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        //hideKeyboard(event)
+        return super.dispatchTouchEvent(event)
+    }
+}

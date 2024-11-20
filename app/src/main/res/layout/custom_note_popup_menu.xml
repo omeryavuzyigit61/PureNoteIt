@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/popup_menu_background"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/deleteTextView"
+        android:layout_width="80dp"
+        android:layout_height="wrap_content"
+        android:text="@string/delete"
+        android:textColor="@color/white"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/editTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/edit"
+        android:textColor="@color/white"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/deleteTextView" />
+
+    <ImageView
+        android:id="@+id/addImageView"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="8dp"
+        app:tint="@color/white"
+        app:layout_constraintBottom_toBottomOf="@+id/deleteTextView"
+        app:layout_constraintStart_toEndOf="@+id/deleteTextView"
+        app:layout_constraintTop_toTopOf="@+id/deleteTextView"
+        app:srcCompat="@drawable/delete" />
+
+    <ImageView
+        android:id="@+id/imageView2"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        app:tint="@color/white"
+        android:padding="1dp"
+        app:layout_constraintBottom_toBottomOf="@+id/editTextView"
+        app:layout_constraintStart_toStartOf="@+id/addImageView"
+        app:layout_constraintTop_toTopOf="@+id/editTextView"
+        app:srcCompat="@drawable/file_edit" />
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">PureNoteIt</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="delete">Sil</string>
+    <string name="edit">Düzenle</string>
+    <string name="open">Open</string>
+    <string name="close">Close</string>
+    <string name="settings">Ayarlar</string>
+    <string name="tema">Tema</string>
+    <string name="category_setting">Kategori Ayarları</string>
+    <string name="search_category">Kategori Giriniz</string>
+</resources>
