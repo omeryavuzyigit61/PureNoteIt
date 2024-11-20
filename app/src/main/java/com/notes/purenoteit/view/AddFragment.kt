@@ -114,9 +114,11 @@ class AddFragment : Fragment(), onItemClickListener {
 
     private fun updateUIForEdit() {
         binding.apply {
-            constraintLayout.visibility = View.VISIBLE
+            if (noteData != null) {
+                binding.constraintLayout.show()
+                binding.confirmButton.text = " Kaydet"
+            }
             imageAdapter.setData(imageUriList)
-            confirmButton.text = "  Güncelle"
         }
     }
 
@@ -124,7 +126,6 @@ class AddFragment : Fragment(), onItemClickListener {
         binding.apply {
             imageRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
             imageRecyclerView.adapter = imageAdapter
-            imageAdapter.setData(imageUriList)
 
             categorySearchView.customCategoryRecyclerView.layoutManager =
                 LinearLayoutManager(requireContext())
@@ -291,10 +292,7 @@ class AddFragment : Fragment(), onItemClickListener {
                     imageUri?.let {
                         imageUriList.add(it.toString())
                         binding.constraintLayout.visibility = View.VISIBLE
-                        if (noteId == null)
-                            initListener(0)
-                        else
-                            initListener(1)
+                        updateUIForEdit()
                     }
                 }
             }
@@ -315,7 +313,7 @@ class AddFragment : Fragment(), onItemClickListener {
                         }
 
                         else -> {
-                            // Hiçbir EditText odakta değilse
+                            binding.titleEditText.append(spokenText)
                         }
                     }
                 }
@@ -337,17 +335,6 @@ class AddFragment : Fragment(), onItemClickListener {
                 // İzin verilmedi
 
             }
-        }
-    }
-
-    private fun initListener(action: Int) {
-        if (action == 0) {
-            imageAdapter.setData(imageUriList)
-        } else {
-            //requireContext().showToastShort(""+it[0].images)
-            binding.constraintLayout.show()
-            binding.confirmButton.text = "Kaydet"
-            noteData?.images?.let { imageAdapter.setData(it) }
         }
     }
 
