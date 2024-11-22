@@ -83,6 +83,7 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
             NoteAction.DELETE -> categoryViewModel.deleteNoteById(position)
             NoteAction.EDIT -> showCategoryDialog(isEdit = true, position = position)
             NoteAction.LOCK -> handleLockAction(position)
+            NoteAction.LIST -> {}
         }
     }
 

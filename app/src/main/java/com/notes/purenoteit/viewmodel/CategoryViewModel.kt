@@ -85,6 +85,37 @@ class CategoryViewModel @Inject constructor(private val repository: CategoryRepo
             .observeOn(AndroidSchedulers.mainThread())
     }
 
+    fun isCategoryExists(name: String): LiveData<Boolean> {
+        val result = MutableLiveData<Boolean>()
+        repository.isCategoryExists(name)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({ exists ->
+                result.value = exists
+            }, {
+
+            }).let {
+                compositeDisposable.add(it)
+            }
+        return result
+    }
+
+    fun isPasswordSet(categoryName: String): LiveData<Boolean> {
+        val result = MutableLiveData<Boolean>()
+        repository.isPasswordSet(categoryName)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({ exists ->
+                result.value = exists
+                Log.i("CategoryViewModel", "Şifre ayarlandı mı?: $result")
+            }, {
+                Log.i("CategoryViewModel", "Şifre ayarlandı mı?: $result")
+            }).let {
+                compositeDisposable.add(it)
+            }
+        return result
+    }
+
     override fun onCleared() {
         super.onCleared()
         compositeDisposable.clear()

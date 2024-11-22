@@ -1,7 +1,6 @@
 package com.notes.purenoteit.view
 
 import android.app.DatePickerDialog
-import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
@@ -9,14 +8,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
-import android.widget.EdgeEffect
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.core.view.GravityCompat
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
-import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import com.notes.purenoteit.R
 import com.notes.purenoteit.adapter.NoteAdapter
@@ -77,15 +74,6 @@ class HomeFragment : Fragment(), onItemClickListener {
             noteRecyclerView.layoutManager =
                 StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
             noteRecyclerView.adapter = adapter
-
-            val edgeEffectColor = Color.parseColor("#FFA500") // Turuncu renk
-            noteRecyclerView.edgeEffectFactory = object : RecyclerView.EdgeEffectFactory() {
-                override fun createEdgeEffect(view: RecyclerView, direction: Int): EdgeEffect {
-                    return EdgeEffect(view.context).apply {
-                        color = edgeEffectColor
-                    }
-                }
-            }
         }
     }
 
@@ -101,8 +89,12 @@ class HomeFragment : Fragment(), onItemClickListener {
 
             navigationView.setNavigationItemSelectedListener { menuItem ->
                 when (menuItem.itemId) {
-                    R.id.lock_menu -> { /* İlgili işlem */ }
-                    R.id.thema_menu -> { /* İlgili işlem */ }
+                    R.id.lock_menu -> { /* İlgili işlem */
+                    }
+
+                    R.id.thema_menu -> { /* İlgili işlem */
+                    }
+
                     R.id.category_setting_menu -> {
                         findNavController().navigate(R.id.action_homeFragment_to_categorySettingFragment)
                     }
@@ -113,17 +105,9 @@ class HomeFragment : Fragment(), onItemClickListener {
                 true
             }
 
-            searchMenuImageView.setOnClickListener {
-                toggleSearchMenu()
-            }
-
-            searchConfirmButton.setOnClickListener {
-                handleSearchConfirmation()
-            }
-
-            searchClearButton.setOnClickListener {
-                clearSearchFields()
-            }
+            searchMenuImageView.setOnClickListener { toggleSearchMenu() }
+            searchConfirmButton.setOnClickListener { handleSearchConfirmation() }
+            searchClearButton.setOnClickListener { clearSearchFields() }
 
             categoryRadioButton.setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) handleSearchOptionChange(SearchOption.CATEGORY)
@@ -177,7 +161,17 @@ class HomeFragment : Fragment(), onItemClickListener {
         if (categoryName == "Tümü") {
             viewModel.getAllNotes()
         } else {
-            viewModel.searchNotesByCategory(categoryName)
+            if (categoryName == "Not" || categoryName == "Günlük" || categoryName == "Günlük") {
+                viewModel.searchNotesByCategory(categoryName)
+            } else {
+                categoryViewModel.isPasswordSet(categoryName).observe(viewLifecycleOwner) {
+                    if (it) {
+                        requireContext().showToastShort("Şifreli")
+                    } else {
+                        viewModel.searchNotesByCategory(categoryName)
+                    }
+                }
+            }
         }
     }
 
@@ -188,6 +182,7 @@ class HomeFragment : Fragment(), onItemClickListener {
                     categorySelectEditText.show()
                     dateSelectConstraintLayout.hide()
                 }
+
                 SearchOption.DATE -> {
                     categorySelectEditText.hide()
                     dateSelectConstraintLayout.show()
@@ -208,6 +203,7 @@ class HomeFragment : Fragment(), onItemClickListener {
                         requireContext().showToastShort("Lütfen kategori giriniz")
                     }
                 }
+
                 dateRadioButton.isChecked -> {
                     if (startDate != null && endDate != null) {
                         if (startDate!! > endDate!!) {
@@ -220,6 +216,7 @@ class HomeFragment : Fragment(), onItemClickListener {
                         requireContext().showToastShort("Lütfen tarih seçiniz")
                     }
                 }
+
                 else -> requireContext().showToastShort("Lütfen bir arama seçeneği seçin")
             }
         }
@@ -291,15 +288,20 @@ class HomeFragment : Fragment(), onItemClickListener {
     override fun onItemClick(position: Int, action: NoteAction, isPassword: Boolean?) {
         when (action) {
             NoteAction.EDIT -> {
-                val navigateAction = HomeFragmentDirections.actionHomeFragmentToAddFragment(position)
+                val navigateAction =
+                    HomeFragmentDirections.actionHomeFragmentToAddFragment(position)
                 if (isPassword == true) {
                     authenticateWithBiometrics { findNavController().navigate(navigateAction) }
                 } else {
                     findNavController().navigate(navigateAction)
                 }
             }
+
             NoteAction.DELETE -> viewModel.deleteNoteById(position)
-            NoteAction.LOCK -> { /* Lock işlemleri */ }
+            NoteAction.LOCK -> { /* Lock işlemleri */
+            }
+
+            NoteAction.LIST -> {}
         }
     }
 

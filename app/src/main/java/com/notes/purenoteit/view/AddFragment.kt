@@ -29,6 +29,7 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.notes.purenoteit.R
 import com.notes.purenoteit.adapter.ImageAdapter
 import com.notes.purenoteit.adapter.SearchCategoryAdapter
+import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.databinding.CustomDialogBinding
 import com.notes.purenoteit.databinding.CustomPasswordDialogBinding
@@ -52,7 +53,7 @@ class AddFragment : Fragment(), onItemClickListener {
     private val viewModel: NoteViewModel by viewModels()
     private val categoryViewModel: CategoryViewModel by viewModels()
     private val imageAdapter = ImageAdapter(this)
-    private val categoryAdapter = SearchCategoryAdapter()
+    private val categoryAdapter = SearchCategoryAdapter(this)
 
     private lateinit var sharedPreferences: SharedPreferences
 
@@ -63,14 +64,12 @@ class AddFragment : Fragment(), onItemClickListener {
 
     private val fromAnimation by lazy {
         AnimationUtils.loadAnimation(
-            requireContext(),
-            R.anim.from_top_anim
+            requireContext(), R.anim.from_top_anim
         )
     }
     private val toAnimation by lazy {
         AnimationUtils.loadAnimation(
-            requireContext(),
-            R.anim.to_top_anim
+            requireContext(), R.anim.to_top_anim
         )
     }
 
@@ -78,8 +77,7 @@ class AddFragment : Fragment(), onItemClickListener {
     private val SPEECH_REQUEST_CODE = 102
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         // Inflate the layout for this fragment
         _binding = FragmentAddBinding.inflate(inflater, container, false)
@@ -99,6 +97,8 @@ class AddFragment : Fragment(), onItemClickListener {
             val disposable = viewModel.getNoteById(noteId!!).subscribe { note ->
                 noteData = note
                 binding.apply {
+                    binding.constraintLayout.show()
+                    binding.confirmButton.text = " Kaydet"
                     titleEditText.setText(note.title)
                     descriptionEditText.setText(note.description)
                     categorySearchView.customCategoryEditText.setText(note.category)
@@ -106,19 +106,9 @@ class AddFragment : Fragment(), onItemClickListener {
                     imageUriList = note.images!!.toMutableList()
                     checkedCategory = note.category.toString()
                 }
-                updateUIForEdit()
+                imageAdapter.setData(imageUriList)
             }
             compositeDisposable.add(disposable)
-        }
-    }
-
-    private fun updateUIForEdit() {
-        binding.apply {
-            if (noteData != null) {
-                binding.constraintLayout.show()
-                binding.confirmButton.text = " Kaydet"
-            }
-            imageAdapter.setData(imageUriList)
         }
     }
 
@@ -179,18 +169,28 @@ class AddFragment : Fragment(), onItemClickListener {
 
     private fun handleCategorySelection() {
         binding.apply {
-            when (radioGroup.checkedRadioButtonId) {
-                R.id.noteRadioButton -> checkedCategory = noteRadioButton.text.toString()
-                R.id.diaryRadioButton -> checkedCategory = diaryRadioButton.text.toString()
-                R.id.importantRadioButton -> checkedCategory = importantRadioButton.text.toString()
+            val customCategory = categorySearchView.customCategoryEditText.text.toString()
+            checkedCategory = when (radioGroup.checkedRadioButtonId) {
+                R.id.noteRadioButton -> noteRadioButton.text.toString()
+                R.id.diaryRadioButton -> diaryRadioButton.text.toString()
+                R.id.importantRadioButton -> importantRadioButton.text.toString()
                 R.id.otherRadiButton -> {
-                    val customCategory = categorySearchView.customCategoryEditText.text.toString()
-                    if (customCategory.isBlank()) {
-                        requireContext().showToastShort("Lütfen bir kategori giriniz")
+                    if (customCategory.isEmpty()) {
+                        requireContext().showToastShort("Lütfen bir kategori adı giriniz")
                         return
                     }
-                    checkedCategory = customCategory
+                    categoryViewModel.isCategoryExists(customCategory)
+                        .observe(viewLifecycleOwner) { isExists ->
+                            if (!isExists) {
+                                categoryViewModel.upsert(CategoryData(customCategory, false))
+                                requireContext().showToastShort("Kategori Eklendi")
+                            }
+                            checkedCategory = customCategory
+                            toggleCategoryMenu()
+                        }
+                    return
                 }
+                else -> return
             }
             toggleCategoryMenu()
         }
@@ -231,14 +231,11 @@ class AddFragment : Fragment(), onItemClickListener {
 
     private fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.READ_EXTERNAL_STORAGE
+                requireContext(), Manifest.permission.READ_EXTERNAL_STORAGE
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             ActivityCompat.requestPermissions(
-                requireActivity(),
-                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
-                REQUEST_CODE
+                requireActivity(), arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_CODE
             )
         } else {
             openGallery() // İzin varsa galeriyi aç
@@ -248,8 +245,7 @@ class AddFragment : Fragment(), onItemClickListener {
     private fun startVoiceRecognition() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             )
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Lütfen konuşun")
@@ -259,9 +255,7 @@ class AddFragment : Fragment(), onItemClickListener {
             startActivityForResult(intent, SPEECH_REQUEST_CODE)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(
-                requireContext(),
-                "Cihazınızda ses tanıma desteklenmiyor",
-                Toast.LENGTH_SHORT
+                requireContext(), "Cihazınızda ses tanıma desteklenmiyor", Toast.LENGTH_SHORT
             ).show()
         }
     }
@@ -291,8 +285,8 @@ class AddFragment : Fragment(), onItemClickListener {
                     val imageUri = data.data
                     imageUri?.let {
                         imageUriList.add(it.toString())
-                        binding.constraintLayout.visibility = View.VISIBLE
-                        updateUIForEdit()
+                        binding.constraintLayout.show()
+                        imageAdapter.setData(imageUriList)
                     }
                 }
             }
@@ -323,9 +317,7 @@ class AddFragment : Fragment(), onItemClickListener {
 
     private var REQUEST_CODE = 100
     override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_CODE) {
@@ -366,6 +358,14 @@ class AddFragment : Fragment(), onItemClickListener {
             NoteAction.LOCK -> {
 
             }
+
+            NoteAction.LIST -> {
+                val disposable = categoryViewModel.getNoteById(position).subscribe { data ->
+                    binding.categorySearchView.customCategoryEditText.setText(data.name)
+                }
+                //toggleCategoryMenu()
+                compositeDisposable.add(disposable)
+            }
         }
     }
 
@@ -373,17 +373,14 @@ class AddFragment : Fragment(), onItemClickListener {
         val dialog = Dialog(requireContext())
         val dialogBinding: CustomDialogBinding = CustomDialogBinding.inflate(layoutInflater)
         dialog.setContentView(dialogBinding.root)
-        Glide.with(requireContext())
-            .load(s)
-            .diskCacheStrategy(DiskCacheStrategy.DATA)
+        Glide.with(requireContext()).load(s).diskCacheStrategy(DiskCacheStrategy.DATA)
             .into(dialogBinding.dialogImageView)
 
         dialogBinding.dialogCancelButton.setOnClickListener {
             dialog.dismiss() // Dialog'u kapat
         }
         dialog.window?.setLayout(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT
+            WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT
         )
         dialog.show()
     }

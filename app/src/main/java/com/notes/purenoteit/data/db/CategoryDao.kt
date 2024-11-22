@@ -17,15 +17,20 @@ interface CategoryDao {
     fun getAllCategories(): Single<List<CategoryData>>
 
     @Delete
-    fun deleteCategory(category: CategoryData):Completable
+    fun deleteCategory(category: CategoryData): Completable
 
     @Query("DELETE FROM categories WHERE id = :id")
-    fun deleteNoteById(id:Int): Completable
+    fun deleteNoteById(id: Int): Completable
 
     @Query("SELECT * FROM categories WHERE name LIKE '%' || :query || '%'")
-    fun searchCategory(query:String): Single<List<CategoryData>>
+    fun searchCategory(query: String): Single<List<CategoryData>>
 
     @Query("SELECT * FROM categories WHERE id = :id")
-    fun getNoteById(id:Int): Single<CategoryData>
+    fun getNoteById(id: Int): Single<CategoryData>
 
+    @Query("SELECT COUNT(*) > 0 FROM categories WHERE name = :name")
+    fun isCategoryExists(name: String): Single<Boolean>
+
+    @Query("SELECT isPassword FROM categories WHERE name = :categoryName")
+    fun isPasswordSet(categoryName: String): Single<Boolean>
 }

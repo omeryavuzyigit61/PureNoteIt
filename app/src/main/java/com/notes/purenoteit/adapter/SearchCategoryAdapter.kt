@@ -6,10 +6,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.databinding.ItemSearchCategoryBinding
 import com.notes.purenoteit.util.GenericDiffUtil
-import com.notes.purenoteit.util.hide
-import com.notes.purenoteit.util.show
+import com.notes.purenoteit.util.NoteAction
+import com.notes.purenoteit.util.onItemClickListener
 
-class SearchCategoryAdapter : RecyclerView.Adapter<SearchCategoryAdapter.ListViewHolder>() {
+class SearchCategoryAdapter(private val listener: onItemClickListener) : RecyclerView.Adapter<SearchCategoryAdapter.ListViewHolder>() {
 
     class ListViewHolder(val binding: ItemSearchCategoryBinding) :
         RecyclerView.ViewHolder(binding.root)
@@ -30,6 +30,9 @@ class SearchCategoryAdapter : RecyclerView.Adapter<SearchCategoryAdapter.ListVie
         val currentItem = itemList[position]
         holder.binding.apply {
             searchCategoryNameTextView.text = currentItem.name
+            root.setOnClickListener {
+                listener.onItemClick(currentItem.id,NoteAction.LIST)
+            }
         }
     }
 
