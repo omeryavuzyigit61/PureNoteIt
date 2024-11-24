@@ -9,6 +9,7 @@ import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.databinding.ItemCategoryBinding
 import com.notes.purenoteit.util.GenericDiffUtil
 import com.notes.purenoteit.util.NoteAction
+import com.notes.purenoteit.util.hide
 import com.notes.purenoteit.util.onItemClickListener
 
 class CategoryAdapter(private val listener: onItemClickListener) :
@@ -29,6 +30,10 @@ class CategoryAdapter(private val listener: onItemClickListener) :
         holder.binding.apply {
             categoryTextView.text = currentItem.name
             Log.i("Ktegoriler", "" + currentItem.name)
+            if (currentItem.name =="Not" || currentItem.name == "Önemli" || currentItem.name == "Günlük") {
+                categoryDeleteImageView.hide()
+                editNameImageView.hide()
+            }
             if (currentItem.isPassword == false) {
                 categoryLockImageView.setImageResource(R.drawable.unlock)
             } else {

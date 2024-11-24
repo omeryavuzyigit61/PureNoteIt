@@ -9,6 +9,9 @@ import android.view.ViewGroup
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import androidx.appcompat.app.ActionBarDrawerToggle
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
@@ -17,6 +20,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import com.notes.purenoteit.R
 import com.notes.purenoteit.adapter.NoteAdapter
+import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.databinding.FragmentHomeBinding
 import com.notes.purenoteit.util.NoteAction
 import com.notes.purenoteit.util.SearchOption
@@ -74,6 +78,14 @@ class HomeFragment : Fragment(), onItemClickListener {
             noteRecyclerView.layoutManager =
                 StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
             noteRecyclerView.adapter = adapter
+        }
+
+        categoryViewModel.areDefaultCategoriesPresent().observe(viewLifecycleOwner) {
+            if (!it) {
+                categoryViewModel.upsert((CategoryData("Not", false)))
+                categoryViewModel.upsert((CategoryData("Önemli", false)))
+                categoryViewModel.upsert((CategoryData("Günlük", false)))
+            }
         }
     }
 
@@ -152,8 +164,10 @@ class HomeFragment : Fragment(), onItemClickListener {
         val dynamicGroupId = 100
         menu?.removeGroup(dynamicGroupId)
         categories.forEach { category ->
-            val newItem = menu?.add(dynamicGroupId, Menu.NONE, Menu.NONE, category)
-            newItem?.setIcon(R.drawable.other)
+            if (category != "Not" && category != "Önemli" && category != "Günlük") {
+                val newItem = menu?.add(dynamicGroupId, Menu.NONE, Menu.NONE, category)
+                newItem?.setIcon(R.drawable.other)
+            }
         }
     }
 
@@ -161,15 +175,13 @@ class HomeFragment : Fragment(), onItemClickListener {
         if (categoryName == "Tümü") {
             viewModel.getAllNotes()
         } else {
-            if (categoryName == "Not" || categoryName == "Günlük" || categoryName == "Günlük") {
-                viewModel.searchNotesByCategory(categoryName)
-            } else {
-                categoryViewModel.isPasswordSet(categoryName).observe(viewLifecycleOwner) {
-                    if (it) {
-                        requireContext().showToastShort("Şifreli")
-                    } else {
+            categoryViewModel.isPasswordSet(categoryName).observe(viewLifecycleOwner) {
+                if (it) {
+                    showBiometricPrompt {
                         viewModel.searchNotesByCategory(categoryName)
                     }
+                } else {
+                    viewModel.searchNotesByCategory(categoryName)
                 }
             }
         }
@@ -306,6 +318,73 @@ class HomeFragment : Fragment(), onItemClickListener {
     }
 
     private fun authenticateWithBiometrics(onSuccess: () -> Unit) {
-        // Biyometrik doğrulama işlemleri
+        val biometricManager = BiometricManager.from(requireContext())
+
+        // Cihazın biyometrik destekleyip desteklemediğini kontrol edin
+        when (biometricManager.canAuthenticate()) {
+            BiometricManager.BIOMETRIC_SUCCESS -> {
+                // Biyometrik destek mevcut
+                showBiometricPrompt(onSuccess)
+            }
+
+            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
+                requireContext().showToastShort("Cihazda biyometrik doğrulama desteklenmiyor")
+            }
+
+            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
+                requireContext().showToastShort("Cihazda biyometrik doğrulama desteklenmiyor")
+            }
+
+            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
+                requireContext().showToastShort("Parmak izi kaydı bulunmuyor")
+            }
+
+            BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED -> {
+                requireContext().showToastShort("Güvenlik güncellemesi yapılması gerekiyor")
+            }
+
+            BiometricManager.BIOMETRIC_ERROR_UNSUPPORTED -> {
+                requireContext().showToastShort("Cihaz biyometrik doğrulamayı desteklemiyor")
+            }
+
+            BiometricManager.BIOMETRIC_STATUS_UNKNOWN -> {
+                requireContext().showToastShort("Biyometrik durum bilinmiyor")
+            }
+        }
+    }
+
+
+    private fun showBiometricPrompt(onSuccess: () -> Unit) {
+        val executor = ContextCompat.getMainExecutor(requireContext())
+
+        // Doğrulama sonucunu dinleyen callback
+        val biometricPrompt =
+            BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    // Doğrulama başarılı olduğunda
+                    onSuccess()
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    requireContext().showToastShort("Doğrulama hatası: $errString")
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    requireContext().showToastShort("Doğrulama başarısız")
+                }
+            })
+
+        // BiometricPrompt penceresini yapılandırın
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Biyometrik Doğrulama")
+            .setSubtitle("Devam etmek için parmak izi doğrulaması yapın")
+            .setNegativeButtonText("İptal")
+            .build()
+
+        // BiometricPrompt'u göster
+        biometricPrompt.authenticate(promptInfo)
     }
 }

@@ -13,7 +13,7 @@ interface CategoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun upsertCategory(category: CategoryData): Completable
 
-    @Query("SELECT * FROM categories")
+    @Query("SELECT * FROM categories ORDER BY name ASC")
     fun getAllCategories(): Single<List<CategoryData>>
 
     @Delete
@@ -30,6 +30,9 @@ interface CategoryDao {
 
     @Query("SELECT COUNT(*) > 0 FROM categories WHERE name = :name")
     fun isCategoryExists(name: String): Single<Boolean>
+
+    @Query("SELECT (SELECT COUNT(*) FROM categories WHERE name IN ('Not', 'Önemli', 'Günlük')) = 3")
+    fun areDefaultCategoriesPresent(): Single<Boolean>
 
     @Query("SELECT isPassword FROM categories WHERE name = :categoryName")
     fun isPasswordSet(categoryName: String): Single<Boolean>

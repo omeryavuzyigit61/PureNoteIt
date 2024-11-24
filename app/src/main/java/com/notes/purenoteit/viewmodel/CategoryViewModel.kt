@@ -116,6 +116,21 @@ class CategoryViewModel @Inject constructor(private val repository: CategoryRepo
         return result
     }
 
+    fun areDefaultCategoriesPresent(): LiveData<Boolean> {
+        val result = MutableLiveData<Boolean>()
+        repository.areDefaultCategoriesPresent()
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({ exists ->
+                result.value = exists
+            }, {
+
+            }).let {
+                compositeDisposable.add(it)
+            }
+        return result
+    }
+
     override fun onCleared() {
         super.onCleared()
         compositeDisposable.clear()
