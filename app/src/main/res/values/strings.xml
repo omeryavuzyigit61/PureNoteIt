@@ -10,4 +10,8 @@
     <string name="tema">Tema</string>
     <string name="category_setting">Kategori Ayarları</string>
     <string name="search_category">Kategori Giriniz</string>
+    <string name="current_password">Mevcut Şifre</string>
+    <string name="new_password">Yeni Şifre</string>
+    <string name="new_repeat_password">Yeni Şifre Tekrar</string>
+    <string name="you_entered_the_current_password_incorrectly">Mevcut Şifreyi Yanlış Girdiniz</string>
 </resources>

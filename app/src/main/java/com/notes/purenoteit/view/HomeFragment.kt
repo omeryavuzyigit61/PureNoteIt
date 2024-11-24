@@ -1,7 +1,10 @@
 package com.notes.purenoteit.view
 
 import android.app.DatePickerDialog
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.View
@@ -101,7 +104,8 @@ class HomeFragment : Fragment(), onItemClickListener {
 
             navigationView.setNavigationItemSelectedListener { menuItem ->
                 when (menuItem.itemId) {
-                    R.id.lock_menu -> { /* İlgili işlem */
+                    R.id.lock_menu -> {
+                        findNavController().navigate(R.id.action_homeFragment_to_passwordSettingFragment)
                     }
 
                     R.id.thema_menu -> { /* İlgili işlem */
@@ -336,7 +340,8 @@ class HomeFragment : Fragment(), onItemClickListener {
             }
 
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                requireContext().showToastShort("Parmak izi kaydı bulunmuyor")
+                // Parmak izi kayıt ekranına yönlendirme
+                openBiometricSetting()
             }
 
             BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED -> {
@@ -376,7 +381,6 @@ class HomeFragment : Fragment(), onItemClickListener {
                     requireContext().showToastShort("Doğrulama başarısız")
                 }
             })
-
         // BiometricPrompt penceresini yapılandırın
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Biyometrik Doğrulama")
@@ -386,5 +390,17 @@ class HomeFragment : Fragment(), onItemClickListener {
 
         // BiometricPrompt'u göster
         biometricPrompt.authenticate(promptInfo)
+    }
+
+    private fun openBiometricSetting(){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            activity?.startActivity(Intent(Settings.ACTION_BIOMETRIC_ENROLL))
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                activity?.startActivity(Intent(Settings.ACTION_FINGERPRINT_ENROLL))
+            } else {
+                activity?.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+            }
+        }
     }
 }

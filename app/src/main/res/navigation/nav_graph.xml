@@ -15,6 +15,9 @@
         <action
             android:id="@+id/action_homeFragment_to_categorySettingFragment"
             app:destination="@id/categorySettingFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_passwordSettingFragment"
+            app:destination="@id/passwordSettingFragment" />
     </fragment>
     <fragment
         android:id="@+id/addFragment"
@@ -35,4 +38,9 @@
         android:name="com.notes.purenoteit.view.CategorySettingFragment"
         android:label="fragment_category_setting"
         tools:layout="@layout/fragment_category_setting" />
+    <fragment
+        android:id="@+id/passwordSettingFragment"
+        android:name="com.notes.purenoteit.view.PasswordSettingFragment"
+        android:label="fragment_password_setting"
+        tools:layout="@layout/fragment_password_setting" />
 </navigation>
