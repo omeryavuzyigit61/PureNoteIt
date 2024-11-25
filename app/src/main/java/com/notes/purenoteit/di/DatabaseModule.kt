@@ -18,6 +18,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): NoteDatabase =
         Room.databaseBuilder(context, NoteDatabase::class.java, "notes").build()
+
     @Provides
     @Singleton
     fun provideDao(db: NoteDatabase) = db.getNoteDao()

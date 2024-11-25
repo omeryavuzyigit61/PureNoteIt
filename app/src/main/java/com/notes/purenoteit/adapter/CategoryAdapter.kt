@@ -11,6 +11,7 @@ import com.notes.purenoteit.util.GenericDiffUtil
 import com.notes.purenoteit.util.NoteAction
 import com.notes.purenoteit.util.hide
 import com.notes.purenoteit.util.onItemClickListener
+import com.notes.purenoteit.util.show
 
 class CategoryAdapter(private val listener: onItemClickListener) :
     RecyclerView.Adapter<CategoryAdapter.ListViewHolder>() {
@@ -30,9 +31,12 @@ class CategoryAdapter(private val listener: onItemClickListener) :
         holder.binding.apply {
             categoryTextView.text = currentItem.name
             Log.i("Ktegoriler", "" + currentItem.name)
-            if (currentItem.name =="Not" || currentItem.name == "Önemli" || currentItem.name == "Günlük") {
+            if (currentItem.name == "Not" || currentItem.name == "Önemli" || currentItem.name == "Günlük") {
                 categoryDeleteImageView.hide()
                 editNameImageView.hide()
+            } else {
+                categoryDeleteImageView.show()
+                editNameImageView.show()
             }
             if (currentItem.isPassword == false) {
                 categoryLockImageView.setImageResource(R.drawable.unlock)

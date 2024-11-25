@@ -80,7 +80,7 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
 
     override fun onItemClick(position: Int, action: NoteAction, isPassword: Boolean?) {
         when (action) {
-            NoteAction.DELETE -> categoryViewModel.deleteNoteById(position)
+            NoteAction.DELETE -> categoryViewModel.deleteCategoryById(position)
             NoteAction.EDIT -> showCategoryDialog(isEdit = true, position = position)
             NoteAction.LOCK -> handleLockAction(position)
             NoteAction.LIST -> {}
@@ -90,10 +90,10 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
     private fun handleLockAction(position: Int) {
         categoryViewModel.getNoteById(position).subscribe { data ->
             if (data.isPassword == false) {
-                showPasswordDialog(position, data)
+                showPasswordDialog(data)
             } else {
                 data.isPassword = false
-                categoryViewModel.upsert(data)
+                categoryViewModel.update(data)
             }
         }.also { compositeDisposable.add(it) }
     }
@@ -133,7 +133,7 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
         dialog.show()
     }
 
-    private fun showPasswordDialog(position: Int, data: CategoryData) {
+    private fun showPasswordDialog(data: CategoryData) {
         val dialog = Dialog(requireContext()).apply {
             val dialogBinding = CustomPasswordDialogBinding.inflate(layoutInflater)
             setContentView(dialogBinding.root)
@@ -167,7 +167,7 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
             requireContext().showToastShort("Lütfen kategori giriniz")
         } else {
             data.name = name
-            categoryViewModel.upsert(data)
+            categoryViewModel.update(data)
             dialog.dismiss()
         }
     }
@@ -186,7 +186,7 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
             }
             else -> requireContext().showToastShort("Yanlış Şifre")
         }
-        categoryViewModel.upsert(data)
+        categoryViewModel.update(data)
     }
 
     override fun onDestroy() {

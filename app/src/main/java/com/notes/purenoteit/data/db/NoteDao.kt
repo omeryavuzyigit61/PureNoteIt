@@ -12,20 +12,41 @@ import io.reactivex.Single
 @Dao
 interface NoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun upsert (note: NoteData): Completable
+    fun upsert(note: NoteData): Completable
+
     @Delete
-    fun delete (note: NoteData): Completable
-    @Query("SELECT * FROM notes")
+    fun delete(note: NoteData): Completable
+
+    @Query(
+        """
+    SELECT notes.*
+    FROM notes
+    LEFT JOIN categories ON notes.categoryId = categories.id
+    WHERE categories.isPassword IS NULL OR categories.isPassword = 0
+"""
+    )
     fun getNotes(): Single<List<NoteData>>
-    //(title LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%') AND isPassword = 0"
-    @Query("SELECT * FROM notes WHERE title LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%'")
-    fun searchNote(query:String): Flowable<List<NoteData>> //Flowable veriyi sürekli dinler(büyük veri setleri için)
+
+    @Query(
+        """
+    SELECT notes.*
+    FROM notes
+    LEFT JOIN categories ON notes.categoryId = categories.id
+    WHERE (categories.isPassword IS NULL OR categories.isPassword = 0)
+      AND (notes.title LIKE '%' || :query || '%' OR notes.description LIKE '%' || :query || '%')
+    """
+    )
+    fun searchNote(query: String): Flowable<List<NoteData>>
+
     @Query("SELECT * FROM notes WHERE id = :id")
-    fun getNoteById(id:Int): Single<NoteData>
+    fun getNoteById(id: Int): Single<NoteData>
+
     @Query("DELETE FROM notes WHERE id = :id")
-    fun deleteNoteById(id:Int): Completable
+    fun deleteNoteById(id: Int): Completable
+
     @Query("SELECT * FROM notes WHERE date BETWEEN :startDate AND :endDate")
     fun getNotesBetweenDates(startDate: Long, endDate: Long): Single<List<NoteData>>
+
     @Query("SELECT * FROM notes WHERE LOWER(category) = LOWER(:category)")
     fun searchByCategory(category: String): Single<List<NoteData>>
 }

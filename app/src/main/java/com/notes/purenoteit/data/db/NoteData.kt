@@ -11,7 +11,7 @@ import java.io.Serializable
         entity = CategoryData::class,
         parentColumns = ["id"],
         childColumns = ["categoryId"],
-        onDelete = ForeignKey.CASCADE
+        onDelete = ForeignKey.CASCADE,
     )])
 data class NoteData(
     @ColumnInfo(name = "title")

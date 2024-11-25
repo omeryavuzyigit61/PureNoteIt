@@ -5,7 +5,6 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.notes.purenoteit.data.db.CategoryData
-import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.repository.CategoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.reactivex.Single
@@ -46,6 +45,17 @@ class CategoryViewModel @Inject constructor(private val repository: CategoryRepo
 
     }
 
+    fun update(item: CategoryData) {
+        repository.categoryUpdate(item).subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread()).subscribe({
+                getAllCategories()
+            }, {
+
+            }).let {
+                compositeDisposable.add(it)
+            }
+    }
+
     fun delete(item: CategoryData) {
         repository.categoryDelete(item).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
@@ -57,8 +67,8 @@ class CategoryViewModel @Inject constructor(private val repository: CategoryRepo
             }
     }
 
-    fun deleteNoteById(id: Int) {
-        repository.deleteNoteById(id).subscribeOn(Schedulers.io())
+    fun deleteCategoryById(id: Int) {
+        repository.deleteCategoryById(id).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllCategories()
                 Log.i("NoteViewModel", "Note deleted successfully")
@@ -125,6 +135,21 @@ class CategoryViewModel @Inject constructor(private val repository: CategoryRepo
                 result.value = exists
             }, {
 
+            }).let {
+                compositeDisposable.add(it)
+            }
+        return result
+    }
+
+    fun getCategoryIdByName(categoryName: String): LiveData<Int> {
+        val result = MutableLiveData<Int>()
+        repository.getCategoryIdByName(categoryName)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({ id ->
+                result.value = id
+            }, { error ->
+                Log.e("CategoryViewModel", "Error fetching category id: $error")
             }).let {
                 compositeDisposable.add(it)
             }

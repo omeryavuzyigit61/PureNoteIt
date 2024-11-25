@@ -200,31 +200,35 @@ class AddFragment : Fragment(), onItemClickListener {
         if (binding.topMenuConstraintLayout.visibility == View.VISIBLE) {
             requireContext().showToastShort("Lütfen önce kategoriyi onaylıyınız")
         } else {
-            if (binding.titleEditText.text.isNotEmpty() && binding.descriptionEditText.text.isNotEmpty()) {
-                val note = NoteData(
-                    title = binding.titleEditText.text.toString(),
-                    description = binding.descriptionEditText.text.toString(),
-                    date = System.currentTimeMillis(),
-                    category = checkedCategory,
-                    images = imageUriList,
-                    isPassword = isPassword
-                )
-                if (noteData == null) {
-                    viewModel.upsert(note)
-                } else {
-                    noteData?.apply {
-                        title = note.title
-                        description = note.description
-                        date = note.date
-                        category = note.category
-                        images = note.images
-                        isPassword = note.isPassword
+            categoryViewModel.getCategoryIdByName(checkedCategory).observe(viewLifecycleOwner){
+                if (binding.titleEditText.text.isNotEmpty() && binding.descriptionEditText.text.isNotEmpty()) {
+                    val note = NoteData(
+                        title = binding.titleEditText.text.toString(),
+                        description = binding.descriptionEditText.text.toString(),
+                        date = System.currentTimeMillis(),
+                        category = checkedCategory,
+                        images = imageUriList,
+                        isPassword = isPassword,
+                        categoryId = it
+                    )
+                    if (noteData == null) {
+                        viewModel.upsert(note)
+                    } else {
+                        noteData?.apply {
+                            title = note.title
+                            description = note.description
+                            date = note.date
+                            category = note.category
+                            images = note.images
+                            isPassword = note.isPassword
+                            categoryId = note.categoryId
+                        }
+                        viewModel.upsert(noteData!!)
                     }
-                    viewModel.upsert(noteData!!)
+                    findNavController().navigateUp()
+                } else {
+                    requireContext().showToastShort("Başlık ve açıklama alanlarını doldurunuz")
                 }
-                findNavController().navigateUp()
-            } else {
-                requireContext().showToastShort("Başlık ve açıklama alanlarını doldurunuz")
             }
         }
     }

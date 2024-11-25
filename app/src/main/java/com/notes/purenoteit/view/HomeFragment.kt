@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.View
@@ -153,12 +154,14 @@ class HomeFragment : Fragment(), onItemClickListener {
         }
 
         categoryViewModel.categoryList.observe(viewLifecycleOwner) { categories ->
+            Log.i("categorydata", "" + categories)
             populateMenuWithCategories(categories.map { it.name })
         }
         categoryViewModel.getAllCategories()
 
         viewModel.noteList.observe(viewLifecycleOwner) { notes ->
             adapter.submitList(notes.toMutableList())
+            Log.i("notedata", "" + notes)
         }
         viewModel.getAllNotes()
     }
@@ -392,7 +395,7 @@ class HomeFragment : Fragment(), onItemClickListener {
         biometricPrompt.authenticate(promptInfo)
     }
 
-    private fun openBiometricSetting(){
+    private fun openBiometricSetting() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             activity?.startActivity(Intent(Settings.ACTION_BIOMETRIC_ENROLL))
         } else {
