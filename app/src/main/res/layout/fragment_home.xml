@@ -3,9 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mainDrawerLayout"
+    style="@style/BackgroundScreen"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_color"
     tools:context=".view.HomeFragment">
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -28,33 +28,33 @@
 
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/floatingActionButton"
+            style="@style/FloatingButtonStyle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="16dp"
-            app:backgroundTint="@color/gray"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:maxImageSize="26dp"
-            app:srcCompat="@drawable/curveplus"
-            app:tint="@color/white" />
+            app:srcCompat="@drawable/curveplus" />
 
         <ImageView
             android:id="@+id/mainMenuImageView"
+            style="@style/CornerButton"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_marginStart="8dp"
-            android:src="@drawable/apps_add"
+            android:background="@drawable/white_background"
             android:padding="10dp"
+            android:src="@drawable/apps_add"
             app:layout_constraintBottom_toBottomOf="@+id/searchEditText"
             app:layout_constraintStart_toStartOf="parent"
-            android:background="@drawable/white_background"
-            app:tint="@color/gray"
             app:layout_constraintTop_toTopOf="@+id/searchEditText" />
 
         <EditText
             android:id="@+id/searchEditText"
+            style="@style/SearchScreen"
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_marginStart="5dp"
@@ -73,6 +73,7 @@
 
         <ImageView
             android:id="@+id/searchMenuImageView"
+            style="@style/CornerButton"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_marginEnd="16dp"
@@ -81,11 +82,11 @@
             android:src="@drawable/detail_search"
             app:layout_constraintBottom_toBottomOf="@+id/searchEditText"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/searchEditText"
-            app:tint="@color/gray" />
+            app:layout_constraintTop_toTopOf="@+id/searchEditText" />
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/searchMenuConstraintLayout"
+            style="@style/TopMenuScreen"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
@@ -140,6 +141,7 @@
                 android:background="@drawable/category_edit_text_background"
                 android:ems="10"
                 android:hint="Kategori Giriniz"
+                style="@style/SearchScreen"
                 android:inputType="text"
                 android:padding="8dp"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -174,11 +176,11 @@
 
                     <TextView
                         android:id="@+id/startDateSelectTextView"
+                        style="@style/TextColor"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
                         android:text="Tarih Seçiniz"
-                        android:textColor="@color/black"
                         app:layout_constraintBottom_toBottomOf="parent"
                         app:layout_constraintStart_toEndOf="@+id/startDateSelectImageView"
                         app:layout_constraintTop_toTopOf="@+id/startDateSelectImageView" />
@@ -201,11 +203,11 @@
 
                     <TextView
                         android:id="@+id/endDateSelectTextView"
+                        style="@style/TextColor"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
                         android:text="Tarih Seçiniz"
-                        android:textColor="@color/black"
                         app:layout_constraintBottom_toBottomOf="parent"
                         app:layout_constraintStart_toEndOf="@+id/endDateSelectImageView"
                         app:layout_constraintTop_toTopOf="@+id/endDateSelectImageView" />
@@ -215,6 +217,7 @@
 
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/searchClearButton"
+                style="@style/ConfirmButton"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
@@ -227,6 +230,7 @@
 
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/searchConfirmButton"
+                style="@style/ConfirmButton"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
@@ -241,11 +245,11 @@
 
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/navigationView"
+        style="@style/DrawerMenu"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:fitsSystemWindows="true"
-        app:itemIconTint="@color/gray"
         app:menu="@menu/drawer_menu" />
 
 </androidx.drawerlayout.widget.DrawerLayout>

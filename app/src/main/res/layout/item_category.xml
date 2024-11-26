@@ -5,6 +5,7 @@
     android:layout_marginTop="8dp"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    style="@style/noteScreen"
     android:background="@drawable/search_background">
 
     <TextView
@@ -16,7 +17,7 @@
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="12dp"
         android:text=""
-        android:textColor="@color/black"
+        style="@style/TextColor"
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/editNameImageView"
@@ -29,6 +30,7 @@
         android:layout_height="24dp"
         android:layout_marginEnd="16dp"
         android:src="@drawable/delete"
+        style="@style/allTint"
         app:layout_constraintBottom_toBottomOf="@+id/categoryLockImageView"
         app:layout_constraintEnd_toStartOf="@+id/categoryLockImageView"
         app:layout_constraintTop_toTopOf="@+id/categoryLockImageView"
@@ -39,6 +41,7 @@
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:layout_marginEnd="8dp"
+        style="@style/allTint"
         app:layout_constraintBottom_toBottomOf="@+id/categoryTextView"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@+id/categoryTextView" />
@@ -48,6 +51,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
+        style="@style/allTint"
         app:layout_constraintBottom_toBottomOf="@+id/categoryDeleteImageView"
         app:layout_constraintEnd_toStartOf="@+id/categoryDeleteImageView"
         app:layout_constraintTop_toTopOf="@+id/categoryDeleteImageView"

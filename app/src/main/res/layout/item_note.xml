@@ -5,6 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/custom_note_item"
+    style="@style/noteScreen"
     android:layout_marginBottom="8dp"
     android:layout_marginEnd="8dp">
 
@@ -25,7 +26,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:textColor="@color/black"
+            style="@style/TextColor"
             android:textStyle="bold"
             app:layout_constraintEnd_toStartOf="@+id/menuImageButton"
             app:layout_constraintStart_toStartOf="parent"
@@ -37,7 +38,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:maxLines="4"
-            android:textColor="@color/black"
+            style="@style/TextColor"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="@+id/titleTextView"
             app:layout_constraintTop_toBottomOf="@+id/titleTextView" />
@@ -50,7 +51,8 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:srcCompat="@drawable/menu"
-            app:tint="@color/gray" />
+            style="@style/allTint"
+             />
 
         <TextView
             android:id="@+id/dateTextView"
@@ -69,7 +71,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:tint="@color/gray"
+            style="@style/allTint"
             app:srcCompat="@drawable/lock" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
@@ -81,7 +83,7 @@
         app:layout_constraintStart_toStartOf="parent"
         android:padding="7dp"
         android:background="@drawable/category_background"
-        app:tint="@color/white"
+        style="@style/NoteCategoryStyle"
         app:layout_constraintTop_toTopOf="parent"
         app:srcCompat="@drawable/note" />
 </androidx.constraintlayout.widget.ConstraintLayout>

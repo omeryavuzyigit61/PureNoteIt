@@ -4,6 +4,8 @@ import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.LayoutInflater
@@ -13,6 +15,8 @@ import android.view.ViewGroup
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import androidx.appcompat.app.ActionBarDrawerToggle
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.widget.SwitchCompat
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -28,6 +32,7 @@ import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.databinding.FragmentHomeBinding
 import com.notes.purenoteit.util.NoteAction
 import com.notes.purenoteit.util.SearchOption
+import com.notes.purenoteit.util.SharedPrefencesUtil
 import com.notes.purenoteit.util.formatDate
 import com.notes.purenoteit.util.hide
 import com.notes.purenoteit.util.onItemClickListener
@@ -76,9 +81,22 @@ class HomeFragment : Fragment(), onItemClickListener {
                 R.string.open,
                 R.string.close
             )
+            val drawerSwitch: SwitchCompat =
+                navigationView.menu.findItem(R.id.thema_menu).actionView as SwitchCompat
+            drawerSwitch.setOnCheckedChangeListener { _, isChecked ->
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (isChecked) {
+                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                        setDarkAndLightTheme(true)
+                    } else {
+                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                        setDarkAndLightTheme(false)
+                    }
+                }, 500)
+            }
+            getDarkAndLightMode(drawerSwitch)
             mainDrawerLayout.addDrawerListener(toggle)
             toggle.syncState()
-
             noteRecyclerView.layoutManager =
                 StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
             noteRecyclerView.adapter = adapter
@@ -90,6 +108,21 @@ class HomeFragment : Fragment(), onItemClickListener {
                 categoryViewModel.upsert((CategoryData("Önemli", false)))
                 categoryViewModel.upsert((CategoryData("Günlük", false)))
             }
+        }
+    }
+
+    private fun getDarkAndLightMode(drawerSwitch: SwitchCompat) {
+        val prefs = SharedPrefencesUtil(requireContext())
+        val thema = prefs.getLocal("night", Boolean)
+        drawerSwitch.isChecked = thema == true
+    }
+
+    private fun setDarkAndLightTheme(b: Boolean) {
+        val prefs = SharedPrefencesUtil(requireContext())
+        if (b) {
+            prefs.addLocal("night", true)
+        } else {
+            prefs.addLocal("night", false)
         }
     }
 
@@ -406,9 +439,11 @@ class HomeFragment : Fragment(), onItemClickListener {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
                 Intent(Settings.ACTION_BIOMETRIC_ENROLL)
             }
+
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
                 Intent(Settings.ACTION_FINGERPRINT_ENROLL)
             }
+
             else -> {
                 Intent(Settings.ACTION_SECURITY_SETTINGS)
             }
