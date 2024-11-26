@@ -16,7 +16,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.animation.AnimationUtils
 import android.widget.Toast
-import androidx.core.app.ActivityCompat
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
@@ -73,9 +73,6 @@ class AddFragment : Fragment(), onItemClickListener {
         )
     }
 
-    private val PICK_IMAGE_REQUEST = 101
-    private val SPEECH_REQUEST_CODE = 102
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -98,13 +95,16 @@ class AddFragment : Fragment(), onItemClickListener {
                 noteData = note
                 binding.apply {
                     binding.constraintLayout.show()
-                    binding.confirmButton.text = " Kaydet"
+                    binding.confirmButton.text = getString(R.string.save)
                     titleEditText.setText(note.title)
                     descriptionEditText.setText(note.description)
-                    categorySearchView.customCategoryEditText.setText(note.category)
+                    val disposable = categoryViewModel.getCategoryById(note.categoryId!!).subscribe { data ->
+                        binding.categorySearchView.customCategoryEditText.setText(data.name)
+                        checkedCategory = data.name
+                    }
+                    compositeDisposable.add(disposable)
                     isPassword = note.isPassword ?: false
                     imageUriList = note.images!!.toMutableList()
-                    checkedCategory = note.category.toString()
                 }
                 imageAdapter.setData(imageUriList)
             }
@@ -153,14 +153,14 @@ class AddFragment : Fragment(), onItemClickListener {
         binding.apply {
             noteRadioButton.isChecked = true
             if (noteData != null) {
-                when (noteData?.category) {
-                    "Not" -> radioGroup.check(noteRadioButton.id)
-                    "Önemli" -> {
+                when (noteData?.categoryId) {
+                    1 -> radioGroup.check(noteRadioButton.id)
+                    2 -> radioGroup.check(diaryRadioButton.id)
+                    3 -> {
                         radioGroup.check(importantRadioButton.id)
                     }
 
-                    "Günlük" -> radioGroup.check(diaryRadioButton.id)
-                    else -> radioGroup.check(otherRadiButton.id) // Diğer tüm durumlarda 4. seçeneği aktif et
+                    else -> radioGroup.check(otherRadiButton.id)
                 }
             }
             setAnimation(clicked)
@@ -206,7 +206,6 @@ class AddFragment : Fragment(), onItemClickListener {
                         title = binding.titleEditText.text.toString(),
                         description = binding.descriptionEditText.text.toString(),
                         date = System.currentTimeMillis(),
-                        category = checkedCategory,
                         images = imageUriList,
                         isPassword = isPassword,
                         categoryId = it
@@ -218,7 +217,6 @@ class AddFragment : Fragment(), onItemClickListener {
                             title = note.title
                             description = note.description
                             date = note.date
-                            category = note.category
                             images = note.images
                             isPassword = note.isPassword
                             categoryId = note.categoryId
@@ -236,13 +234,13 @@ class AddFragment : Fragment(), onItemClickListener {
     private fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(
                 requireContext(), Manifest.permission.READ_EXTERNAL_STORAGE
-            ) != PackageManager.PERMISSION_GRANTED
+            ) == PackageManager.PERMISSION_GRANTED
         ) {
-            ActivityCompat.requestPermissions(
-                requireActivity(), arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_CODE
-            )
+            // İzin zaten verilmiş, galeriyi aç
+            openGallery()
         } else {
-            openGallery() // İzin varsa galeriyi aç
+            // İzin verilmemiş, izin iste
+            requestPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
     }
 
@@ -256,13 +254,40 @@ class AddFragment : Fragment(), onItemClickListener {
         }
 
         try {
-            startActivityForResult(intent, SPEECH_REQUEST_CODE)
+            speechRecognizerLauncher.launch(intent)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(
                 requireContext(), "Cihazınızda ses tanıma desteklenmiyor", Toast.LENGTH_SHORT
             ).show()
         }
     }
+
+    private val speechRecognizerLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                matches?.let {
+                    val recognizedText = it[0] // Tanınan ilk metin sonucu
+                    when {
+                        binding.titleEditText.hasFocus() -> {
+                            // editText1 odakta, değeri ekle
+                            binding.titleEditText.append(recognizedText)
+                        }
+
+                        binding.descriptionEditText.hasFocus() -> {
+                            // editText2 odakta, değeri ekle
+                            binding.descriptionEditText.append(recognizedText)
+                        }
+
+                        else -> {
+                            binding.titleEditText.append(recognizedText)
+                        }
+                    }
+                }
+            } else {
+                Toast.makeText(requireContext(), "Ses tanıma başarısız oldu", Toast.LENGTH_SHORT).show()
+            }
+        }
 
     private fun handleSecurity() {
         if (!isPassword) {
@@ -277,62 +302,32 @@ class AddFragment : Fragment(), onItemClickListener {
         val intent = Intent(Intent.ACTION_PICK).apply {
             type = "image/*"
         }
-        startActivityForResult(intent, PICK_IMAGE_REQUEST)
+        pickImageLauncher.launch(intent)
     }
 
     private var imageUriList = mutableListOf<String>()
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        when (requestCode) {
-            PICK_IMAGE_REQUEST -> {
-                if (resultCode == Activity.RESULT_OK && data != null) {
-                    val imageUri = data.data
-                    imageUri?.let {
-                        imageUriList.add(it.toString())
-                        binding.constraintLayout.show()
-                        imageAdapter.setData(imageUriList)
-                    }
-                }
-            }
-
-            SPEECH_REQUEST_CODE -> {
-                if (resultCode == Activity.RESULT_OK && data != null) {
-                    val results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                    val spokenText = results?.get(0) ?: ""
-                    when {
-                        binding.titleEditText.hasFocus() -> {
-                            // editText1 odakta, değeri ekle
-                            binding.titleEditText.append(spokenText)
-                        }
-
-                        binding.descriptionEditText.hasFocus() -> {
-                            // editText2 odakta, değeri ekle
-                            binding.descriptionEditText.append(spokenText)
-                        }
-
-                        else -> {
-                            binding.titleEditText.append(spokenText)
-                        }
-                    }
+    private val pickImageLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                val imageUri = result.data?.data
+                imageUri?.let {
+                    imageUriList.add(it.toString())
+                    binding.constraintLayout.show()
+                    imageAdapter.setData(imageUriList)
                 }
             }
         }
-    }
 
-    private var REQUEST_CODE = 100
-    override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                openGallery()
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                openGallery()  // İzin verildiyse galeriyi aç
             } else {
-                // İzin verilmedi
-
+                // İzin verilmedi, kullanıcıya bildirim
+                requireContext().showToastShort("İzin verilmedi")
             }
         }
-    }
 
     private fun setAnimation(clicked: Boolean) {
         if (!clicked) {
@@ -364,7 +359,7 @@ class AddFragment : Fragment(), onItemClickListener {
             }
 
             NoteAction.LIST -> {
-                val disposable = categoryViewModel.getNoteById(position).subscribe { data ->
+                val disposable = categoryViewModel.getCategoryById(position).subscribe { data ->
                     binding.categorySearchView.customCategoryEditText.setText(data.name)
                 }
                 //toggleCategoryMenu()

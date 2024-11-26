@@ -90,8 +90,8 @@ class CategoryViewModel @Inject constructor(private val repository: CategoryRepo
             }
     }
 
-    fun getNoteById(id: Int): Single<CategoryData> {
-        return repository.getNoteById(id).subscribeOn(Schedulers.io())
+    fun getCategoryById(id: Int): Single<CategoryData> {
+        return repository.getCategoryById(id).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
     }
 

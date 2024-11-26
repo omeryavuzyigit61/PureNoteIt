@@ -77,8 +77,8 @@ class NoteViewModel @Inject constructor(private val repository: NoteRepository) 
             }
     }
 
-    fun searchNotesByCategory(category: String) {
-        repository.searchByCategory(category).subscribeOn(Schedulers.io())
+    fun searchNotesByCategory(categoryName: String) {
+        repository.getNotesByCategory(categoryName).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({ notes ->
                 _noteList.value = notes
             }, { error ->

@@ -18,8 +18,6 @@ data class NoteData(
     var title: String? = null,
     @ColumnInfo(name = "description")
     var description: String? = null,
-    @ColumnInfo(name = "category")
-    var category: String? = null,
     @ColumnInfo(name = "date")
     var date: Long,
     @ColumnInfo(name = "isPassword")

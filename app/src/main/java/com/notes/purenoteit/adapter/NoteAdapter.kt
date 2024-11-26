@@ -48,21 +48,8 @@ class NoteAdapter(private val listener: onItemClickListener) :
             noteMenuConstraintLayout.setOnClickListener {
                 listener.onItemClick(currentItem.id, NoteAction.EDIT, currentItem.isPassword)
             }
-            when (currentItem.category) {
-                "Not" -> {
-                    imageView3.setImageResource(R.drawable.note)
-                }
 
-                "Günlük" -> {
-                    imageView3.setImageResource(R.drawable.diary)
-                }
-
-                "Önemli" -> {
-                    imageView3.setImageResource(R.drawable.important)
-                }
-
-                else -> imageView3.setImageResource(R.drawable.other)
-            }
+            imageView3.setImageResource(getIconForCategory(currentItem.categoryId))
         }
     }
 
@@ -121,5 +108,14 @@ class NoteAdapter(private val listener: onItemClickListener) :
         itemList.clear()
         itemList.addAll(newList)
         diffResult.dispatchUpdatesTo(this)
+    }
+
+    private fun getIconForCategory(categoryId: Int?): Int {
+        return when (categoryId) {
+            1 -> R.drawable.note
+            2 -> R.drawable.diary
+            3 -> R.drawable.important
+            else -> R.drawable.other
+        }
     }
 }

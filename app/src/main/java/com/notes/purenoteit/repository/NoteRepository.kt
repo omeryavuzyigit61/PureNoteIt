@@ -12,5 +12,5 @@ class NoteRepository @Inject constructor(private val noteDao: NoteDao) {
     fun getNoteById(id: Int) = noteDao.getNoteById(id)
     fun deleteNoteById(id: Int) = noteDao.deleteNoteById(id)
     fun getNotesBetweenDates(startDate: Long, endDate: Long) = noteDao.getNotesBetweenDates(startDate, endDate)
-    fun searchByCategory(category: String) = noteDao.searchByCategory(category)
+    fun getNotesByCategory(categoryName: String) = noteDao.getNotesByCategory(categoryName)
 }

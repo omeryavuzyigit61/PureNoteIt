@@ -47,6 +47,13 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE date BETWEEN :startDate AND :endDate")
     fun getNotesBetweenDates(startDate: Long, endDate: Long): Single<List<NoteData>>
 
-    @Query("SELECT * FROM notes WHERE LOWER(category) = LOWER(:category)")
-    fun searchByCategory(category: String): Single<List<NoteData>>
+    @Query(
+        """
+    SELECT notes.*
+    FROM notes
+    INNER JOIN categories ON notes.categoryId = categories.id
+    WHERE categories.name = :categoryName
+    """
+    )
+    fun getNotesByCategory(categoryName: String): Flowable<List<NoteData>>
 }

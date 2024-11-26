@@ -11,7 +11,7 @@ class CategoryRepository @Inject constructor(private val categoryDao: CategoryDa
     fun getAllCategories() = categoryDao.getAllCategories()
     fun deleteCategoryById(id: Int) = categoryDao.deleteCategoryById(id)
     fun searchCategory(query: String) = categoryDao.searchCategory(query)
-    fun getNoteById(id: Int) = categoryDao.getNoteById(id)
+    fun getCategoryById(id: Int) = categoryDao.getCategoryById(id)
     fun isCategoryExists(name: String) = categoryDao.isCategoryExists(name)
     fun isPasswordSet(categoryName: String) = categoryDao.isPasswordSet(categoryName)
     fun areDefaultCategoriesPresent() = categoryDao.areDefaultCategoriesPresent()

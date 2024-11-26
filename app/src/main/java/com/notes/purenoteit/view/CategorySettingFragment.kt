@@ -88,7 +88,7 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
     }
 
     private fun handleLockAction(position: Int) {
-        categoryViewModel.getNoteById(position).subscribe { data ->
+        categoryViewModel.getCategoryById(position).subscribe { data ->
             if (data.isPassword == false) {
                 showPasswordDialog(data)
             } else {
@@ -109,7 +109,7 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
 
                 position?.let { pos ->
                     if (isEdit) {
-                        categoryViewModel.getNoteById(pos).subscribe { data ->
+                        categoryViewModel.getCategoryById(pos).subscribe { data ->
                             categoryEditText.setText(data.name)
                             confirmCategoryButton.setOnClickListener {
                                 updateCategory(data, categoryEditText.text.toString(),dialog)

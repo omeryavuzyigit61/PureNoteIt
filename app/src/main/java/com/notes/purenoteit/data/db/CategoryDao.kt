@@ -30,7 +30,7 @@ interface CategoryDao {
     fun searchCategory(query: String): Single<List<CategoryData>>
 
     @Query("SELECT * FROM categories WHERE id = :id")
-    fun getNoteById(id: Int): Single<CategoryData>
+    fun getCategoryById(id: Int): Single<CategoryData>
 
     @Query("SELECT COUNT(*) > 0 FROM categories WHERE name = :name")
     fun isCategoryExists(name: String): Single<Boolean>
