@@ -44,7 +44,14 @@ interface NoteDao {
     @Query("DELETE FROM notes WHERE id = :id")
     fun deleteNoteById(id: Int): Completable
 
-    @Query("SELECT * FROM notes WHERE date BETWEEN :startDate AND :endDate")
+    @Query("""
+    SELECT notes.*
+    FROM notes
+    LEFT JOIN categories ON notes.categoryId = categories.id
+    WHERE (categories.isPassword IS NULL OR categories.isPassword = 0)
+      AND (notes.date BETWEEN :startDate AND :endDate)
+    """
+    )
     fun getNotesBetweenDates(startDate: Long, endDate: Long): Single<List<NoteData>>
 
     @Query(

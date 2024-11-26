@@ -121,6 +121,7 @@ class AddFragment : Fragment(), onItemClickListener {
                 LinearLayoutManager(requireContext())
             categorySearchView.customCategoryRecyclerView.adapter = categoryAdapter
 
+            categoryViewModel.categoryList.removeObservers(viewLifecycleOwner)
             categoryViewModel.categoryList.observe(viewLifecycleOwner) {
                 categoryAdapter.submitList(it.toMutableList())
             }
@@ -179,6 +180,7 @@ class AddFragment : Fragment(), onItemClickListener {
                         requireContext().showToastShort("Lütfen bir kategori adı giriniz")
                         return
                     }
+                    categoryViewModel.isCategoryExists(customCategory).removeObservers(viewLifecycleOwner)
                     categoryViewModel.isCategoryExists(customCategory)
                         .observe(viewLifecycleOwner) { isExists ->
                             if (!isExists) {
@@ -200,6 +202,7 @@ class AddFragment : Fragment(), onItemClickListener {
         if (binding.topMenuConstraintLayout.visibility == View.VISIBLE) {
             requireContext().showToastShort("Lütfen önce kategoriyi onaylıyınız")
         } else {
+            categoryViewModel.getCategoryIdByName(checkedCategory).removeObservers(viewLifecycleOwner)
             categoryViewModel.getCategoryIdByName(checkedCategory).observe(viewLifecycleOwner){
                 if (binding.titleEditText.text.isNotEmpty() && binding.descriptionEditText.text.isNotEmpty()) {
                     val note = NoteData(
