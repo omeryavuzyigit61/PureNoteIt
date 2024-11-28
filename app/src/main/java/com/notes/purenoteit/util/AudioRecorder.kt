@@ -3,9 +3,9 @@ package com.notes.purenoteit.util
 import android.content.Context
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.util.Log
 import com.notes.purenoteit.R
 import com.notes.purenoteit.databinding.CustomSaveDialogBinding
-import com.notes.purenoteit.databinding.FragmentAddBinding
 import java.io.File
 
 class AudioRecorder(private val context: Context) {
@@ -88,18 +88,21 @@ class AudioRecorder(private val context: Context) {
     fun deleteRecording(filePath: String): Boolean {
         return try {
             val file = File(filePath)
-            if (file.exists()) {
-                file.delete()
+            if (file.exists() && file.delete()) {
+                Log.i("AudioRecorder", "Dosya başarıyla silindi: $filePath")
+                true
             } else {
+                Log.e("AudioRecorder", "Dosya silinemedi: $filePath")
                 false
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            Log.e("AudioRecorder", "Dosya silme sırasında hata oluştu: ${e.message}")
             false
         }
     }
 
-    fun cancelRecording(dialogBinding: CustomSaveDialogBinding, binding: FragmentAddBinding) {
+    fun cancelRecording(dialogBinding: CustomSaveDialogBinding) {
         if (mediaRecorder == null) {
             context.showToastShort("Şu anda aktif bir kayıt yok!")
             return
@@ -128,9 +131,5 @@ class AudioRecorder(private val context: Context) {
             e.printStackTrace()
             context.showToastShort("Ses kaydı iptal edilemedi: ${e.message}")
         }
-    }
-
-    fun getLastRecordingPath(): String? {
-        return currentRecordingFilePath
     }
 }

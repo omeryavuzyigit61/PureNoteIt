@@ -142,6 +142,15 @@ class AddFragment : Fragment(), onItemClickListener {
 
             soundListRecyclerView.layoutManager = LinearLayoutManager(requireContext())
             soundListRecyclerView.adapter = soundAdapter
+            soundListRecyclerView.viewTreeObserver.addOnGlobalLayoutListener {
+                val maxHeight =
+                    resources.getDimensionPixelSize(R.dimen.recycler_max_height) // 130dp
+                if (soundListRecyclerView.height > maxHeight) {
+                    soundListRecyclerView.layoutParams = soundListRecyclerView.layoutParams.apply {
+                        height = maxHeight
+                    }
+                }
+            }
 
             categoryViewModel.categoryList.removeObservers(viewLifecycleOwner)
             categoryViewModel.categoryList.observe(viewLifecycleOwner) {
@@ -206,7 +215,7 @@ class AddFragment : Fragment(), onItemClickListener {
                 R.id.importantRadioButton -> importantRadioButton.text.toString()
                 R.id.otherRadiButton -> {
                     if (customCategory.isEmpty()) {
-                        requireContext().showToastShort("Lütfen bir kategori adı giriniz")
+                        requireContext().showToastShort(getString(R.string.please_enter_category))
                         return
                     }
                     categoryViewModel.isCategoryExists(customCategory)
@@ -215,7 +224,7 @@ class AddFragment : Fragment(), onItemClickListener {
                         .observe(viewLifecycleOwner) { isExists ->
                             if (!isExists) {
                                 categoryViewModel.upsert(CategoryData(customCategory, false))
-                                requireContext().showToastShort("Kategori Eklendi")
+                                requireContext().showToastShort(getString(R.string.category_added))
                             }
                             checkedCategory = customCategory
                             toggleCategoryMenu()
@@ -231,7 +240,7 @@ class AddFragment : Fragment(), onItemClickListener {
 
     private fun saveNote() {
         if (binding.topMenuConstraintLayout.visibility == View.VISIBLE) {
-            requireContext().showToastShort("Lütfen önce kategoriyi onaylıyınız")
+            requireContext().showToastShort(getString(R.string.please_confirm_category))
         } else {
             categoryViewModel.getCategoryIdByName(checkedCategory)
                 .removeObservers(viewLifecycleOwner)
@@ -262,7 +271,7 @@ class AddFragment : Fragment(), onItemClickListener {
                     }
                     findNavController().navigateUp()
                 } else {
-                    requireContext().showToastShort("Başlık ve açıklama alanlarını doldurunuz")
+                    requireContext().showToastShort(getString(R.string.titleanddescritionenter))
                 }
             }
         }
@@ -287,14 +296,14 @@ class AddFragment : Fragment(), onItemClickListener {
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             )
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Lütfen konuşun")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.please_talk))
         }
 
         try {
             speechRecognizerLauncher.launch(intent)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(
-                requireContext(), "Cihazınızda ses tanıma desteklenmiyor", Toast.LENGTH_SHORT
+                requireContext(), getString(R.string.devicenotsound), Toast.LENGTH_SHORT
             ).show()
         }
     }
@@ -514,7 +523,10 @@ class AddFragment : Fragment(), onItemClickListener {
         dialogBinding.apply {
             startStopSoundButton.setOnClickListener { startStopSound(dialogBinding) }
             cancelSoundButton.setOnClickListener { cancelSound(dialogBinding) }
-            cancelDialogImageView.setOnClickListener { dialog.dismiss() }
+            cancelDialogImageView.setOnClickListener {
+                cancelSound(dialogBinding)
+                dialog.dismiss()
+            }
         }
         dialog.show()
     }
@@ -528,8 +540,8 @@ class AddFragment : Fragment(), onItemClickListener {
         if (!isRecording) {
             val filePath = audioRecorder.startRecording()
             filePath?.let {
-                audioRecorder.stopPlaying() //Ses dinliyoesa kaydetmeden durdur
-                Toast.makeText(requireContext(), "Ses kaydediliyor...", Toast.LENGTH_SHORT).show()
+                audioRecorder.stopPlaying() // Stop playback if listening without saving
+                requireContext().showToastShort(getString(R.string.saving_sound))
             }
             isRecording = true
             customSaveDialogBinding.startStopSoundButton.text = getString(R.string.stop_sond)
@@ -540,8 +552,8 @@ class AddFragment : Fragment(), onItemClickListener {
                 soundsPathList.add(filePath.toString())
                 soundAdapter.setData(soundsPathList)
                 binding.soundListRecyclerView.show()
-                Log.i("soundData", "Kaydedilen ses= $filePath")
-                requireContext().showToastShort("Ses kaydedildi")
+                Log.i("soundData", "Recorded sound= $filePath")
+                requireContext().showToastShort(getString(R.string.saved_sound))
             }
             isRecording = false
             customSaveDialogBinding.startStopSoundButton.text = getString(R.string.start_sound)
@@ -549,50 +561,52 @@ class AddFragment : Fragment(), onItemClickListener {
     }
 
     private fun cancelSound(dialogBinding: CustomSaveDialogBinding) {
-        audioRecorder.cancelRecording(dialogBinding, binding)
-        isRecording = false
+        if (isRecording) { // If a recording is ongoing
+            audioRecorder.cancelRecording(dialogBinding) // Cancel the recording
+            isRecording = false // Update the recording state
+        }
     }
 
     private var currentPlayingFilePath: String? = null
     private var isPlaying = false
-    private var previousImageView: ImageView? = null // Önceki ImageView'i saklamak için
+    private var previousImageView: ImageView? = null // To keep track of the previous ImageView
 
     private fun listenSound(filePath: String, imageView: ImageView?) {
-        // Eğer aynı ses çalıyorsa, bu sesi durdur
+        // If the same sound is playing, stop it
         if (isPlaying && currentPlayingFilePath == filePath) {
-            // Aynı ses tıklanmış, durdur
+            // Same sound clicked, stop it
             audioRecorder.stopPlaying()
-            imageView?.setImageResource(R.drawable.soundwave) // Duraklatma simgesi
+            imageView?.setImageResource(R.drawable.soundwave) // Pause icon
             isPlaying = false
-            currentPlayingFilePath = null // Geçerli ses yolunu sıfırla
-            previousImageView = null // Önceki ImageView sıfırla
-            Log.i("soundData", "Ses durduruldu: $filePath")
+            currentPlayingFilePath = null // Reset the current sound path
+            previousImageView = null // Reset the previous ImageView
+            Log.i("soundData", "Sound stopped: $filePath")
             return
         }
-        // Eğer başka bir ses çalıyorsa, önceki sesin animasyonunu durdur
+        // If another sound is playing, stop the previous sound animation
         if (isPlaying) {
-            // Önceki sesin animasyonunu durdur ve varsayılan resme çevir
-            previousImageView?.setImageResource(R.drawable.soundwave) // Önceki ImageView sıfırlanıyor
+            // Stop the animation for the previous sound and set it to default
+            previousImageView?.setImageResource(R.drawable.soundwave) // Reset the previous ImageView
             audioRecorder.stopPlaying()
             isPlaying = false
         }
-        // Yeni ses kaydını çalmaya başla
+        // Start playing the new sound recording
         audioRecorder.playRecording(filePath, onCompletion = {
             isPlaying = false
-            imageView?.setImageResource(R.drawable.soundwave) // Ses bitince duraklatma simgesini göster
-            currentPlayingFilePath = null // Çalan ses tamamlandı, ses yolunu sıfırla
-            previousImageView = null // Ses tamamlandığında önceki ImageView sıfırlanıyor
+            imageView?.setImageResource(R.drawable.soundwave) // Show pause icon when sound ends
+            currentPlayingFilePath = null // Reset the sound path when playback completes
+            previousImageView = null // Reset the previous ImageView when playback ends
         })
-        // Yeni sesin animasyonunu başlat
+        // Start animation for the new sound
         Glide.with(requireContext())
-            .load(R.drawable.soundwave) // Animasyonlu GIF
+            .load(R.drawable.soundwave) // Animated GIF
             .diskCacheStrategy(DiskCacheStrategy.DATA)
             .into(imageView!!)
-        // Yeni ImageView'i sakla
+        // Keep track of the new ImageView
         previousImageView = imageView
         isPlaying = true
-        currentPlayingFilePath = filePath // Geçerli ses kaydının yolunu sakla
-        Log.i("soundData", "Çalınan ses= $filePath")
+        currentPlayingFilePath = filePath // Save the current sound path
+        Log.i("soundData", "Playing sound= $filePath")
     }
 
     private fun deleteSound(filePath: String) {
@@ -600,6 +614,7 @@ class AddFragment : Fragment(), onItemClickListener {
         if (isDeleted) {
             if (soundsPathList.isEmpty()) {
                 binding.soundListRecyclerView.hide() // RecyclerView'ı gizle
+                requireContext().showToastShort("Ses Silindi")
             }
             Log.i("soundData", "Silinen Ses= $filePath")
         }

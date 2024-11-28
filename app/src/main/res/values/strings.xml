@@ -18,4 +18,12 @@
     <string name="select_date">Tarih Seçiniz</string>
     <string name="stop_sond">Kaydı Durdur</string>
     <string name="start_sound">Kaydı Başlat</string>
+    <string name="please_enter_category">Lütfen bir kategori adı giriniz</string>
+    <string name="category_added">Kategori Eklendi</string>
+    <string name="please_confirm_category">Lütfen önce kategoriyi onaylıyınız</string>
+    <string name="titleanddescritionenter">Başlık ve açıklama alanlarını doldurunuz</string>
+    <string name="please_talk">Lütfen konuşun</string>
+    <string name="devicenotsound">Cihazınızda ses tanıma desteklenmiyor</string>
+    <string name="saving_sound">Ses Kaydediliyor....</string>
+    <string name="saved_sound">Ses Kaydedildi</string>
 </resources>

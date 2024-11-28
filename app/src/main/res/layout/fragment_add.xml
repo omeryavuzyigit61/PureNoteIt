@@ -295,7 +295,7 @@
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/soundListRecyclerView"
         android:layout_width="0dp"
-        android:layout_height="100dp"
+        android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="@+id/titleEditText"
