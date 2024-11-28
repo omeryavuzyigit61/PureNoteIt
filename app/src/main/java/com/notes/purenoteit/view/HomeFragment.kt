@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
+import android.widget.ImageView
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
@@ -104,9 +105,9 @@ class HomeFragment : Fragment(), onItemClickListener {
 
         categoryViewModel.areDefaultCategoriesPresent().observe(viewLifecycleOwner) {
             if (!it) {
-                categoryViewModel.upsert((CategoryData("Not", false)))
-                categoryViewModel.upsert((CategoryData("Önemli", false)))
-                categoryViewModel.upsert((CategoryData("Günlük", false)))
+                categoryViewModel.upsert((CategoryData("Not", false, id = 1)))
+                categoryViewModel.upsert((CategoryData("Önemli", false, id = 3)))
+                categoryViewModel.upsert((CategoryData("Günlük", false, id = 2)))
             }
         }
     }
@@ -339,7 +340,12 @@ class HomeFragment : Fragment(), onItemClickListener {
         set(Calendar.MILLISECOND, 999)
     }
 
-    override fun onItemClick(position: Int, action: NoteAction, isPassword: Boolean?) {
+    override fun onItemClick(
+        position: Int,
+        action: NoteAction,
+        isPassword: Boolean?,
+        imageView: ImageView?
+    ) {
         when (action) {
             NoteAction.EDIT -> {
                 val navigateAction =
@@ -356,6 +362,8 @@ class HomeFragment : Fragment(), onItemClickListener {
             }
 
             NoteAction.LIST -> {}
+            NoteAction.PLAY -> {}
+            NoteAction.SOUND -> {}
         }
     }
 

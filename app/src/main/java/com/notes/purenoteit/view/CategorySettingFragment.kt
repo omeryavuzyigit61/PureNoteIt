@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.EdgeEffect
+import android.widget.ImageView
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -78,12 +79,14 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
         categoryViewModel.getAllCategories()
     }
 
-    override fun onItemClick(position: Int, action: NoteAction, isPassword: Boolean?) {
+    override fun onItemClick(position: Int, action: NoteAction, isPassword: Boolean?,imageView: ImageView?) {
         when (action) {
             NoteAction.DELETE -> categoryViewModel.deleteCategoryById(position)
             NoteAction.EDIT -> showCategoryDialog(isEdit = true, position = position)
             NoteAction.LOCK -> handleLockAction(position)
             NoteAction.LIST -> {}
+            NoteAction.PLAY -> {}
+            NoteAction.SOUND -> {}
         }
     }
 

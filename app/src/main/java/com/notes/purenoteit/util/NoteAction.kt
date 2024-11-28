@@ -1,5 +1,5 @@
 package com.notes.purenoteit.util
 
 enum class NoteAction {
-    EDIT, DELETE, LOCK, LIST
+    EDIT, DELETE, LOCK, LIST,PLAY,SOUND
 }

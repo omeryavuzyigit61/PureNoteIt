@@ -25,7 +25,9 @@ data class NoteData(
     @ColumnInfo(name = "images")
     var images: List<String>? = null,
     @ColumnInfo(name = "categoryId")
-    var categoryId: Int? = null
+    var categoryId: Int? = null,
+    @ColumnInfo(name = "isSound")
+    var sounds: List<String>? = null,
 ) : Serializable {
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0

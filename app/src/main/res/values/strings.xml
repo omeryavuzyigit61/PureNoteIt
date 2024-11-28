@@ -16,4 +16,6 @@
     <string name="you_entered_the_current_password_incorrectly">Mevcut Şifreyi Yanlış Girdiniz</string>
     <string name="save">Kaydet</string>
     <string name="select_date">Tarih Seçiniz</string>
+    <string name="stop_sond">Kaydı Durdur</string>
+    <string name="start_sound">Kaydı Başlat</string>
 </resources>

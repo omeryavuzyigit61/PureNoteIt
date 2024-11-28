@@ -142,7 +142,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="8dp"
         android:background="@null"
@@ -153,7 +153,7 @@
         app:layout_constraintBottom_toTopOf="@+id/constraintLayout"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/titleEditText" />
+        app:layout_constraintTop_toBottomOf="@+id/soundListRecyclerView" />
 
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/confirm_button"
@@ -217,13 +217,14 @@
         app:layout_constraintTop_toTopOf="@+id/backImageButton" />
 
     <View
+        android:id="@+id/view"
         style="@style/allBackgroundTint"
         android:layout_width="0dp"
         android:layout_height="30dp"
         android:background="@drawable/confirm_button_background"
         app:layout_constraintBottom_toBottomOf="@+id/confirm_button"
         app:layout_constraintEnd_toEndOf="@+id/confirm_button"
-        app:layout_constraintStart_toStartOf="@+id/securityImageView"
+        app:layout_constraintStart_toStartOf="@+id/soundSaveImageView"
         app:layout_constraintTop_toTopOf="@+id/confirm_button" />
 
     <ImageView
@@ -277,5 +278,28 @@
         app:layout_constraintTop_toTopOf="@+id/confirm_button"
         app:layout_constraintVertical_bias="0.0"
         app:tint="@color/gray" />
+
+    <ImageView
+        android:id="@+id/soundSaveImageView"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:background="@drawable/white_gray_circle_background"
+        android:padding="12dp"
+        android:src="@drawable/waveform_path"
+        app:layout_constraintBottom_toBottomOf="@+id/confirm_button"
+        app:layout_constraintEnd_toStartOf="@+id/securityImageView"
+        app:layout_constraintTop_toTopOf="@+id/confirm_button"
+        app:layout_constraintVertical_bias="0.0"
+        app:tint="@color/gray" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/soundListRecyclerView"
+        android:layout_width="0dp"
+        android:layout_height="100dp"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="@+id/titleEditText"
+        app:layout_constraintStart_toStartOf="@+id/titleEditText"
+        app:layout_constraintTop_toBottomOf="@+id/titleEditText" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

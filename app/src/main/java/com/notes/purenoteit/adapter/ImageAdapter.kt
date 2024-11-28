@@ -15,6 +15,7 @@ import com.notes.purenoteit.util.onItemClickListener
 
 class ImageAdapter(private val listener: onItemClickListener) :
     RecyclerView.Adapter<ImageAdapter.ListViewHolder>() {
+
     class ListViewHolder(val binding: ItemImageBinding) :
         RecyclerView.ViewHolder(binding.root)
 
@@ -30,8 +31,6 @@ class ImageAdapter(private val listener: onItemClickListener) :
 
     override fun onBindViewHolder(holder: ListViewHolder, position: Int) {
         val currentItem = itemList[position]
-        Log.i("imagecontrol2", "" + itemList)
-        Log.i("imagecontrol3", "" + currentItem)
         holder.binding.apply {
             Glide.with(this.root)
                 .load(currentItem)

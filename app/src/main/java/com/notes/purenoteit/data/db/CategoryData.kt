@@ -10,8 +10,7 @@ data class CategoryData(
     @ColumnInfo(name = "name")
     var name: String,
     @ColumnInfo(name = "isPassword")
-    var isPassword: Boolean? = null
-) : Serializable {
+    var isPassword: Boolean? = null,
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0
-}
+) : Serializable
