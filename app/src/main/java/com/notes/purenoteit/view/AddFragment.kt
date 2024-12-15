@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.speech.RecognizerIntent
@@ -21,6 +22,7 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -50,6 +52,7 @@ import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import io.reactivex.disposables.CompositeDisposable
+import java.io.File
 
 @AndroidEntryPoint
 class AddFragment : Fragment(), onItemClickListener {
@@ -91,8 +94,8 @@ class AddFragment : Fragment(), onItemClickListener {
             requireContext().getSharedPreferences("MyPreferences", Context.MODE_PRIVATE)
         audioRecorder = AudioRecorder(requireContext())
         setupUi()
-        setupListener()
         loadNoteData()
+        setupListener()
         initSearchView()
         return binding.root
     }
@@ -173,6 +176,13 @@ class AddFragment : Fragment(), onItemClickListener {
                 handleRadioButtonChange(checkedId)
             }
             soundSaveImageView.setOnClickListener { saveSoundDialog() }
+            shareButton.setOnClickListener {
+                shareNote(
+                    titleEditText.text.toString(),
+                    descriptionEditText.text.toString(),
+                    imageUriList
+                )
+            }
             setupSearch()
         }
     }
@@ -363,10 +373,31 @@ class AddFragment : Fragment(), onItemClickListener {
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK && result.data != null) {
                 val imageUri = result.data?.data
-                imageUri?.let {
-                    imageUriList.add(it.toString())
-                    binding.constraintLayout.show()
-                    imageAdapter.setData(imageUriList)
+                imageUri?.let { uri ->
+                    try {
+                        // Create directory if it doesn't exist
+                        val imagesDir = File(requireContext().filesDir, "shared_images")
+                        imagesDir.mkdirs()
+
+                        // Create a new file with unique name
+                        val fileName = "note_image_${System.currentTimeMillis()}.jpg"
+                        val destinationFile = File(imagesDir, fileName)
+
+                        // Copy the content URI to our app's files directory
+                        requireContext().contentResolver.openInputStream(uri)?.use { input ->
+                            destinationFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+
+                        // Store the file path
+                        imageUriList.add(destinationFile.absolutePath)
+                        binding.constraintLayout.show()
+                        imageAdapter.setData(imageUriList)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        requireContext().showToastShort("Resim kaydedilemedi")
+                    }
                 }
             }
         }
@@ -661,6 +692,60 @@ class AddFragment : Fragment(), onItemClickListener {
                 // İzin reddedildi
                 Log.d("Permissions", "$permission denied")
             }
+        }
+    }
+
+    /*for (path in imageUriList) {
+        val mediaFile = File(path)
+        val uri = FileProvider.getUriForFile(requireContext(), requireContext().getApplicationContext().getPackageName() + ".provider", mediaFile)
+        uriList.add(uri)
+    }*/
+    /*val mediaFile = File(uriString)
+    val uri = FileProvider.getUriForFile(
+        requireContext(),
+        requireContext().applicationContext.packageName + ".fileprovider",
+        mediaFile)
+    uriList.add(uri)*/
+    private fun shareNote(title: String, description: String, imageUriList: MutableList<String>) {
+        val shareIntent: Intent = Intent().apply {
+            action = Intent.ACTION_SEND_MULTIPLE
+            putExtra(Intent.EXTRA_SUBJECT, title)
+            //putExtra(Intent.EXTRA_TEXT, "$title\n\n$description")
+            type = if (imageUriList.isNotEmpty()) "image/*" else "text/plain"
+
+            if (imageUriList.isNotEmpty()) {
+                val uriList = ArrayList<Uri>()
+                
+                imageUriList.forEach { filePath ->
+                    try {
+                        val file = File(filePath)
+                        if (file.exists()) {
+                            val contentUri = FileProvider.getUriForFile(
+                                requireContext(),
+                                "${requireContext().packageName}.provider",
+                                file
+                            )
+                            uriList.add(contentUri)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        requireContext().showToastShort("Resim paylaşılamadı")
+                        return@forEach
+                    }
+                }
+
+                if (uriList.isNotEmpty()) {
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, uriList)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            }
+        }
+
+        try {
+            startActivity(Intent.createChooser(shareIntent, "Share Note"))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            requireContext().showToastShort("Paylaşım başarısız")
         }
     }
 }
