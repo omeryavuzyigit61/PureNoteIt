@@ -8,23 +8,56 @@
     android:padding="16dp">
 
     <TextView
-        android:id="@+id/deleteTextView"
+        android:id="@+id/pinTextView"
         android:layout_width="80dp"
         android:layout_height="wrap_content"
-        android:text="@string/delete"
+        android:text="Sabitle"
         android:textColor="@color/white"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <ImageView
+        android:id="@+id/pinImageView"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="8dp"
+        app:tint="@color/white"
+        app:layout_constraintBottom_toBottomOf="@+id/pinTextView"
+        app:layout_constraintStart_toEndOf="@+id/pinTextView"
+        app:layout_constraintTop_toTopOf="@+id/pinTextView"
+        app:srcCompat="@drawable/ic_pin" />
+
     <TextView
         android:id="@+id/editTextView"
-        android:layout_width="wrap_content"
+        android:layout_width="80dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="12dp"
         android:text="@string/edit"
         android:textColor="@color/white"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/deleteTextView" />
+        app:layout_constraintTop_toBottomOf="@+id/pinTextView" />
+
+    <ImageView
+        android:id="@+id/imageView2"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="8dp"
+        app:tint="@color/white"
+        android:padding="1dp"
+        app:layout_constraintBottom_toBottomOf="@+id/editTextView"
+        app:layout_constraintStart_toEndOf="@+id/editTextView"
+        app:layout_constraintTop_toTopOf="@+id/editTextView"
+        app:srcCompat="@drawable/file_edit" />
+
+    <TextView
+        android:id="@+id/deleteTextView"
+        android:layout_width="80dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/delete"
+        android:textColor="@color/white"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/editTextView" />
 
     <ImageView
         android:id="@+id/addImageView"
@@ -37,14 +70,4 @@
         app:layout_constraintTop_toTopOf="@+id/deleteTextView"
         app:srcCompat="@drawable/delete" />
 
-    <ImageView
-        android:id="@+id/imageView2"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        app:tint="@color/white"
-        android:padding="1dp"
-        app:layout_constraintBottom_toBottomOf="@+id/editTextView"
-        app:layout_constraintStart_toStartOf="@+id/addImageView"
-        app:layout_constraintTop_toTopOf="@+id/editTextView"
-        app:srcCompat="@drawable/file_edit" />
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -23,6 +23,7 @@ interface NoteDao {
     FROM notes
     LEFT JOIN categories ON notes.categoryId = categories.id
     WHERE categories.isPassword IS NULL OR categories.isPassword = 0
+    ORDER BY notes.isPinned DESC, notes.date DESC
 """
     )
     fun getNotes(): Single<List<NoteData>>
@@ -34,6 +35,7 @@ interface NoteDao {
     LEFT JOIN categories ON notes.categoryId = categories.id
     WHERE (categories.isPassword IS NULL OR categories.isPassword = 0)
       AND (notes.title LIKE '%' || :query || '%' OR notes.description LIKE '%' || :query || '%')
+    ORDER BY notes.isPinned DESC, notes.date DESC
     """
     )
     fun searchNote(query: String): Flowable<List<NoteData>>
@@ -44,12 +46,14 @@ interface NoteDao {
     @Query("DELETE FROM notes WHERE id = :id")
     fun deleteNoteById(id: Int): Completable
 
-    @Query("""
+    @Query(
+        """
     SELECT notes.*
     FROM notes
     LEFT JOIN categories ON notes.categoryId = categories.id
     WHERE (categories.isPassword IS NULL OR categories.isPassword = 0)
       AND (notes.date BETWEEN :startDate AND :endDate)
+    ORDER BY notes.isPinned DESC, notes.date DESC
     """
     )
     fun getNotesBetweenDates(startDate: Long, endDate: Long): Single<List<NoteData>>
@@ -60,7 +64,11 @@ interface NoteDao {
     FROM notes
     INNER JOIN categories ON notes.categoryId = categories.id
     WHERE categories.name = :categoryName
+    ORDER BY notes.isPinned DESC, notes.date DESC
     """
     )
     fun getNotesByCategory(categoryName: String): Flowable<List<NoteData>>
+
+    @Query("UPDATE notes SET isPinned = :isPinned WHERE id = :id")
+    fun updatePinStatus(id: Int, isPinned: Boolean): Completable
 }

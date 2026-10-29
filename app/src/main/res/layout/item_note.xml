@@ -6,84 +6,138 @@
     android:layout_height="wrap_content"
     android:background="@drawable/custom_note_item"
     style="@style/noteScreen"
-    android:layout_marginBottom="8dp"
-    android:layout_marginEnd="8dp">
+    android:layout_marginBottom="10dp"
+    android:layout_marginEnd="10dp"
+    android:elevation="2dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/noteMenuConstraintLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="10dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="12dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/imageView3">
 
         <TextView
+            android:id="@+id/iconTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="18sp"
+            android:visibility="gone"
+            android:layout_marginEnd="6dp"
+            app:layout_constraintBottom_toBottomOf="@+id/titleTextView"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/titleTextView"
+            tools:text="💡" />
+
+        <TextView
             android:id="@+id/titleTextView"
+            style="@style/TextColor"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            style="@style/TextColor"
+            android:textSize="16sp"
             android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@+id/menuImageButton"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/menuImageButton" />
+            app:layout_constraintEnd_toStartOf="@+id/pinImageView"
+            app:layout_constraintStart_toEndOf="@+id/iconTextView"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="Proje Notları" />
 
-        <TextView
-            android:id="@+id/descriptionTextView"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:maxLines="4"
-            style="@style/TextColor"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="@+id/titleTextView"
-            app:layout_constraintTop_toBottomOf="@+id/titleTextView" />
+        <ImageView
+            android:id="@+id/pinImageView"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginEnd="6dp"
+            android:src="@drawable/ic_pin"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@+id/menuImageButton"
+            app:layout_constraintEnd_toStartOf="@+id/menuImageButton"
+            app:layout_constraintTop_toTopOf="@+id/menuImageButton" />
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/menuImageButton"
-            android:layout_width="18dp"
-            android:layout_height="18dp"
+            style="@style/allTint"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
             android:background="@android:color/transparent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/menu"
-            style="@style/allTint"
-             />
+            app:srcCompat="@drawable/menu" />
+
+        <TextView
+            android:id="@+id/descriptionTextView"
+            style="@style/TextColor"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:maxLines="5"
+            android:lineSpacingExtra="2dp"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/titleTextView"
+            tools:text="Notion benzeri zengin içerik ve yapılacaklar listesi..." />
+
+        <!-- Notion-style Task Progress Badge -->
+        <TextView
+            android:id="@+id/taskProgressTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/confirm_button_background"
+            android:backgroundTint="#F0EFEF"
+            android:drawableStart="@drawable/ic_checklist"
+            android:drawablePadding="4dp"
+            android:drawableTint="@color/orange"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:textColor="@color/gray"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/descriptionTextView"
+            tools:text="2/5 Tamamlandı" />
 
         <TextView
             android:id="@+id/dateTextView"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            app:layout_constraintEnd_toEndOf="@+id/descriptionTextView"
-            app:layout_constraintStart_toStartOf="@+id/descriptionTextView"
-            app:layout_constraintTop_toBottomOf="@+id/descriptionTextView" />
+            android:layout_marginTop="8dp"
+            android:textColor="#888888"
+            android:textSize="11sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/taskProgressTextView"
+            tools:text="30 Eki 2026" />
 
         <ImageView
             android:id="@+id/noteLockImageView"
+            style="@style/allTint"
             android:layout_width="32dp"
             android:layout_height="32dp"
+            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            style="@style/allTint"
             app:srcCompat="@drawable/lock" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <ImageView
         android:id="@+id/imageView3"
+        style="@style/NoteCategoryStyle"
         android:layout_width="32dp"
         android:layout_height="32dp"
-        app:layout_constraintStart_toStartOf="parent"
-        android:padding="7dp"
         android:background="@drawable/category_background"
-        style="@style/NoteCategoryStyle"
+        android:padding="7dp"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:srcCompat="@drawable/note" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

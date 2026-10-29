@@ -83,6 +83,7 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
             NoteAction.LIST -> {}
             NoteAction.PLAY -> {}
             NoteAction.SOUND -> {}
+            NoteAction.PIN -> {}
         }
     }
 

@@ -32,6 +32,16 @@ data class NoteData(
     var categoryId: Int? = null,
     @ColumnInfo(name = "isSound")
     var sounds: List<String>? = null,
+    @ColumnInfo(name = "isPinned", defaultValue = "0")
+    var isPinned: Boolean = false,
+    @ColumnInfo(name = "icon")
+    var icon: String? = null,
+    @ColumnInfo(name = "isEncrypted", defaultValue = "0")
+    var isEncrypted: Boolean = false,
+    @ColumnInfo(name = "totalTasks", defaultValue = "0")
+    var totalTasks: Int = 0,
+    @ColumnInfo(name = "completedTasks", defaultValue = "0")
+    var completedTasks: Int = 0,
 ) : Serializable {
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0

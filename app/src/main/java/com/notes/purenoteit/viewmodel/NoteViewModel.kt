@@ -18,6 +18,7 @@ class NoteViewModel @Inject constructor(private val repository: NoteRepository) 
     private val compositeDisposable = CompositeDisposable()
     private val _noteList = MutableLiveData<List<NoteData>>()
     val noteList: LiveData<List<NoteData>> = _noteList
+
     fun getAllNotes() {
         repository.getNotes()
             .subscribeOn(Schedulers.io())
@@ -26,7 +27,7 @@ class NoteViewModel @Inject constructor(private val repository: NoteRepository) 
                 _noteList.value = it
                 Log.i("datas", "getAllNotes: ")
             }, {
-
+                Log.e("NoteViewModel", "Error fetching notes: ${it.message}")
             }).let {
                 compositeDisposable.add(it)
             }
@@ -35,21 +36,21 @@ class NoteViewModel @Inject constructor(private val repository: NoteRepository) 
     fun upsert(item: NoteData) {
         repository.upsert(item).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
+                getAllNotes()
                 Log.i("NoteViewModel", "Note upserted successfully")
             }, { error ->
                 Log.i("NoteViewModel", "Error upserting note: ${error.message}")
             }).let {
                 compositeDisposable.add(it)
             }
-
     }
 
     fun delete(item: NoteData) {
         repository.delete(item).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
-
+                getAllNotes()
             }, {
-
+                Log.e("NoteViewModel", "Error deleting note: ${it.message}")
             }).let {
                 compositeDisposable.add(it)
             }
@@ -67,11 +68,26 @@ class NoteViewModel @Inject constructor(private val repository: NoteRepository) 
             }
     }
 
+    fun togglePinStatus(id: Int, currentPinned: Boolean) {
+        repository.updatePinStatus(id, !currentPinned)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({
+                getAllNotes()
+                Log.i("NoteViewModel", "Pin status toggled successfully")
+            }, { error ->
+                Log.e("NoteViewModel", "Error toggling pin: ${error.message}")
+            }).let {
+                compositeDisposable.add(it)
+            }
+    }
+
     fun getNotesBetweenDates(startDate: Long, endDate: Long) {
-        return repository.getNotesBetweenDates(startDate, endDate).subscribeOn(Schedulers.io())
+        repository.getNotesBetweenDates(startDate, endDate).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({ dateDatas ->
                 _noteList.value = dateDatas
             }, {
+                Log.e("NoteViewModel", "Error fetching notes between dates: ${it.message}")
             }).let {
                 compositeDisposable.add(it)
             }

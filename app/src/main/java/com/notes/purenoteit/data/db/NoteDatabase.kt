@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.notes.purenoteit.util.Converters
 
-@Database(entities = [NoteData::class, CategoryData::class], version = 1, exportSchema = false)
+@Database(entities = [NoteData::class, CategoryData::class], version = 2, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class NoteDatabase : RoomDatabase() {
     abstract fun getNoteDao(): NoteDao

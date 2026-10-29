@@ -33,19 +33,47 @@ class NoteAdapter(private val listener: onItemClickListener) :
     override fun onBindViewHolder(holder: ListViewHolder, position: Int) {
         val currentItem = itemList[position]
         holder.binding.apply {
+            // Icon / Emoji (Notion Style)
+            if (!currentItem.icon.isNullOrBlank()) {
+                iconTextView.text = currentItem.icon
+                iconTextView.show()
+            } else {
+                iconTextView.hide()
+            }
+
+            // Pinned indicator
+            if (currentItem.isPinned) {
+                pinImageView.show()
+            } else {
+                pinImageView.hide()
+            }
+
+            // Password / Protected Note
             if (currentItem.isPassword == true) {
                 titleTextView.text = "******"
                 descriptionTextView.text = "***********\n***********"
                 noteLockImageView.show()
+                taskProgressTextView.hide()
             } else {
                 titleTextView.text = currentItem.title
                 descriptionTextView.text = currentItem.description
                 noteLockImageView.hide()
+
+                // Notion Task Progress
+                if (currentItem.totalTasks > 0) {
+                    taskProgressTextView.text = "${currentItem.completedTasks}/${currentItem.totalTasks} Tamamlandı"
+                    taskProgressTextView.show()
+                } else {
+                    taskProgressTextView.hide()
+                }
             }
+
             dateTextView.formatDate(currentItem.date)
+
             menuImageButton.setOnClickListener {
-                showPopupWindow(it, currentItem.id, currentItem.isPassword)
+                showPopupWindow(it, currentItem)
             }
+
             noteMenuConstraintLayout.setOnClickListener {
                 listener.onItemClick(currentItem.id, NoteAction.EDIT, currentItem.isPassword)
             }
@@ -54,7 +82,7 @@ class NoteAdapter(private val listener: onItemClickListener) :
         }
     }
 
-    private fun showPopupWindow(anchor: View, position: Int, isPassword: Boolean? = null) {
+    private fun showPopupWindow(anchor: View, item: NoteData) {
         val popupBinding = CustomNotePopupMenuBinding.inflate(LayoutInflater.from(anchor.context))
         val popupWindow = PopupWindow(
             popupBinding.root,
@@ -65,6 +93,28 @@ class NoteAdapter(private val listener: onItemClickListener) :
         popupWindow.isFocusable = true
         popupWindow.isOutsideTouchable = true
 
+        // Set Pin button label dynamically
+        popupBinding.pinTextView.text = if (item.isPinned) "Kaldır" else "Sabitle"
+
+        popupBinding.pinTextView.setOnClickListener {
+            listener.onItemClick(item.id, NoteAction.PIN, item.isPassword)
+            popupWindow.dismiss()
+        }
+        popupBinding.pinImageView.setOnClickListener {
+            listener.onItemClick(item.id, NoteAction.PIN, item.isPassword)
+            popupWindow.dismiss()
+        }
+
+        popupBinding.editTextView.setOnClickListener {
+            listener.onItemClick(item.id, NoteAction.EDIT, item.isPassword)
+            popupWindow.dismiss()
+        }
+
+        popupBinding.deleteTextView.setOnClickListener {
+            listener.onItemClick(item.id, NoteAction.DELETE)
+            popupWindow.dismiss()
+        }
+
         popupBinding.root.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
 
         val location = IntArray(2)
@@ -74,16 +124,6 @@ class NoteAdapter(private val listener: onItemClickListener) :
 
         val leftOffset = 60
         val topOffset = 20
-
-        popupBinding.editTextView.setOnClickListener {
-            listener.onItemClick(position, NoteAction.EDIT, isPassword)
-            popupWindow.dismiss()
-        }
-
-        popupBinding.deleteTextView.setOnClickListener {
-            listener.onItemClick(position, NoteAction.DELETE)
-            popupWindow.dismiss()
-        }
 
         popupWindow.showAsDropDown(
             anchor,

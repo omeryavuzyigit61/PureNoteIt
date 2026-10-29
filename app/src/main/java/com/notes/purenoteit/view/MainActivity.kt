@@ -12,10 +12,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.navigation.findNavController
 import com.notes.purenoteit.R
 import com.notes.purenoteit.databinding.ActivityMainBinding
+import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.SharedPrefencesUtil
-import com.notes.purenoteit.util.hideKeyboard
 import dagger.hilt.android.AndroidEntryPoint
-
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -32,18 +31,18 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
-        if (getAppTheme()){
+        if (getAppTheme()) {
             val window = this.window
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             window.statusBarColor = ContextCompat.getColor(this, R.color.gray)
-        }else{
+        } else {
             val window = this.window
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             window.statusBarColor = ContextCompat.getColor(this, R.color.background_color)
         }
     }
 
-    private fun supportTheme(){
+    private fun supportTheme() {
         if (getAppTheme()) {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         } else {
@@ -54,15 +53,21 @@ class MainActivity : AppCompatActivity() {
     private fun getAppTheme(): Boolean {
         val prefs = SharedPrefencesUtil(applicationContext)
         val theme = prefs.getLocal("night", Boolean)
-        return theme as Boolean
+        return theme as? Boolean ?: false
     }
 
     override fun onSupportNavigateUp(): Boolean {
         val navController = findNavController(R.id.home_fragment)
         return navController.navigateUp() || super.onSupportNavigateUp()
     }
+
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        //hideKeyboard(event)
         return super.dispatchTouchEvent(event)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Bitwarden Vault Timeout: Lock session when app is backgrounded
+        SecurityUtil.lockVault()
     }
 }

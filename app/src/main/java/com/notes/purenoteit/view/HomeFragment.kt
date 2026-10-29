@@ -362,6 +362,13 @@ class HomeFragment : Fragment(), onItemClickListener {
             }
 
             NoteAction.DELETE -> viewModel.deleteNoteById(position)
+            NoteAction.PIN -> {
+                viewModel.getNoteById(position).subscribe { note ->
+                    viewModel.togglePinStatus(note.id, note.isPinned)
+                    val msg = if (!note.isPinned) "Not başa sabitlendi" else "Sabitleme kaldırıldı"
+                    requireContext().showToastShort(msg)
+                }
+            }
             NoteAction.LOCK -> { /* Lock işlemleri */
             }
 

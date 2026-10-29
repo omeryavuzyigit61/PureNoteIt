@@ -16,6 +16,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.animation.AnimationUtils
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +37,7 @@ import com.notes.purenoteit.adapter.SoundAdapter
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.databinding.CustomDialogBinding
+import com.notes.purenoteit.databinding.CustomEmojiPickerDialogBinding
 import com.notes.purenoteit.databinding.CustomPasswordDialogBinding
 import com.notes.purenoteit.databinding.CustomSaveDialogBinding
 import com.notes.purenoteit.databinding.FragmentAddBinding
@@ -52,6 +54,8 @@ import com.notes.purenoteit.viewmodel.NoteViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import io.reactivex.disposables.CompositeDisposable
 import java.io.File
+import kotlin.math.max
+import kotlin.math.min
 
 @AndroidEntryPoint
 class AddFragment : Fragment(), onItemClickListener {
@@ -69,6 +73,7 @@ class AddFragment : Fragment(), onItemClickListener {
     private var noteId: Int? = null
     private var checkedCategory: String = "Not"
     private var clicked = false
+    private var selectedIcon: String? = null
 
     private val fromAnimation by lazy {
         AnimationUtils.loadAnimation(
@@ -89,6 +94,7 @@ class AddFragment : Fragment(), onItemClickListener {
         setupUi()
         loadNoteData()
         setupListener()
+        setupNotionToolbar()
         initSearchView()
         return binding.root
     }
@@ -104,7 +110,23 @@ class AddFragment : Fragment(), onItemClickListener {
                     binding.soundListRecyclerView.show()
                     binding.confirmButton.text = getString(R.string.save)
                     titleEditText.setText(note.title)
-                    descriptionEditText.setText(note.description)
+
+                    // Bitwarden Decryption
+                    val loadedDesc = if (note.isEncrypted) {
+                        SecurityUtil.decrypt(note.description ?: "")
+                    } else {
+                        note.description
+                    }
+                    descriptionEditText.setText(loadedDesc)
+
+                    // Notion Icon
+                    selectedIcon = note.icon
+                    if (!selectedIcon.isNullOrBlank()) {
+                        selectIconButton.text = selectedIcon
+                    } else {
+                        selectIconButton.text = "➕"
+                    }
+
                     val catDisposable =
                         categoryViewModel.getCategoryById(note.categoryId!!).subscribe { data ->
                             binding.categorySearchView.customCategoryEditText.setText(data.name)
@@ -165,6 +187,7 @@ class AddFragment : Fragment(), onItemClickListener {
             addImageView.setOnClickListener { openGallery() }
             soundImageView.setOnClickListener { startVoiceRecognition() }
             securityImageView.setOnClickListener { handleSecurity() }
+            selectIconButton.setOnClickListener { showEmojiPickerDialog() }
             radioGroup.setOnCheckedChangeListener { _, checkedId ->
                 handleRadioButtonChange(checkedId)
             }
@@ -178,6 +201,65 @@ class AddFragment : Fragment(), onItemClickListener {
             }
             setupSearch()
         }
+    }
+
+    private fun setupNotionToolbar() {
+        binding.apply {
+            btnFormatH1.setOnClickListener { insertFormatting("\n# ") }
+            btnFormatH2.setOnClickListener { insertFormatting("\n## ") }
+            btnFormatTodo.setOnClickListener { insertFormatting("\n[ ] ") }
+            btnFormatBullet.setOnClickListener { insertFormatting("\n• ") }
+            btnFormatQuote.setOnClickListener { insertFormatting("\n> ") }
+            btnFormatDivider.setOnClickListener { insertFormatting("\n---\n") }
+        }
+    }
+
+    private fun insertFormatting(prefix: String) {
+        val editText = binding.descriptionEditText
+        val start = editText.selectionStart.coerceAtLeast(0)
+        val end = editText.selectionEnd.coerceAtLeast(0)
+        val currentText = editText.text ?: return
+        currentText.replace(min(start, end), max(start, end), prefix)
+        editText.setSelection(min(start, end) + prefix.length)
+    }
+
+    private fun showEmojiPickerDialog() {
+        val dialog = Dialog(requireContext())
+        val dialogBinding = CustomEmojiPickerDialogBinding.inflate(layoutInflater)
+        dialog.setContentView(dialogBinding.root)
+
+        val emojis = listOf(
+            "📝", "💡", "🎯", "⭐", "🔒", "💼",
+            "📚", "🚀", "🛒", "❤️", "📅", "✨",
+            "🔥", "📌", "🎨", "💻", "☕", "🔑"
+        )
+
+        dialogBinding.emojiRemoveTextView.setOnClickListener {
+            selectedIcon = null
+            binding.selectIconButton.text = "➕"
+            dialog.dismiss()
+        }
+
+        dialogBinding.emojiGridLayout.removeAllViews()
+        emojis.forEach { emoji ->
+            val tv = TextView(requireContext()).apply {
+                text = emoji
+                textSize = 26f
+                setPadding(18, 18, 18, 18)
+                setOnClickListener {
+                    selectedIcon = emoji
+                    binding.selectIconButton.text = emoji
+                    dialog.dismiss()
+                }
+            }
+            dialogBinding.emojiGridLayout.addView(tv)
+        }
+
+        dialog.window?.setLayout(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT
+        )
+        dialog.show()
     }
 
     private fun toggleCategoryMenu() {
@@ -245,27 +327,50 @@ class AddFragment : Fragment(), onItemClickListener {
             categoryViewModel.getCategoryIdByName(checkedCategory)
                 .removeObservers(viewLifecycleOwner)
             categoryViewModel.getCategoryIdByName(checkedCategory).observe(viewLifecycleOwner) { catId ->
-                if (binding.titleEditText.text.isNotEmpty() && binding.descriptionEditText.text.isNotEmpty()) {
+                val rawTitle = binding.titleEditText.text.toString().trim()
+                val rawDesc = binding.descriptionEditText.text.toString()
+
+                if (rawTitle.isNotEmpty() && rawDesc.isNotEmpty()) {
+                    // Notion Checklist Progress calculation
+                    val todoPattern = Regex("""^\s*\[([ xX])\]""", RegexOption.MULTILINE)
+                    val matches = todoPattern.findAll(rawDesc).toList()
+                    val total = matches.size
+                    val completed = matches.count { it.groupValues[1].equals("x", ignoreCase = true) }
+
+                    // Bitwarden AES-256 Encryption
+                    val finalDesc = if (isPassword) SecurityUtil.encrypt(rawDesc) else rawDesc
+                    val isEncrypted = isPassword
+
                     val note = NoteData(
-                        title = binding.titleEditText.text.toString(),
-                        description = binding.descriptionEditText.text.toString(),
+                        title = rawTitle,
+                        description = finalDesc,
                         date = System.currentTimeMillis(),
                         images = imageUriList,
                         isPassword = isPassword,
                         categoryId = catId,
-                        sounds = soundsPathList
+                        sounds = soundsPathList,
+                        isPinned = noteData?.isPinned ?: false,
+                        icon = selectedIcon,
+                        isEncrypted = isEncrypted,
+                        totalTasks = total,
+                        completedTasks = completed
                     )
+
                     if (noteData == null) {
                         viewModel.upsert(note)
                     } else {
                         noteData?.apply {
-                            title = note.title
-                            description = note.description
-                            date = note.date
-                            images = note.images
-                            isPassword = note.isPassword
+                            this.title = note.title
+                            this.description = note.description
+                            this.date = note.date
+                            this.images = note.images
+                            this.isPassword = note.isPassword
                             this.categoryId = note.categoryId
-                            sounds = note.sounds
+                            this.sounds = note.sounds
+                            this.icon = note.icon
+                            this.isEncrypted = note.isEncrypted
+                            this.totalTasks = note.totalTasks
+                            this.completedTasks = note.completedTasks
                         }
                         viewModel.upsert(noteData!!)
                     }
@@ -387,6 +492,8 @@ class AddFragment : Fragment(), onItemClickListener {
             }
 
             NoteAction.LOCK -> {}
+
+            NoteAction.PIN -> {}
 
             NoteAction.LIST -> {
                 val disposable = categoryViewModel.getCategoryById(position).subscribe { data ->

@@ -115,13 +115,26 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <TextView
+        android:id="@+id/selectIconButton"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="5dp"
+        android:background="@drawable/white_gray_circle_background"
+        android:gravity="center"
+        android:text="➕"
+        android:textSize="18sp"
+        app:layout_constraintBottom_toBottomOf="@+id/titleEditText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/topMenuConstraintLayout" />
 
     <EditText
         android:id="@+id/titleEditText"
         style="@style/TextColor"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
+        android:layout_marginStart="10dp"
         android:layout_marginTop="5dp"
         android:layout_marginEnd="16dp"
         android:background="@null"
@@ -133,7 +146,7 @@
         android:textSize="22sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/selectIconButton"
         app:layout_constraintTop_toBottomOf="@+id/topMenuConstraintLayout" />
 
     <EditText
@@ -148,21 +161,127 @@
         android:background="@null"
         android:ems="10"
         android:gravity="start|top"
-        android:hint="Yazmaya başla"
+        android:hint="Yazmaya başla (Notion formatları desteklenir)..."
         android:inputType="textMultiLine"
         app:layout_constraintBottom_toTopOf="@+id/constraintLayout"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/soundListRecyclerView" />
 
+    <!-- Notion-Style Quick Formatting Toolbar -->
+    <HorizontalScrollView
+        android:id="@+id/notionToolbarScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
+        android:scrollbars="none"
+        android:background="@drawable/custom_note_item"
+        android:backgroundTint="#F2F2F5"
+        android:padding="4dp"
+        app:layout_constraintBottom_toTopOf="@+id/confirm_button"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnFormatH1"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:background="@drawable/confirm_button_background"
+                android:backgroundTint="@color/white"
+                android:text="H1"
+                android:textColor="@color/gray"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:layout_marginEnd="4dp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnFormatH2"
+                android:layout_width="48dp"
+                android:layout_height="36dp"
+                android:background="@drawable/confirm_button_background"
+                android:backgroundTint="@color/white"
+                android:text="H2"
+                android:textColor="@color/gray"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:layout_marginEnd="4dp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnFormatTodo"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/confirm_button_background"
+                android:backgroundTint="@color/white"
+                android:drawableStart="@drawable/ic_checklist"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/orange"
+                android:paddingHorizontal="10dp"
+                android:text="Görev"
+                android:textColor="@color/gray"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginEnd="4dp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnFormatBullet"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/confirm_button_background"
+                android:backgroundTint="@color/white"
+                android:drawableStart="@drawable/ic_format_bullet"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/gray"
+                android:paddingHorizontal="10dp"
+                android:text="Liste"
+                android:textColor="@color/gray"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnFormatQuote"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/confirm_button_background"
+                android:backgroundTint="@color/white"
+                android:drawableStart="@drawable/ic_format_quote"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/gray"
+                android:paddingHorizontal="10dp"
+                android:text="Alıntı"
+                android:textColor="@color/gray"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnFormatDivider"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/confirm_button_background"
+                android:backgroundTint="@color/white"
+                android:paddingHorizontal="10dp"
+                android:text="— Çizgi"
+                android:textColor="@color/gray"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+    </HorizontalScrollView>
+
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/confirm_button"
+        style="@style/ConfirmButton"
         android:layout_width="120dp"
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="16dp"
         android:background="@drawable/confirm_button_background"
-        style="@style/ConfirmButton"
         android:paddingStart="16dp"
         android:text="Ekle"
         android:textAllCaps="false"
@@ -172,12 +291,12 @@
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/constraintLayout"
         android:layout_width="match_parent"
-        android:layout_height="200dp"
+        android:layout_height="180dp"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="8dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@+id/confirm_button"
+        app:layout_constraintBottom_toTopOf="@+id/notionToolbarScrollView"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
@@ -202,15 +321,14 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-
     <ImageView
         android:id="@+id/menuImageView"
         style="@style/CornerButton"
         android:layout_width="40dp"
-        android:padding="8dp"
-        android:background="@drawable/white_background"
         android:layout_height="40dp"
         android:layout_marginEnd="16dp"
+        android:background="@drawable/white_background"
+        android:padding="8dp"
         android:src="@drawable/menu"
         app:layout_constraintBottom_toBottomOf="@+id/backImageButton"
         app:layout_constraintEnd_toEndOf="parent"
@@ -231,7 +349,6 @@
         android:id="@+id/addImageView"
         android:layout_width="50dp"
         android:layout_height="50dp"
-        android:layout_marginEnd="0dp"
         android:background="@drawable/white_gray_circle_background"
         android:padding="14dp"
         android:src="@drawable/picture"
@@ -299,7 +416,7 @@
         android:layout_marginTop="8dp"
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="@+id/titleEditText"
-        app:layout_constraintStart_toStartOf="@+id/titleEditText"
+        app:layout_constraintStart_toStartOf="@+id/selectIconButton"
         app:layout_constraintTop_toBottomOf="@+id/titleEditText" />
 
     <View
@@ -323,4 +440,5 @@
         android:tint="@color/gray"
         app:layout_constraintBottom_toTopOf="@+id/confirm_button"
         app:layout_constraintEnd_toEndOf="@+id/confirm_button" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
