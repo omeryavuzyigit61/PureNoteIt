@@ -1,68 +1,115 @@
 package com.notes.purenoteit.view
 
 import android.os.Bundle
-import android.view.MotionEvent
-import android.view.WindowManager
+import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.navigation.findNavController
-import com.notes.purenoteit.R
-import com.notes.purenoteit.databinding.ActivityMainBinding
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.notes.purenoteit.ui.screens.CategoryManagementScreen
+import com.notes.purenoteit.ui.screens.HomeScreen
+import com.notes.purenoteit.ui.screens.NoteDetailScreen
+import com.notes.purenoteit.ui.screens.PasswordSettingScreen
+import com.notes.purenoteit.ui.theme.PureNoteItTheme
 import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.SharedPrefencesUtil
+import com.notes.purenoteit.viewmodel.CategoryViewModel
+import com.notes.purenoteit.viewmodel.NoteViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityMainBinding
+
+    private val noteViewModel: NoteViewModel by viewModels()
+    private val categoryViewModel: CategoryViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        supportTheme()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
-        if (getAppTheme()) {
-            val window = this.window
-            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-            window.statusBarColor = ContextCompat.getColor(this, R.color.gray)
-        } else {
-            val window = this.window
-            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-            window.statusBarColor = ContextCompat.getColor(this, R.color.background_color)
-        }
-    }
 
-    private fun supportTheme() {
-        if (getAppTheme()) {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        } else {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-        }
-    }
-
-    private fun getAppTheme(): Boolean {
         val prefs = SharedPrefencesUtil(applicationContext)
-        val theme = prefs.getLocal("night", Boolean)
-        return theme as? Boolean ?: false
-    }
 
-    override fun onSupportNavigateUp(): Boolean {
-        val navController = findNavController(R.id.home_fragment)
-        return navController.navigateUp() || super.onSupportNavigateUp()
-    }
+        setContent {
+            var isDarkTheme by remember {
+                val saved = prefs.getLocal("night", Boolean) as? Boolean
+                mutableStateOf(saved ?: false)
+            }
 
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        return super.dispatchTouchEvent(event)
+            PureNoteItTheme(darkTheme = isDarkTheme) {
+                val navController = rememberNavController()
+
+                NavHost(
+                    navController = navController,
+                    startDestination = "home"
+                ) {
+                    composable("home") {
+                        HomeScreen(
+                            noteViewModel = noteViewModel,
+                            categoryViewModel = categoryViewModel,
+                            onNavigateToAddNote = { noteId ->
+                                navController.navigate("note_detail/$noteId")
+                            },
+                            onNavigateToPasswordSettings = {
+                                navController.navigate("password_settings")
+                            },
+                            onNavigateToCategorySettings = {
+                                navController.navigate("category_settings")
+                            },
+                            onToggleDarkTheme = { newTheme ->
+                                isDarkTheme = newTheme
+                                prefs.addLocal("night", newTheme)
+                            },
+                            isDarkTheme = isDarkTheme
+                        )
+                    }
+
+                    composable(
+                        route = "note_detail/{noteId}",
+                        arguments = listOf(
+                            navArgument("noteId") {
+                                type = NavType.IntType
+                                defaultValue = -1
+                            }
+                        )
+                    ) { backStackEntry ->
+                        val noteId = backStackEntry.arguments?.getInt("noteId") ?: -1
+                        NoteDetailScreen(
+                            noteId = noteId,
+                            noteViewModel = noteViewModel,
+                            categoryViewModel = categoryViewModel,
+                            onNavigateBack = {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+
+                    composable("category_settings") {
+                        CategoryManagementScreen(
+                            categoryViewModel = categoryViewModel,
+                            onNavigateBack = {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+
+                    composable("password_settings") {
+                        PasswordSettingScreen(
+                            onNavigateBack = {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 
     override fun onStop() {

@@ -1,0 +1,520 @@
+package com.notes.purenoteit.ui.screens
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import com.notes.purenoteit.R
+import com.notes.purenoteit.data.db.CategoryData
+import com.notes.purenoteit.data.db.NoteData
+import com.notes.purenoteit.model.BlockParser
+import com.notes.purenoteit.model.BlockType
+import com.notes.purenoteit.model.NoteBlock
+import com.notes.purenoteit.ui.components.EmojiPickerSheet
+import com.notes.purenoteit.ui.components.NotionBlockRow
+import com.notes.purenoteit.ui.components.NotionSlashDialog
+import com.notes.purenoteit.ui.components.NotionToolbar
+import com.notes.purenoteit.ui.theme.BorderLight
+import com.notes.purenoteit.ui.theme.CharcoalGray
+import com.notes.purenoteit.ui.theme.PureWhite
+import com.notes.purenoteit.ui.theme.SoftOrangeLight
+import com.notes.purenoteit.ui.theme.VibrantOrange
+import com.notes.purenoteit.util.AudioRecorder
+import com.notes.purenoteit.util.SecurityUtil
+import com.notes.purenoteit.util.showToastShort
+import com.notes.purenoteit.viewmodel.CategoryViewModel
+import com.notes.purenoteit.viewmodel.NoteViewModel
+import java.io.File
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NoteDetailScreen(
+    noteId: Int,
+    noteViewModel: NoteViewModel,
+    categoryViewModel: CategoryViewModel,
+    onNavigateBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val audioRecorder = remember { AudioRecorder(context) }
+
+    var title by remember { mutableStateOf("") }
+    var selectedIcon by remember { mutableStateOf<String?>(null) }
+    var isPassword by remember { mutableStateOf(false) }
+    var isPinned by remember { mutableStateOf(false) }
+    var selectedCategoryId by remember { mutableStateOf(1) }
+    var selectedCategoryName by remember { mutableStateOf("Not") }
+
+    val blocks = remember { mutableStateListOf<NoteBlock>() }
+    var isRecordingAudio by remember { mutableStateOf(false) }
+
+    // Dialog sheets
+    var showEmojiSheet by remember { mutableStateOf(false) }
+    var showSlashSheet by remember { mutableStateOf(false) }
+    var showCategoryMenu by remember { mutableStateOf(false) }
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var pinInput by remember { mutableStateOf("") }
+
+    val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
+
+    // Load existing note data
+    LaunchedEffect(noteId) {
+        if (noteId != -1) {
+            noteViewModel.getNoteById(noteId).subscribe { note ->
+                title = note.title ?: ""
+                selectedIcon = note.icon
+                isPassword = note.isPassword ?: false
+                isPinned = note.isPinned
+                selectedCategoryId = note.categoryId ?: 1
+
+                val rawDesc = if (note.isEncrypted) {
+                    SecurityUtil.decrypt(note.description ?: "")
+                } else {
+                    note.description ?: ""
+                }
+
+                blocks.clear()
+                val parsed = BlockParser.parse(rawDesc)
+                blocks.addAll(parsed)
+
+                // Add existing images and sounds as blocks if not already included
+                note.images?.forEach { imgPath ->
+                    if (blocks.none { it.mediaPath == imgPath }) {
+                        blocks.add(NoteBlock(type = BlockType.IMAGE, mediaPath = imgPath))
+                    }
+                }
+                note.sounds?.forEach { soundPath ->
+                    if (blocks.none { it.mediaPath == soundPath }) {
+                        blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = soundPath))
+                    }
+                }
+            }
+        } else {
+            blocks.clear()
+            blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = ""))
+        }
+    }
+
+    LaunchedEffect(categoryList, selectedCategoryId) {
+        val cat = categoryList.find { it.id == selectedCategoryId }
+        if (cat != null) {
+            selectedCategoryName = cat.name
+        }
+    }
+
+    // Photo picker
+    val pickMediaLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let {
+            try {
+                val dir = File(context.filesDir, "shared_images").apply { mkdirs() }
+                val file = File(dir, "note_image_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+                blocks.add(NoteBlock(type = BlockType.IMAGE, mediaPath = file.absolutePath))
+            } catch (e: Exception) {
+                context.showToastShort("Görsel yüklenemedi")
+            }
+        }
+    }
+
+    // Audio recording permission
+    val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Permission granted
+        } else {
+            context.showToastShort("Ses kaydı için mikrofon izni gereklidir")
+        }
+    }
+
+    fun handleRecordAudio() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+
+        if (!isRecordingAudio) {
+            val path = audioRecorder.startRecording()
+            if (path != null) {
+                isRecordingAudio = true
+                context.showToastShort("Ses kaydı başlatıldı...")
+            }
+        } else {
+            val path = audioRecorder.stopRecording()
+            isRecordingAudio = false
+            if (path != null) {
+                blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = path))
+                context.showToastShort("Ses kaydı eklendi")
+            }
+        }
+    }
+
+    fun saveNote() {
+        if (title.isBlank() && blocks.all { it.content.isBlank() && it.mediaPath == null }) {
+            context.showToastShort("Lütfen en azından bir başlık veya içerik giriniz")
+            return
+        }
+
+        val (total, completed) = BlockParser.calculateTasks(blocks)
+        val jsonContent = BlockParser.blocksToJson(blocks)
+
+        // Bitwarden AES-256 GCM encryption
+        val finalContent = if (isPassword) SecurityUtil.encrypt(jsonContent) else jsonContent
+        val isEncrypted = isPassword
+
+        val images = blocks.filter { it.type == BlockType.IMAGE && it.mediaPath != null }.map { it.mediaPath!! }
+        val sounds = blocks.filter { it.type == BlockType.AUDIO && it.mediaPath != null }.map { it.mediaPath!! }
+
+        val note = NoteData(
+            title = if (title.isBlank()) "Başlıksız Not" else title.trim(),
+            description = finalContent,
+            date = System.currentTimeMillis(),
+            images = images,
+            isPassword = isPassword,
+            categoryId = selectedCategoryId,
+            sounds = sounds,
+            isPinned = isPinned,
+            icon = selectedIcon,
+            isEncrypted = isEncrypted,
+            totalTasks = total,
+            completedTasks = completed
+        )
+
+        if (noteId != -1) {
+            note.id = noteId
+        }
+        noteViewModel.upsert(note)
+        onNavigateBack()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {},
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.arrow_left),
+                            contentDescription = "Geri",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
+                actions = {
+                    // Category Selection Pill
+                    Box {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(SoftOrangeLight)
+                                .clickable { showCategoryMenu = true }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = selectedCategoryName,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showCategoryMenu,
+                            onDismissRequest = { showCategoryMenu = false }
+                        ) {
+                            for (category in categoryList) {
+                                DropdownMenuItem(
+                                    text = { Text(category.name) },
+                                    onClick = {
+                                        selectedCategoryId = category.id
+                                        selectedCategoryName = category.name
+                                        showCategoryMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Bitwarden Lock Action Button
+                    IconButton(
+                        onClick = {
+                            if (!isPassword) {
+                                if (SecurityUtil.isPasswordSet(context)) {
+                                    isPassword = true
+                                    context.showToastShort("Nota Bitwarden kilidi eklendi")
+                                } else {
+                                    showPasswordDialog = true
+                                }
+                            } else {
+                                isPassword = false
+                                context.showToastShort("Kilit kaldırıldı")
+                            }
+                        }
+                    ) {
+                        Icon(
+                            painter = painterResource(id = if (isPassword) R.drawable.lock else R.drawable.unlock),
+                            contentDescription = "Kilit",
+                            tint = if (isPassword) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    // Save Button
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CharcoalGray)
+                            .clickable { saveNote() }
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Kaydet",
+                            color = PureWhite,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        },
+        bottomBar = {
+            NotionToolbar(
+                onAddBlock = { type ->
+                    blocks.add(NoteBlock(type = type, content = ""))
+                },
+                onPickImage = {
+                    pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
+                onRecordAudio = { handleRecordAudio() },
+                onOpenSlashMenu = { showSlashSheet = true },
+                modifier = Modifier.imePadding()
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(bottom = 100.dp)
+        ) {
+            // Notion Page Header (Emoji Icon + Title)
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .clickable { showEmojiSheet = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = selectedIcon ?: "➕",
+                            fontSize = 22.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    BasicTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        textStyle = TextStyle(
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        ),
+                        cursorBrush = SolidColor(VibrantOrange),
+                        decorationBox = { innerTextField ->
+                            if (title.isEmpty()) {
+                                Text(
+                                    text = "Başlıksız",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                )
+                            }
+                            innerTextField()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Dynamic Notion Blocks
+            itemsIndexed(blocks, key = { _, block -> block.id }) { index, block ->
+                NotionBlockRow(
+                    block = block,
+                    onContentChange = { newText ->
+                        blocks[index] = block.copy(content = newText)
+                    },
+                    onCheckedChange = { isChecked ->
+                        blocks[index] = block.copy(isChecked = isChecked)
+                    },
+                    onDeleteBlock = {
+                        if (blocks.size > 1) {
+                            blocks.removeAt(index)
+                        } else {
+                            blocks[0] = NoteBlock()
+                        }
+                    },
+                    onPlayAudio = { path ->
+                        audioRecorder.playRecording(path)
+                    }
+                )
+            }
+        }
+    }
+
+    // Emoji Picker Sheet
+    if (showEmojiSheet) {
+        EmojiPickerSheet(
+            onDismiss = { showEmojiSheet = false },
+            onSelectEmoji = { emoji -> selectedIcon = emoji }
+        )
+    }
+
+    // Slash Command Sheet
+    if (showSlashSheet) {
+        NotionSlashDialog(
+            onDismiss = { showSlashSheet = false },
+            onSelectBlock = { type ->
+                blocks.add(NoteBlock(type = type, content = ""))
+            }
+        )
+    }
+
+    // Set PIN dialog if not set yet
+    if (showPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showPasswordDialog = false
+                pinInput = ""
+            },
+            title = {
+                Text(text = "Yeni PIN Belirleyin", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column {
+                    Text(text = "Korumalı notlarınızı şifrelemek için 6 haneli bir PIN giriniz:")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = pinInput,
+                        onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) pinInput = it },
+                        placeholder = { Text("6 Haneli PIN") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (pinInput.length == 6) {
+                            SecurityUtil.savePassword(context, pinInput)
+                            isPassword = true
+                            showPasswordDialog = false
+                            pinInput = ""
+                            context.showToastShort("PIN kaydedildi ve not kilitlendi")
+                        } else {
+                            context.showToastShort("Lütfen 6 haneli bir PIN giriniz")
+                        }
+                    }
+                ) {
+                    Text("Kaydet", color = VibrantOrange, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPasswordDialog = false; pinInput = "" }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+}

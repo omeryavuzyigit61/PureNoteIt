@@ -1,7 +1,7 @@
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
     alias(libs.plugins.google.dagger.hilt)
     alias(libs.plugins.androidx.navigation.safe.args)
@@ -39,9 +39,9 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        compose = true
     }
 }
-
 
 dependencies {
     implementation(libs.androidx.core.ktx)
@@ -59,19 +59,32 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
-    //RXJava 2
+    // Jetpack Compose Material 3
+    val composeBom = platform(libs.androidx.compose.bom)
+    implementation(composeBom)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons)
+    implementation(libs.androidx.compose.runtime.livedata)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.coil.compose)
+
+    // RXJava 2
     implementation(libs.androidx.room.rxjava2)
     implementation(libs.rxandroid)
 
-    //Dagger Hilt
+    // Dagger Hilt
     implementation(libs.google.dagger.hilt)
     ksp(libs.google.dagger.hilt.compiler)
 
-    //Room
+    // Room
     implementation(libs.androidx.room.runtime)
-    ksp (libs.androidx.room.compiler)
+    ksp(libs.androidx.room.compiler)
 
-    //Glide
+    // Glide
     implementation(libs.glide)
     ksp(libs.glide.compiler)
 }
