@@ -3,16 +3,20 @@ package com.notes.purenoteit.data.db
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.io.Serializable
 
-@Entity(tableName = "notes",
+@Entity(
+    tableName = "notes",
     foreignKeys = [ForeignKey(
         entity = CategoryData::class,
         parentColumns = ["id"],
         childColumns = ["categoryId"],
         onDelete = ForeignKey.CASCADE,
-    )])
+    )],
+    indices = [Index(value = ["categoryId"])]
+)
 data class NoteData(
     @ColumnInfo(name = "title")
     var title: String? = null,

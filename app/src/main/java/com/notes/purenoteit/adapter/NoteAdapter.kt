@@ -1,22 +1,22 @@
 package com.notes.purenoteit.adapter
 
+import android.graphics.Rect
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupWindow
 import androidx.recyclerview.widget.RecyclerView
-import com.notes.purenoteit.data.db.NoteData
-import com.notes.purenoteit.databinding.ItemNoteBinding
-import com.notes.purenoteit.databinding.CustomNotePopupMenuBinding
-import com.notes.purenoteit.util.onItemClickListener
-import android.graphics.Rect
-import android.view.Gravity
-import com.notes.purenoteit.util.NoteAction
 import com.notes.purenoteit.R
+import com.notes.purenoteit.data.db.NoteData
+import com.notes.purenoteit.databinding.CustomNotePopupMenuBinding
+import com.notes.purenoteit.databinding.ItemNoteBinding
 import com.notes.purenoteit.util.GenericDiffUtil
+import com.notes.purenoteit.util.NoteAction
 import com.notes.purenoteit.util.formatDate
 import com.notes.purenoteit.util.hide
-
+import com.notes.purenoteit.util.onItemClickListener
+import com.notes.purenoteit.util.show
 
 class NoteAdapter(private val listener: onItemClickListener) :
     RecyclerView.Adapter<NoteAdapter.ListViewHolder>() {
@@ -36,6 +36,7 @@ class NoteAdapter(private val listener: onItemClickListener) :
             if (currentItem.isPassword == true) {
                 titleTextView.text = "******"
                 descriptionTextView.text = "***********\n***********"
+                noteLockImageView.show()
             } else {
                 titleTextView.text = currentItem.title
                 descriptionTextView.text = currentItem.description

@@ -302,12 +302,25 @@
         app:layout_constraintStart_toStartOf="@+id/titleEditText"
         app:layout_constraintTop_toBottomOf="@+id/titleEditText" />
 
-    <Button
-        android:id="@+id/shareButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Button"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+    <View
+        android:id="@+id/view2"
+        style="@style/allBackgroundTint"
+        android:layout_width="50dp"
+        android:layout_height="0dp"
+        android:background="@drawable/confirm_button_background"
+        app:layout_constraintBottom_toBottomOf="@+id/confirm_button"
+        app:layout_constraintEnd_toEndOf="@+id/shareButton"
+        app:layout_constraintStart_toStartOf="@+id/shareButton"
+        app:layout_constraintTop_toTopOf="@+id/shareButton" />
 
+    <ImageView
+        android:id="@+id/shareButton"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:background="@drawable/white_gray_circle_background"
+        android:padding="12dp"
+        android:src="@drawable/share_square"
+        android:tint="@color/gray"
+        app:layout_constraintBottom_toTopOf="@+id/confirm_button"
+        app:layout_constraintEnd_toEndOf="@+id/confirm_button" />
 </androidx.constraintlayout.widget.ConstraintLayout>

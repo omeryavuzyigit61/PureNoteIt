@@ -4,12 +4,9 @@ import android.Manifest
 import android.app.Activity
 import android.app.Dialog
 import android.content.ActivityNotFoundException
-import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.util.Log
@@ -20,6 +17,7 @@ import android.view.WindowManager
 import android.view.animation.AnimationUtils
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -44,6 +42,7 @@ import com.notes.purenoteit.databinding.FragmentAddBinding
 import com.notes.purenoteit.util.AudioRecorder
 import com.notes.purenoteit.util.NoteAction
 import com.notes.purenoteit.util.SearchViewUtil
+import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.hide
 import com.notes.purenoteit.util.onItemClickListener
 import com.notes.purenoteit.util.show
@@ -66,9 +65,6 @@ class AddFragment : Fragment(), onItemClickListener {
     private val categoryAdapter = SearchCategoryAdapter(this)
     private lateinit var audioRecorder: AudioRecorder
 
-
-    private lateinit var sharedPreferences: SharedPreferences
-
     private var noteData: NoteData? = null
     private var noteId: Int? = null
     private var checkedCategory: String = "Not"
@@ -88,10 +84,7 @@ class AddFragment : Fragment(), onItemClickListener {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        // Inflate the layout for this fragment
         _binding = FragmentAddBinding.inflate(inflater, container, false)
-        sharedPreferences =
-            requireContext().getSharedPreferences("MyPreferences", Context.MODE_PRIVATE)
         audioRecorder = AudioRecorder(requireContext())
         setupUi()
         loadNoteData()
@@ -112,15 +105,15 @@ class AddFragment : Fragment(), onItemClickListener {
                     binding.confirmButton.text = getString(R.string.save)
                     titleEditText.setText(note.title)
                     descriptionEditText.setText(note.description)
-                    val disposable =
+                    val catDisposable =
                         categoryViewModel.getCategoryById(note.categoryId!!).subscribe { data ->
                             binding.categorySearchView.customCategoryEditText.setText(data.name)
                             checkedCategory = data.name
                         }
-                    compositeDisposable.add(disposable)
+                    compositeDisposable.add(catDisposable)
                     isPassword = note.isPassword ?: false
-                    imageUriList = note.images!!.toMutableList()
-                    soundsPathList = note.sounds!!.toMutableList()
+                    imageUriList = (note.images ?: emptyList()).toMutableList()
+                    soundsPathList = (note.sounds ?: emptyList()).toMutableList()
                     if (soundsPathList.isEmpty()) {
                         binding.soundListRecyclerView.hide()
                     } else {
@@ -147,7 +140,7 @@ class AddFragment : Fragment(), onItemClickListener {
             soundListRecyclerView.adapter = soundAdapter
             soundListRecyclerView.viewTreeObserver.addOnGlobalLayoutListener {
                 val maxHeight =
-                    resources.getDimensionPixelSize(R.dimen.recycler_max_height) // 130dp
+                    resources.getDimensionPixelSize(R.dimen.recycler_max_height)
                 if (soundListRecyclerView.height > maxHeight) {
                     soundListRecyclerView.layoutParams = soundListRecyclerView.layoutParams.apply {
                         height = maxHeight
@@ -169,7 +162,7 @@ class AddFragment : Fragment(), onItemClickListener {
             menuImageView.setOnClickListener { toggleCategoryMenu() }
             categoryButton.setOnClickListener { handleCategorySelection() }
             confirmButton.setOnClickListener { saveNote() }
-            addImageView.setOnClickListener { checkPermissions() }
+            addImageView.setOnClickListener { openGallery() }
             soundImageView.setOnClickListener { startVoiceRecognition() }
             securityImageView.setOnClickListener { handleSecurity() }
             radioGroup.setOnCheckedChangeListener { _, checkedId ->
@@ -194,10 +187,7 @@ class AddFragment : Fragment(), onItemClickListener {
                 when (noteData?.categoryId) {
                     1 -> radioGroup.check(noteRadioButton.id)
                     2 -> radioGroup.check(diaryRadioButton.id)
-                    3 -> {
-                        radioGroup.check(importantRadioButton.id)
-                    }
-
+                    3 -> radioGroup.check(importantRadioButton.id)
                     else -> radioGroup.check(otherRadiButton.id)
                 }
             }
@@ -254,7 +244,7 @@ class AddFragment : Fragment(), onItemClickListener {
         } else {
             categoryViewModel.getCategoryIdByName(checkedCategory)
                 .removeObservers(viewLifecycleOwner)
-            categoryViewModel.getCategoryIdByName(checkedCategory).observe(viewLifecycleOwner) {
+            categoryViewModel.getCategoryIdByName(checkedCategory).observe(viewLifecycleOwner) { catId ->
                 if (binding.titleEditText.text.isNotEmpty() && binding.descriptionEditText.text.isNotEmpty()) {
                     val note = NoteData(
                         title = binding.titleEditText.text.toString(),
@@ -262,7 +252,7 @@ class AddFragment : Fragment(), onItemClickListener {
                         date = System.currentTimeMillis(),
                         images = imageUriList,
                         isPassword = isPassword,
-                        categoryId = it,
+                        categoryId = catId,
                         sounds = soundsPathList
                     )
                     if (noteData == null) {
@@ -274,7 +264,7 @@ class AddFragment : Fragment(), onItemClickListener {
                             date = note.date
                             images = note.images
                             isPassword = note.isPassword
-                            categoryId = note.categoryId
+                            this.categoryId = note.categoryId
                             sounds = note.sounds
                         }
                         viewModel.upsert(noteData!!)
@@ -284,19 +274,6 @@ class AddFragment : Fragment(), onItemClickListener {
                     requireContext().showToastShort(getString(R.string.titleanddescritionenter))
                 }
             }
-        }
-    }
-
-    private fun checkPermissions() {
-        if (ContextCompat.checkSelfPermission(
-                requireContext(), Manifest.permission.READ_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            // İzin zaten verilmiş, galeriyi aç
-            openGallery()
-        } else {
-            // İzin verilmemiş, izin iste
-            requestPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
     }
 
@@ -323,18 +300,14 @@ class AddFragment : Fragment(), onItemClickListener {
             if (result.resultCode == Activity.RESULT_OK && result.data != null) {
                 val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
                 matches?.let {
-                    val recognizedText = it[0] // Tanınan ilk metin sonucu
+                    val recognizedText = it[0]
                     when {
                         binding.titleEditText.hasFocus() -> {
-                            // editText1 odakta, değeri ekle
                             binding.titleEditText.append(recognizedText)
                         }
-
                         binding.descriptionEditText.hasFocus() -> {
-                            // editText2 odakta, değeri ekle
                             binding.descriptionEditText.append(recognizedText)
                         }
-
                         else -> {
                             binding.titleEditText.append(recognizedText)
                         }
@@ -355,63 +328,47 @@ class AddFragment : Fragment(), onItemClickListener {
         if (!isPassword) {
             showPasswordCustomDialog()
         } else {
-            requireContext().showToastShort("Biometrik Kaldırıldı Ama Notu Kaydetmeniz Gerekiyor")
+            requireContext().showToastShort("Kilit Kaldırıldı (Notu Kaydetmeyi Unutmayın)")
             isPassword = false
         }
     }
 
-    private fun openGallery() {
-        val intent = Intent(Intent.ACTION_PICK).apply {
-            type = "image/*"
-        }
-        pickImageLauncher.launch(intent)
-    }
-
     private var imageUriList = mutableListOf<String>()
     private var soundsPathList = mutableListOf<String>()
-    private val pickImageLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-                val imageUri = result.data?.data
-                imageUri?.let { uri ->
-                    try {
-                        // Create directory if it doesn't exist
-                        val imagesDir = File(requireContext().filesDir, "shared_images")
-                        imagesDir.mkdirs()
 
-                        // Create a new file with unique name
-                        val fileName = "note_image_${System.currentTimeMillis()}.jpg"
-                        val destinationFile = File(imagesDir, fileName)
+    private val pickMediaLauncher =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let { savePickedImage(it) }
+        }
 
-                        // Copy the content URI to our app's files directory
-                        requireContext().contentResolver.openInputStream(uri)?.use { input ->
-                            destinationFile.outputStream().use { output ->
-                                input.copyTo(output)
-                            }
-                        }
+    private fun openGallery() {
+        pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
 
-                        // Store the file path
-                        imageUriList.add(destinationFile.absolutePath)
-                        binding.constraintLayout.show()
-                        imageAdapter.setData(imageUriList)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        requireContext().showToastShort("Resim kaydedilemedi")
-                    }
+    private fun savePickedImage(uri: Uri) {
+        try {
+            val imagesDir = File(requireContext().filesDir, "shared_images")
+            if (!imagesDir.exists()) {
+                imagesDir.mkdirs()
+            }
+
+            val fileName = "note_image_${System.currentTimeMillis()}.jpg"
+            val destinationFile = File(imagesDir, fileName)
+
+            requireContext().contentResolver.openInputStream(uri)?.use { input ->
+                destinationFile.outputStream().use { output ->
+                    input.copyTo(output)
                 }
             }
-        }
 
-
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                openGallery()  // İzin verildiyse galeriyi aç
-            } else {
-                // İzin verilmedi, kullanıcıya bildirim
-                requireContext().showToastShort("İzin verilmedi")
-            }
+            imageUriList.add(destinationFile.absolutePath)
+            binding.constraintLayout.show()
+            imageAdapter.setData(imageUriList)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            requireContext().showToastShort("Resim kaydedilemedi")
         }
+    }
 
     override fun onItemClick(
         position: Int,
@@ -425,22 +382,16 @@ class AddFragment : Fragment(), onItemClickListener {
             }
 
             NoteAction.DELETE -> {
-                /*if (noteData != null) {
-                    imageUriList = noteData?.images as MutableList<String>
-                }*/
                 imageUriList.removeAt(position)
                 imageAdapter.setData(imageUriList)
             }
 
-            NoteAction.LOCK -> {
-
-            }
+            NoteAction.LOCK -> {}
 
             NoteAction.LIST -> {
                 val disposable = categoryViewModel.getCategoryById(position).subscribe { data ->
                     binding.categorySearchView.customCategoryEditText.setText(data.name)
                 }
-                //toggleCategoryMenu()
                 compositeDisposable.add(disposable)
             }
 
@@ -465,7 +416,7 @@ class AddFragment : Fragment(), onItemClickListener {
             .into(dialogBinding.dialogImageView)
 
         dialogBinding.dialogCancelButton.setOnClickListener {
-            dialog.dismiss() // Dialog'u kapat
+            dialog.dismiss()
         }
         dialog.window?.setLayout(
             WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT
@@ -476,7 +427,6 @@ class AddFragment : Fragment(), onItemClickListener {
     private var isPassword: Boolean = false
 
     private fun showPasswordCustomDialog() {
-        // Dialog oluştur
         val dialog = Dialog(requireContext())
         val dialogBinding: CustomPasswordDialogBinding =
             CustomPasswordDialogBinding.inflate(layoutInflater)
@@ -484,35 +434,26 @@ class AddFragment : Fragment(), onItemClickListener {
 
         dialogBinding.apply {
             dialogPasswordConfirmButton.setOnClickListener {
-                val passwordString = dialogPasswordEditText.text.toString()
-
-                // Girilen şifreyi integer'a dönüştür ve SharedPreferences'a kaydet
-                if (passwordString.isNotEmpty()) {
-                    val password = passwordString.toIntOrNull()
-                    if (password != null && passwordString.length == 6) {
-                        savePassword(password)
-                        dialog.dismiss()
-                    } else {
-                        // Geçersiz şifre
-                        requireContext().showToastShort("6 Haneli Bir PIN Giriniz")
-                    }
+                val pin = dialogPasswordEditText.text.toString().trim()
+                if (pin.length == 6 && pin.all { it.isDigit() }) {
+                    savePassword(pin)
+                    dialog.dismiss()
                 } else {
-                    requireContext().showToastShort("Şifre girin.")
+                    requireContext().showToastShort("6 Haneli Bir PIN Giriniz")
                 }
             }
         }
         dialog.show()
     }
 
-    private fun savePassword(password: Int) {
-        val savedPassword = sharedPreferences.getInt("password_key", -1)
-        if (!isPassword && savedPassword == -1) {
+    private fun savePassword(pin: String) {
+        if (!SecurityUtil.isPasswordSet(requireContext())) {
+            SecurityUtil.savePassword(requireContext(), pin)
             isPassword = true
-            sharedPreferences.edit().putInt("password_key", password).apply()
-            requireContext().showToastShort("Biometrik doğrulama açıldı")
-        } else if (password == savedPassword) {
+            requireContext().showToastShort("Şifre kaydedildi ve nota kilit eklendi")
+        } else if (SecurityUtil.verifyPassword(requireContext(), pin)) {
             isPassword = true
-            requireContext().showToastShort("Biometrik doğrulama açıldı")
+            requireContext().showToastShort("Nota kilit eklendi")
         } else {
             requireContext().showToastShort("Yanlış Şifre")
         }
@@ -538,11 +479,6 @@ class AddFragment : Fragment(), onItemClickListener {
         }
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        compositeDisposable.clear() // Tüm abonelikleri temizler
-    }
-
     private fun saveSoundDialog() {
         val dialog = Dialog(requireContext())
         val dialogBinding: CustomSaveDialogBinding =
@@ -562,16 +498,33 @@ class AddFragment : Fragment(), onItemClickListener {
         dialog.show()
     }
 
+    private val requestRecordAudioLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (!isGranted) {
+                requireContext().showToastShort("Ses kaydı için mikrofon izni gereklidir")
+            }
+        }
+
     private var isRecording = false
     private fun startStopSound(customSaveDialogBinding: CustomSaveDialogBinding) {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            requestRecordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+
         Glide.with(requireContext()).load(R.drawable.sound_wave_unscreen)
             .diskCacheStrategy(DiskCacheStrategy.DATA)
             .into(customSaveDialogBinding.waveAnimationImageView)
-        checkAndRequestPermissions()
+
         if (!isRecording) {
             val filePath = audioRecorder.startRecording()
             filePath?.let {
-                audioRecorder.stopPlaying() // Stop playback if listening without saving
+                audioRecorder.stopPlaying()
                 requireContext().showToastShort(getString(R.string.saving_sound))
             }
             isRecording = true
@@ -580,7 +533,7 @@ class AddFragment : Fragment(), onItemClickListener {
             val filePath = audioRecorder.stopRecording()
             filePath?.let {
                 customSaveDialogBinding.waveAnimationImageView.setImageResource(R.drawable.sound_wave_unscreen)
-                soundsPathList.add(filePath.toString())
+                soundsPathList.add(filePath)
                 soundAdapter.setData(soundsPathList)
                 binding.soundListRecyclerView.show()
                 Log.i("soundData", "Recorded sound= $filePath")
@@ -592,51 +545,44 @@ class AddFragment : Fragment(), onItemClickListener {
     }
 
     private fun cancelSound(dialogBinding: CustomSaveDialogBinding) {
-        if (isRecording) { // If a recording is ongoing
-            audioRecorder.cancelRecording(dialogBinding) // Cancel the recording
-            isRecording = false // Update the recording state
+        if (isRecording) {
+            audioRecorder.cancelRecording(dialogBinding)
+            isRecording = false
         }
     }
 
     private var currentPlayingFilePath: String? = null
     private var isPlaying = false
-    private var previousImageView: ImageView? = null // To keep track of the previous ImageView
+    private var previousImageView: ImageView? = null
 
     private fun listenSound(filePath: String, imageView: ImageView?) {
-        // If the same sound is playing, stop it
         if (isPlaying && currentPlayingFilePath == filePath) {
-            // Same sound clicked, stop it
             audioRecorder.stopPlaying()
-            imageView?.setImageResource(R.drawable.soundwave) // Pause icon
+            imageView?.setImageResource(R.drawable.soundwave)
             isPlaying = false
-            currentPlayingFilePath = null // Reset the current sound path
-            previousImageView = null // Reset the previous ImageView
+            currentPlayingFilePath = null
+            previousImageView = null
             Log.i("soundData", "Sound stopped: $filePath")
             return
         }
-        // If another sound is playing, stop the previous sound animation
         if (isPlaying) {
-            // Stop the animation for the previous sound and set it to default
-            previousImageView?.setImageResource(R.drawable.soundwave) // Reset the previous ImageView
+            previousImageView?.setImageResource(R.drawable.soundwave)
             audioRecorder.stopPlaying()
             isPlaying = false
         }
-        // Start playing the new sound recording
         audioRecorder.playRecording(filePath, onCompletion = {
             isPlaying = false
-            imageView?.setImageResource(R.drawable.soundwave) // Show pause icon when sound ends
-            currentPlayingFilePath = null // Reset the sound path when playback completes
-            previousImageView = null // Reset the previous ImageView when playback ends
+            imageView?.setImageResource(R.drawable.soundwave)
+            currentPlayingFilePath = null
+            previousImageView = null
         })
-        // Start animation for the new sound
         Glide.with(requireContext())
-            .load(R.drawable.soundwave) // Animated GIF
+            .load(R.drawable.soundwave)
             .diskCacheStrategy(DiskCacheStrategy.DATA)
             .into(imageView!!)
-        // Keep track of the new ImageView
         previousImageView = imageView
         isPlaying = true
-        currentPlayingFilePath = filePath // Save the current sound path
+        currentPlayingFilePath = filePath
         Log.i("soundData", "Playing sound= $filePath")
     }
 
@@ -644,78 +590,22 @@ class AddFragment : Fragment(), onItemClickListener {
         val isDeleted = audioRecorder.deleteRecording(filePath)
         if (isDeleted) {
             if (soundsPathList.isEmpty()) {
-                binding.soundListRecyclerView.hide() // RecyclerView'ı gizle
+                binding.soundListRecyclerView.hide()
                 requireContext().showToastShort("Ses Silindi")
             }
             Log.i("soundData", "Silinen Ses= $filePath")
         }
     }
 
-    private fun checkAndRequestPermissions() {
-        val permissions = mutableListOf(
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-        )
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
-
-        val ungrantedPermissions = permissions.filter {
-            ContextCompat.checkSelfPermission(
-                requireContext(),
-                it
-            ) != PackageManager.PERMISSION_GRANTED
-        }
-
-        if (ungrantedPermissions.isNotEmpty()) {
-            requestSoundPermissionLauncher.launch(ungrantedPermissions.toTypedArray())
-        } else {
-            // Tüm izinler zaten verilmiş
-            Log.d("Permissions", "All permissions granted")
-        }
-    }
-
-    private val requestSoundPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        // Kullanıcı izinlere yanıt verdiğinde burası çalışır
-        permissions.entries.forEach { entry ->
-            val permission = entry.key
-            val isGranted = entry.value
-            if (isGranted) {
-                // İzin verildi
-                Log.d("Permissions", "$permission granted")
-            } else {
-                // İzin reddedildi
-                Log.d("Permissions", "$permission denied")
-            }
-        }
-    }
-
-    /*for (path in imageUriList) {
-        val mediaFile = File(path)
-        val uri = FileProvider.getUriForFile(requireContext(), requireContext().getApplicationContext().getPackageName() + ".provider", mediaFile)
-        uriList.add(uri)
-    }*/
-    /*val mediaFile = File(uriString)
-    val uri = FileProvider.getUriForFile(
-        requireContext(),
-        requireContext().applicationContext.packageName + ".fileprovider",
-        mediaFile)
-    uriList.add(uri)*/
     private fun shareNote(title: String, description: String, imageUriList: MutableList<String>) {
         val shareIntent: Intent = Intent().apply {
             action = Intent.ACTION_SEND_MULTIPLE
             putExtra(Intent.EXTRA_SUBJECT, title)
-            //putExtra(Intent.EXTRA_TEXT, "$title\n\n$description")
+            putExtra(Intent.EXTRA_TEXT, "$title\n\n$description")
             type = if (imageUriList.isNotEmpty()) "image/*" else "text/plain"
 
             if (imageUriList.isNotEmpty()) {
                 val uriList = ArrayList<Uri>()
-                
                 imageUriList.forEach { filePath ->
                     try {
                         val file = File(filePath)
@@ -747,5 +637,11 @@ class AddFragment : Fragment(), onItemClickListener {
             e.printStackTrace()
             requireContext().showToastShort("Paylaşım başarısız")
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        compositeDisposable.clear()
+        _binding = null
     }
 }

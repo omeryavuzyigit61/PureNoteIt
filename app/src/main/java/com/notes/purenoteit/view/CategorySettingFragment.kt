@@ -1,8 +1,6 @@
 package com.notes.purenoteit.view
 
 import android.app.Dialog
-import android.content.Context
-import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -23,6 +21,7 @@ import com.notes.purenoteit.databinding.CustomCategoryAddBinding
 import com.notes.purenoteit.databinding.CustomPasswordDialogBinding
 import com.notes.purenoteit.databinding.FragmentCategorySettingBinding
 import com.notes.purenoteit.util.NoteAction
+import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.onItemClickListener
 import com.notes.purenoteit.util.showToastShort
 import com.notes.purenoteit.viewmodel.CategoryViewModel
@@ -35,24 +34,21 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
     private var _binding: FragmentCategorySettingBinding? = null
     private val binding get() = _binding!!
     private val adapter: CategoryAdapter = CategoryAdapter(this)
-    private lateinit var sharedPreferences: SharedPreferences
     private val categoryViewModel: CategoryViewModel by viewModels()
     private val compositeDisposable = CompositeDisposable()
+
+    private val edgeEffectColor = Color.parseColor("#FFA500")
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentCategorySettingBinding.inflate(inflater, container, false)
-        sharedPreferences = requireContext().getSharedPreferences("MyPreferences", Context.MODE_PRIVATE)
-
         setupUI()
         observeCategoryData()
-
         return binding.root
     }
 
-    val edgeEffectColor = Color.parseColor("#FFA500") // Turuncu renk
     private fun setupUI() = binding.apply {
         categoryRecyclerView.layoutManager = LinearLayoutManager(requireContext())
         categoryRecyclerView.adapter = adapter
@@ -79,7 +75,7 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
         categoryViewModel.getAllCategories()
     }
 
-    override fun onItemClick(position: Int, action: NoteAction, isPassword: Boolean?,imageView: ImageView?) {
+    override fun onItemClick(position: Int, action: NoteAction, isPassword: Boolean?, imageView: ImageView?) {
         when (action) {
             NoteAction.DELETE -> categoryViewModel.deleteCategoryById(position)
             NoteAction.EDIT -> showCategoryDialog(isEdit = true, position = position)
@@ -91,65 +87,67 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
     }
 
     private fun handleLockAction(position: Int) {
-        categoryViewModel.getCategoryById(position).subscribe { data ->
-            if (data.isPassword == false) {
+        val disposable = categoryViewModel.getCategoryById(position).subscribe { data ->
+            if (data.isPassword == false || data.isPassword == null) {
                 showPasswordDialog(data)
             } else {
                 data.isPassword = false
                 categoryViewModel.update(data)
+                requireContext().showToastShort("Kategori kilidi kaldırıldı")
             }
-        }.also { compositeDisposable.add(it) }
+        }
+        compositeDisposable.add(disposable)
     }
 
     private fun showCategoryDialog(isEdit: Boolean, position: Int? = null) {
         val dialog = Dialog(requireContext())
-            val dialogBinding = CustomCategoryAddBinding.inflate(layoutInflater)
-            dialog.setContentView(dialogBinding.root)
+        val dialogBinding = CustomCategoryAddBinding.inflate(layoutInflater)
+        dialog.setContentView(dialogBinding.root)
 
-            dialogBinding.apply {
-                categoryTitleTextView.text = if (isEdit) "Düzenleme" else "Ekleme"
-                confirmCategoryButton.text = if (isEdit) "Düzenle" else "Ekle"
+        dialogBinding.apply {
+            categoryTitleTextView.text = if (isEdit) "Düzenleme" else "Ekleme"
+            confirmCategoryButton.text = if (isEdit) "Düzenle" else "Ekle"
 
-                position?.let { pos ->
-                    if (isEdit) {
-                        categoryViewModel.getCategoryById(pos).subscribe { data ->
-                            categoryEditText.setText(data.name)
-                            confirmCategoryButton.setOnClickListener {
-                                updateCategory(data, categoryEditText.text.toString(),dialog)
-                            }
-                        }.also { compositeDisposable.add(it) }
+            position?.let { pos ->
+                if (isEdit) {
+                    val disposable = categoryViewModel.getCategoryById(pos).subscribe { data ->
+                        categoryEditText.setText(data.name)
+                        confirmCategoryButton.setOnClickListener {
+                            updateCategory(data, categoryEditText.text.toString(), dialog)
+                        }
                     }
-                } ?: run {
-                    confirmCategoryButton.setOnClickListener {
-                        addCategory(categoryEditText.text.toString(), dialog)
-                    }
+                    compositeDisposable.add(disposable)
                 }
-
-                cancelImageView.setOnClickListener { dialog.dismiss() }
+            } ?: run {
+                confirmCategoryButton.setOnClickListener {
+                    addCategory(categoryEditText.text.toString(), dialog)
+                }
             }
 
-            dialog.window?.setLayout(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT
-            )
+            cancelImageView.setOnClickListener { dialog.dismiss() }
+        }
+
+        dialog.window?.setLayout(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT
+        )
 
         dialog.show()
     }
 
     private fun showPasswordDialog(data: CategoryData) {
-        val dialog = Dialog(requireContext()).apply {
-            val dialogBinding = CustomPasswordDialogBinding.inflate(layoutInflater)
-            setContentView(dialogBinding.root)
+        val dialog = Dialog(requireContext())
+        val dialogBinding = CustomPasswordDialogBinding.inflate(layoutInflater)
+        dialog.setContentView(dialogBinding.root)
 
-            dialogBinding.apply {
-                dialogPasswordConfirmButton.setOnClickListener {
-                    val password = dialogPasswordEditText.text.toString().toIntOrNull()
-                    if (password != null && dialogPasswordEditText.text.length == 6) {
-                        savePassword(password, data)
-                        dismiss()
-                    } else {
-                        requireContext().showToastShort("6 Haneli Bir PIN Giriniz")
-                    }
+        dialogBinding.apply {
+            dialogPasswordConfirmButton.setOnClickListener {
+                val pin = dialogPasswordEditText.text.toString().trim()
+                if (pin.length == 6 && pin.all { it.isDigit() }) {
+                    savePassword(pin, data)
+                    dialog.dismiss()
+                } else {
+                    requireContext().showToastShort("6 Haneli Bir PIN Giriniz")
                 }
             }
         }
@@ -175,25 +173,24 @@ class CategorySettingFragment : Fragment(), onItemClickListener {
         }
     }
 
-    private fun savePassword(password: Int, data: CategoryData) {
-        val savedPassword = sharedPreferences.getInt("password_key", -1)
-        when {
-            savedPassword == -1 -> {
-                sharedPreferences.edit().putInt("password_key", password).apply()
-                data.isPassword = true
-                requireContext().showToastShort("Biometrik doğrulama açıldı")
-            }
-            password == savedPassword -> {
-                data.isPassword = true
-                requireContext().showToastShort("Biometrik doğrulama açıldı")
-            }
-            else -> requireContext().showToastShort("Yanlış Şifre")
+    private fun savePassword(pin: String, data: CategoryData) {
+        if (!SecurityUtil.isPasswordSet(requireContext())) {
+            SecurityUtil.savePassword(requireContext(), pin)
+            data.isPassword = true
+            categoryViewModel.update(data)
+            requireContext().showToastShort("Şifre kaydedildi ve kategori kilitlendi")
+        } else if (SecurityUtil.verifyPassword(requireContext(), pin)) {
+            data.isPassword = true
+            categoryViewModel.update(data)
+            requireContext().showToastShort("Kategori kilitlendi")
+        } else {
+            requireContext().showToastShort("Yanlış Şifre")
         }
-        categoryViewModel.update(data)
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    override fun onDestroyView() {
+        super.onDestroyView()
         compositeDisposable.clear()
+        _binding = null
     }
 }

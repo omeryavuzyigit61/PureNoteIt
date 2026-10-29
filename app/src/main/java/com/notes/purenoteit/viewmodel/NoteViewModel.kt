@@ -108,5 +108,4 @@ class NoteViewModel @Inject constructor(private val repository: NoteRepository) 
         super.onCleared()
         compositeDisposable.clear()
     }
-
 }

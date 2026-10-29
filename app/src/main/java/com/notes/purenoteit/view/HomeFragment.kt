@@ -1,6 +1,7 @@
 package com.notes.purenoteit.view
 
 import android.app.DatePickerDialog
+import android.app.Dialog
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -30,9 +31,11 @@ import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import com.notes.purenoteit.R
 import com.notes.purenoteit.adapter.NoteAdapter
 import com.notes.purenoteit.data.db.CategoryData
+import com.notes.purenoteit.databinding.CustomPasswordDialogBinding
 import com.notes.purenoteit.databinding.FragmentHomeBinding
 import com.notes.purenoteit.util.NoteAction
 import com.notes.purenoteit.util.SearchOption
+import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.SharedPrefencesUtil
 import com.notes.purenoteit.util.formatDate
 import com.notes.purenoteit.util.hide
@@ -98,6 +101,7 @@ class HomeFragment : Fragment(), onItemClickListener {
             getDarkAndLightMode(drawerSwitch)
             mainDrawerLayout.addDrawerListener(toggle)
             toggle.syncState()
+
             noteRecyclerView.layoutManager =
                 StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
             noteRecyclerView.adapter = adapter
@@ -218,9 +222,9 @@ class HomeFragment : Fragment(), onItemClickListener {
         if (categoryName == "Tümü") {
             viewModel.getAllNotes()
         } else {
-            categoryViewModel.isPasswordSet(categoryName).observe(viewLifecycleOwner) {
-                if (it) {
-                    showBiometricPrompt {
+            categoryViewModel.isPasswordSet(categoryName).observe(viewLifecycleOwner) { isPassword ->
+                if (isPassword) {
+                    authenticateWithBiometrics {
                         viewModel.searchNotesByCategory(categoryName)
                     }
                 } else {
@@ -369,93 +373,82 @@ class HomeFragment : Fragment(), onItemClickListener {
 
     private fun authenticateWithBiometrics(onSuccess: () -> Unit) {
         val biometricManager = BiometricManager.from(requireContext())
-
-        // Cihazın biyometrik destekleyip desteklemediğini kontrol edin
         val canAuthenticate = biometricManager.canAuthenticate(
             BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
         )
 
         when (canAuthenticate) {
             BiometricManager.BIOMETRIC_SUCCESS -> {
-                // Biyometrik destek mevcut
                 showBiometricPrompt(onSuccess)
             }
 
-            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
-                requireContext().showToastShort("Cihazda biyometrik doğrulama desteklenmiyor")
-            }
-
+            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED,
+            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE,
             BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
-                requireContext().showToastShort("Cihazda biyometrik doğrulama geçici olarak kullanılamıyor")
+                showPinFallbackDialog(onSuccess)
             }
 
-            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                openBiometricSetting()
-            }
-
-            BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED -> {
-                requireContext().showToastShort("Güvenlik güncellemesi yapılması gerekiyor")
-            }
-
-            BiometricManager.BIOMETRIC_ERROR_UNSUPPORTED -> {
-                requireContext().showToastShort("Cihaz biyometrik doğrulamayı desteklemiyor")
-            }
-
-            BiometricManager.BIOMETRIC_STATUS_UNKNOWN -> {
-                requireContext().showToastShort("Biyometrik durum bilinmiyor")
+            else -> {
+                showPinFallbackDialog(onSuccess)
             }
         }
     }
 
-
     private fun showBiometricPrompt(onSuccess: () -> Unit) {
         val executor = ContextCompat.getMainExecutor(requireContext())
-
-        // Doğrulama sonucunu dinleyen callback
         val biometricPrompt =
             BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
-                    // Doğrulama başarılı olduğunda
                     onSuccess()
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    requireContext().showToastShort("Doğrulama hatası: $errString")
+                    // If user cancels or biometrics fail, allow PIN fallback
+                    if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                        showPinFallbackDialog(onSuccess)
+                    }
                 }
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    requireContext().showToastShort("Doğrulama başarısız")
+                    requireContext().showToastShort("Biyometrik doğrulama başarısız")
                 }
             })
-        // BiometricPrompt penceresini yapılandırın
+
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Biyometrik Doğrulama")
-            .setSubtitle("Devam etmek için parmak izi doğrulaması yapın")
-            .setNegativeButtonText("İptal")
+            .setSubtitle("Devam etmek için parmak izinizi okutun")
+            .setNegativeButtonText("PIN ile Doğrula")
             .build()
 
-        // BiometricPrompt'u göster
         biometricPrompt.authenticate(promptInfo)
     }
 
-    @Suppress("DEPRECATION")
-    private fun openBiometricSetting() {
-        val intent = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
-                Intent(Settings.ACTION_BIOMETRIC_ENROLL)
-            }
+    private fun showPinFallbackDialog(onSuccess: () -> Unit) {
+        if (!SecurityUtil.isPasswordSet(requireContext())) {
+            onSuccess()
+            return
+        }
+        val dialog = Dialog(requireContext())
+        val dialogBinding = CustomPasswordDialogBinding.inflate(layoutInflater)
+        dialog.setContentView(dialogBinding.root)
 
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
-                Intent(Settings.ACTION_FINGERPRINT_ENROLL)
-            }
-
-            else -> {
-                Intent(Settings.ACTION_SECURITY_SETTINGS)
+        dialogBinding.dialogPasswordConfirmButton.setOnClickListener {
+            val enteredPin = dialogBinding.dialogPasswordEditText.text.toString().trim()
+            if (SecurityUtil.verifyPassword(requireContext(), enteredPin)) {
+                dialog.dismiss()
+                onSuccess()
+            } else {
+                requireContext().showToastShort("Yanlış PIN!")
             }
         }
-        activity?.startActivity(intent)
+        dialog.show()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

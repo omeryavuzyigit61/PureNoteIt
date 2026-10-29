@@ -3,6 +3,7 @@ package com.notes.purenoteit.util
 import android.content.Context
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.os.Build
 import android.util.Log
 import com.notes.purenoteit.R
 import com.notes.purenoteit.databinding.CustomSaveDialogBinding
@@ -13,14 +14,24 @@ class AudioRecorder(private val context: Context) {
     private var mediaPlayer: MediaPlayer? = null
     private var currentRecordingFilePath: String? = null
 
-    // Ses kaydını başlat
     fun startRecording(): String? {
-        val fileName = "recorded_audio_${System.currentTimeMillis()}.mp3"
-        val filePath =
-            context.getExternalFilesDir(android.os.Environment.DIRECTORY_MUSIC)?.absolutePath + "/" + fileName
+        val fileName = "recorded_audio_${System.currentTimeMillis()}.m4a"
+        val recordingsDir = File(context.filesDir, "recordings")
+        if (!recordingsDir.exists()) {
+            recordingsDir.mkdirs()
+        }
+        val file = File(recordingsDir, fileName)
+        val filePath = file.absolutePath
 
         try {
-            mediaRecorder = MediaRecorder().apply {
+            val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(context)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+
+            mediaRecorder = recorder.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -37,7 +48,6 @@ class AudioRecorder(private val context: Context) {
         return currentRecordingFilePath
     }
 
-    // Kaydı durdur
     fun stopRecording(): String? {
         try {
             mediaRecorder?.apply {
@@ -52,10 +62,9 @@ class AudioRecorder(private val context: Context) {
         return currentRecordingFilePath
     }
 
-    // Ses dosyasını çal
     fun playRecording(filePath: String, onCompletion: (() -> Unit)? = null) {
         try {
-            mediaPlayer?.release() // Eski MediaPlayer varsa serbest bırak
+            mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(filePath)
                 prepare()
@@ -71,7 +80,6 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    // Ses dosyasını durdur
     fun stopPlaying() {
         try {
             mediaPlayer?.apply {
@@ -115,7 +123,6 @@ class AudioRecorder(private val context: Context) {
             }
             mediaRecorder = null
 
-            // Geçici ses kaydı dosyasını sil
             currentRecordingFilePath?.let {
                 val file = File(it)
                 if (file.exists()) {
@@ -123,7 +130,7 @@ class AudioRecorder(private val context: Context) {
                 }
             }
 
-            currentRecordingFilePath = null // Geçerli dosya yolunu temizle
+            currentRecordingFilePath = null
             context.showToastShort("Ses kaydı iptal edildi")
             dialogBinding.waveAnimationImageView.setImageResource(R.drawable.sound_wave_unscreen)
             dialogBinding.startStopSoundButton.text = context.getString(R.string.start_sound)
