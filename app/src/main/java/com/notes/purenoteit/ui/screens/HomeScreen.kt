@@ -9,6 +9,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -20,8 +21,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -33,24 +36,25 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -188,77 +193,150 @@ fun HomeScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .width(300.dp),
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(20.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(VibrantOrange),
-                        contentAlignment = Alignment.Center
+                    // Modern App Logo & Brand Header
+                    Row(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.note),
-                            contentDescription = null,
-                            tint = PureWhite,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(SoftOrangeLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.note),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = "PureNoteIt",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 20.sp
+                                )
+                            )
+                            Text(
+                                text = "Notion & Kasa Mimarisi",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = BorderLight.copy(alpha = 0.5f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Menu Item: Category Management
+                    DrawerMenuTile(
+                        iconRes = R.drawable.category,
+                        title = "Kategori Yönetimi",
+                        subtitle = "Kategorileri yönet ve kilitle",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToCategorySettings()
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Menu Item: PIN & Vault Settings
+                    DrawerMenuTile(
+                        iconRes = R.drawable.lock,
+                        title = "PIN & Kasa Kilidi",
+                        subtitle = "Bitwarden güvenlik ayarları",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToPasswordSettings()
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Menu Item: Dark Mode Switch
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onToggleDarkTheme(!isDarkTheme) },
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(SoftOrangeLight),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.theme),
+                                    contentDescription = null,
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Karanlık Mod",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isDarkTheme) "Koyu tema aktif" else "Açık tema aktif",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                            }
+                            Switch(
+                                checked = isDarkTheme,
+                                onCheckedChange = { onToggleDarkTheme(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = PureWhite,
+                                    checkedTrackColor = VibrantOrange
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Footer
                     Text(
-                        text = "PureNoteIt",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        text = "PureNoteIt v1.0.0\nModern & Yumuşak Tasarım",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                     )
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                NavigationDrawerItem(
-                    label = { Text("Kategori Yönetimi") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onNavigateToCategorySettings()
-                    },
-                    icon = {
-                        Icon(painter = painterResource(id = R.drawable.category), contentDescription = null, tint = VibrantOrange)
-                    },
-                    colors = NavigationDrawerItemDefaults.colors(unselectedTextColor = MaterialTheme.colorScheme.onSurface)
-                )
-
-                NavigationDrawerItem(
-                    label = { Text("PIN & Güvenlik Kilidi") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onNavigateToPasswordSettings()
-                    },
-                    icon = {
-                        Icon(painter = painterResource(id = R.drawable.lock), contentDescription = null, tint = VibrantOrange)
-                    },
-                    colors = NavigationDrawerItemDefaults.colors(unselectedTextColor = MaterialTheme.colorScheme.onSurface)
-                )
-
-                NavigationDrawerItem(
-                    label = { Text(if (isDarkTheme) "Açık Moda Geç" else "Karanlık Modu Aç") },
-                    selected = false,
-                    onClick = {
-                        onToggleDarkTheme(!isDarkTheme)
-                    },
-                    icon = {
-                        Icon(painter = painterResource(id = R.drawable.theme), contentDescription = null, tint = VibrantOrange)
-                    },
-                    colors = NavigationDrawerItemDefaults.colors(unselectedTextColor = MaterialTheme.colorScheme.onSurface)
-                )
             }
         }
     ) {
@@ -268,6 +346,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.background)
+                        .statusBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Row(
@@ -279,15 +358,16 @@ fun HomeScreen(
                         IconButton(
                             onClick = { scope.launch { drawerState.open() } },
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(42.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.menu),
                                 contentDescription = "Menü",
                                 tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
@@ -321,20 +401,20 @@ fun HomeScreen(
                             )
                         }
 
-                        // Right actions: Search toggle & Grid/List view toggle
+                        // Right: Actions (Search & Layout Toggle)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
-                                onClick = {
-                                    isSearchExpanded = !isSearchExpanded
-                                    if (!isSearchExpanded) searchQuery = ""
-                                },
+                                onClick = { isSearchExpanded = !isSearchExpanded },
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(42.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(MaterialTheme.colorScheme.surface)
+                                    .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
                             ) {
                                 Icon(
-                                    painter = painterResource(id = if (isSearchExpanded) R.drawable.cancel else R.drawable.search),
+                                    painter = painterResource(
+                                        id = if (isSearchExpanded) R.drawable.cancel else R.drawable.search
+                                    ),
                                     contentDescription = "Ara",
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(18.dp)
@@ -346,14 +426,17 @@ fun HomeScreen(
                             IconButton(
                                 onClick = { isGridView = !isGridView },
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(42.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(MaterialTheme.colorScheme.surface)
+                                    .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
                             ) {
                                 Icon(
-                                    painter = painterResource(id = if (isGridView) R.drawable.calendar else R.drawable.apps_add),
-                                    contentDescription = "Görünüm",
-                                    tint = VibrantOrange,
+                                    painter = painterResource(
+                                        id = if (isGridView) R.drawable.category_alt else R.drawable.category
+                                    ),
+                                    contentDescription = "Görünüm Değiştir",
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -362,33 +445,26 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Horizontal Category Chips (Notion Style)
-                    val allCategories = listOf("Tümü") + categoryList.map { it.name }
+                    // Horizontal Category Chips
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        allCategories.forEach { categoryName ->
-                            val isSelected = selectedCategory == categoryName
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surface
-                                    )
-                                    .clickable { selectedCategory = categoryName }
-                                    .padding(horizontal = 14.dp, vertical = 7.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = categoryName,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                        CategoryChip(
+                            label = "Tümü",
+                            isSelected = selectedCategory == "Tümü",
+                            onClick = { selectedCategory = "Tümü" }
+                        )
+
+                        categoryList.forEach { category ->
+                            CategoryChip(
+                                label = category.name,
+                                isSelected = selectedCategory == category.name,
+                                isLocked = category.isPassword == true,
+                                onClick = { selectedCategory = category.name }
+                            )
                         }
                     }
                 }
@@ -399,36 +475,91 @@ fun HomeScreen(
                     containerColor = CharcoalGray,
                     contentColor = PureWhite,
                     shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(bottom = 8.dp, end = 4.dp)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.plus_small),
-                        contentDescription = "Yeni Not Ekle",
-                        tint = PureWhite,
-                        modifier = Modifier.size(28.dp)
+                        contentDescription = "Yeni Not",
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             },
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             if (filteredNotes.isEmpty()) {
+                // Modern, Soft Empty State (No 2000s emoji!)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "📝",
-                            fontSize = 48.sp
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(88.dp)
+                                .clip(CircleShape)
+                                .background(SoftOrangeLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.note),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(42.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
                         Text(
                             text = if (searchQuery.isNotBlank()) "Aramanızla eşleşen not bulunamadı" else "Henüz bir not yok",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = if (searchQuery.isNotBlank())
+                                "Farklı bir arama terimi deneyebilir veya kategoriyi değiştirebilirsiniz."
+                            else
+                                "Notion blokları, yapılacaklar listesi veya ses kaydı ile hemen yeni bir not oluşturun.",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                textAlign = TextAlign.Center,
+                                lineHeight = 18.sp
+                            )
+                        )
+
+                        if (searchQuery.isBlank()) {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Button(
+                                onClick = { onNavigateToAddNote(-1) },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = VibrantOrange,
+                                    contentColor = PureWhite
+                                )
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.plus_small),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(text = "Yeni Not Oluştur", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                        }
                     }
                 }
             } else {
@@ -445,13 +576,24 @@ fun HomeScreen(
                     ) {
                         if (pinnedNotes.isNotEmpty()) {
                             item(span = { GridItemSpan(2) }) {
-                                Text(
-                                    text = "📌 Sabitlenenler",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = VibrantOrange,
-                                    modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_pin),
+                                        contentDescription = null,
+                                        tint = VibrantOrange,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Sabitlenenler",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
 
                             items(pinnedNotes, key = { it.id }) { note ->
@@ -486,7 +628,6 @@ fun HomeScreen(
                         }
                     }
                 } else {
-                    // List View
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -514,25 +655,25 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = {
                 showPinDialog = false
-                enteredPin = ""
                 pendingUnlockNoteId = null
+                enteredPin = ""
             },
             title = {
-                Text(text = "Korumalı Not Kilidi", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = "Not Kilidini Aç", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             },
             text = {
                 Column {
                     Text(
-                        text = "Bu not AES-256 ile şifrelenmiştir. Devam etmek için 6 haneli PIN'inizi giriniz:",
-                        fontSize = 13.sp,
+                        text = "Bu not Bitwarden düzeyinde şifrelenmiştir. Erişim sağlamak için 6 haneli ana PIN kodunuzu girin:",
+                        fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = enteredPin,
-                        onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) enteredPin = it },
-                        placeholder = { Text("6 Haneli PIN") },
+                        onValueChange = { if (it.length <= 6 && it.all { char -> char.isDigit() }) enteredPin = it },
                         singleLine = true,
+                        placeholder = { Text("••••••") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -542,15 +683,16 @@ fun HomeScreen(
                 TextButton(
                     onClick = {
                         if (SecurityUtil.verifyPassword(context, enteredPin)) {
-                            showPinDialog = false
+                            SecurityUtil.unlockVault()
                             val targetId = pendingUnlockNoteId
-                            enteredPin = ""
+                            showPinDialog = false
                             pendingUnlockNoteId = null
+                            enteredPin = ""
                             if (targetId != null) {
                                 onNavigateToAddNote(targetId)
                             }
                         } else {
-                            context.showToastShort("Yanlış PIN!")
+                            context.showToastShort("Yanlış PIN Kodu")
                         }
                     }
                 ) {
@@ -561,15 +703,107 @@ fun HomeScreen(
                 TextButton(
                     onClick = {
                         showPinDialog = false
-                        enteredPin = ""
                         pendingUnlockNoteId = null
+                        enteredPin = ""
                     }
                 ) {
-                    Text("İptal", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("İptal")
                 }
             },
-            shape = RoundedCornerShape(20.dp),
-            containerColor = MaterialTheme.colorScheme.surface
+            shape = RoundedCornerShape(18.dp)
         )
+    }
+}
+
+@Composable
+private fun DrawerMenuTile(
+    iconRes: Int,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() },
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(SoftOrangeLight),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    tint = VibrantOrange,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryChip(
+    label: String,
+    isSelected: Boolean,
+    isLocked: Boolean = false,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surface)
+            .border(
+                1.dp,
+                if (isSelected) VibrantOrange else BorderLight.copy(alpha = 0.7f),
+                RoundedCornerShape(14.dp)
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (isLocked) {
+                Icon(
+                    painter = painterResource(id = R.drawable.lock),
+                    contentDescription = null,
+                    tint = if (isSelected) PureWhite else VibrantOrange,
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }

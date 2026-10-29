@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -102,6 +104,7 @@ fun CategoryManagementScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                modifier = Modifier.statusBarsPadding(),
                 title = {
                     Text(
                         text = "Kategoriler",
@@ -150,7 +153,8 @@ fun CategoryManagementScreen(
                 },
                 containerColor = VibrantOrange,
                 contentColor = PureWhite,
-                shape = CircleShape
+                shape = CircleShape,
+                modifier = Modifier.navigationBarsPadding().padding(bottom = 8.dp, end = 4.dp)
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.apps_add),

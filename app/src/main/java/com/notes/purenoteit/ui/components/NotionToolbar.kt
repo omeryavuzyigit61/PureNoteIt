@@ -1,5 +1,6 @@
 package com.notes.purenoteit.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,29 +44,28 @@ fun NotionToolbar(
     onPickImage: () -> Unit,
     onRecordAudio: () -> Unit,
     onOpenSlashMenu: () -> Unit,
+    isRecordingAudio: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(20.dp),
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp
+        border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.7f)),
+        shadowElevation = 8.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
                 .horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Notion Slash / [+] Quick Action Button
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(38.dp)
                     .clip(CircleShape)
                     .background(VibrantOrange)
                     .clickable { onOpenSlashMenu() },
@@ -79,98 +79,100 @@ fun NotionToolbar(
                 )
             }
 
-            ToolbarButton(label = "H1", onClick = { onAddBlock(BlockType.HEADING_1) })
-            ToolbarButton(label = "H2", onClick = { onAddBlock(BlockType.HEADING_2) })
+            // H1 Başlık (Heading 1) with clear icon & label
+            ToolbarItem(
+                iconRes = R.drawable.ic_format_h1,
+                label = "Başlık 1",
+                onClick = { onAddBlock(BlockType.HEADING_1) }
+            )
 
-            ToolbarIconButton(
+            // H2 Alt Başlık (Heading 2) with clear icon & label
+            ToolbarItem(
+                iconRes = R.drawable.ic_format_h2,
+                label = "Başlık 2",
+                onClick = { onAddBlock(BlockType.HEADING_2) }
+            )
+
+            // Görev / Checklist (To-Do)
+            ToolbarItem(
                 iconRes = R.drawable.ic_checklist,
                 label = "Görev",
                 onClick = { onAddBlock(BlockType.TODO) },
                 iconTint = VibrantOrange
             )
 
-            ToolbarIconButton(
+            // Madde İmleri (Bullet list)
+            ToolbarItem(
                 iconRes = R.drawable.ic_format_bullet,
                 label = "Liste",
                 onClick = { onAddBlock(BlockType.BULLET_LIST) }
             )
 
-            ToolbarIconButton(
+            // Vurgu / Alıntı Kutusu (Callout / Quote)
+            ToolbarItem(
                 iconRes = R.drawable.ic_format_quote,
                 label = "Alıntı",
                 onClick = { onAddBlock(BlockType.CALLOUT) }
             )
 
-            ToolbarButton(label = "— Çizgi", onClick = { onAddBlock(BlockType.DIVIDER) })
-
-            ToolbarIconButton(
+            // Fotoğraf Ekleme
+            ToolbarItem(
                 iconRes = R.drawable.picture,
-                label = "Resim",
+                label = "Fotoğraf",
                 onClick = onPickImage
             )
 
-            ToolbarIconButton(
+            // Ses Kaydı (changes visual style when recording)
+            ToolbarItem(
                 iconRes = R.drawable.microphone_lines,
-                label = "Ses",
+                label = if (isRecordingAudio) "Kaydediliyor..." else "Ses Kaydı",
                 onClick = onRecordAudio,
-                iconTint = VibrantOrange
+                iconTint = if (isRecordingAudio) Color(0xFFE53935) else VibrantOrange,
+                containerColor = if (isRecordingAudio) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            // Ayırıcı Çizgi (Divider)
+            ToolbarItem(
+                iconRes = R.drawable.category,
+                label = "Ayırıcı",
+                onClick = { onAddBlock(BlockType.DIVIDER) }
             )
         }
     }
 }
 
 @Composable
-private fun ToolbarButton(
-    label: String,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .height(36.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun ToolbarIconButton(
+private fun ToolbarItem(
     iconRes: Int,
     label: String,
     onClick: () -> Unit,
-    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant
+    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
 ) {
-    Box(
+    Surface(
         modifier = Modifier
-            .height(36.dp)
+            .height(38.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center
+            .clickable { onClick() },
+        color = containerColor,
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Icon(
                 painter = painterResource(id = iconRes),
                 contentDescription = null,
                 tint = iconTint,
-                modifier = Modifier.size(15.dp)
+                modifier = Modifier.size(17.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = label,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }

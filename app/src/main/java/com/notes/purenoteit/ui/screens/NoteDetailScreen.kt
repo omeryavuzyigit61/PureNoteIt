@@ -9,6 +9,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,8 +30,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -31,6 +41,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,6 +60,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,7 +77,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
+import coil.compose.AsyncImage
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
@@ -85,6 +98,7 @@ import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.showToastShort
 import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
+import kotlinx.coroutines.delay
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,6 +121,30 @@ fun NoteDetailScreen(
 
     val blocks = remember { mutableStateListOf<NoteBlock>() }
     var isRecordingAudio by remember { mutableStateOf(false) }
+    var recordingSeconds by remember { mutableIntStateOf(0) }
+
+    // Pulsing animation for audio recording
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
+    // Recording timer
+    LaunchedEffect(isRecordingAudio) {
+        if (isRecordingAudio) {
+            recordingSeconds = 0
+            while (true) {
+                delay(1000L)
+                recordingSeconds++
+            }
+        }
+    }
 
     // Dialog sheets
     var showEmojiSheet by remember { mutableStateOf(false) }
@@ -148,13 +186,18 @@ fun NoteDetailScreen(
                         blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = soundPath))
                     }
                 }
+
+                if (blocks.isEmpty()) {
+                    blocks.add(NoteBlock())
+                }
             }
         } else {
             blocks.clear()
-            blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = ""))
+            blocks.add(NoteBlock())
         }
     }
 
+    // Category name resolver
     LaunchedEffect(categoryList, selectedCategoryId) {
         val cat = categoryList.find { it.id == selectedCategoryId }
         if (cat != null) {
@@ -206,7 +249,7 @@ fun NoteDetailScreen(
             val path = audioRecorder.startRecording()
             if (path != null) {
                 isRecordingAudio = true
-                context.showToastShort("Ses kaydı başlatıldı...")
+                context.showToastShort("Ses kaydı başladı")
             }
         } else {
             val path = audioRecorder.stopRecording()
@@ -219,13 +262,11 @@ fun NoteDetailScreen(
     }
 
     fun saveNote() {
-        if (title.isBlank() && blocks.all { it.content.isBlank() && it.mediaPath == null }) {
-            context.showToastShort("Lütfen en azından bir başlık veya içerik giriniz")
-            return
-        }
+        val jsonContent = BlockParser.serialize(blocks)
 
-        val (total, completed) = BlockParser.calculateTasks(blocks)
-        val jsonContent = BlockParser.blocksToJson(blocks)
+        // Calculate tasks count
+        val total = blocks.count { it.type == BlockType.TODO }
+        val completed = blocks.count { it.type == BlockType.TODO && it.isChecked }
 
         // Bitwarden AES-256 GCM encryption
         val finalContent = if (isPassword) SecurityUtil.encrypt(jsonContent) else jsonContent
@@ -259,6 +300,7 @@ fun NoteDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                modifier = Modifier.statusBarsPadding(),
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -313,7 +355,7 @@ fun NoteDetailScreen(
                             if (!isPassword) {
                                 if (SecurityUtil.isPasswordSet(context)) {
                                     isPassword = true
-                                    context.showToastShort("Nota Bitwarden kilidi eklendi")
+                                    context.showToastShort("Not AES-256 ile şifrelendi")
                                 } else {
                                     showPasswordDialog = true
                                 }
@@ -355,17 +397,99 @@ fun NoteDetailScreen(
             )
         },
         bottomBar = {
-            NotionToolbar(
-                onAddBlock = { type ->
-                    blocks.add(NoteBlock(type = type, content = ""))
-                },
-                onPickImage = {
-                    pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                },
-                onRecordAudio = { handleRecordAudio() },
-                onOpenSlashMenu = { showSlashSheet = true },
-                modifier = Modifier.imePadding()
-            )
+            Column(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                // Live Audio Recording Banner with Timer & Soundwave
+                AnimatedVisibility(
+                    visible = isRecordingAudio,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    val timerText = String.format("%02d:%02d", recordingSeconds / 60, recordingSeconds % 60)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFFFFF0F0),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFCDD2)),
+                        shadowElevation = 6.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Pulsing red dot
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFE53935).copy(alpha = pulseAlpha))
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Ses Kaydediliyor...",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Color(0xFFC62828)
+                                    )
+                                    Text(
+                                        text = timerText,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFC62828).copy(alpha = 0.8f),
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                // Soundwave GIF
+                                AsyncImage(
+                                    model = R.drawable.sound_wave_unscreen,
+                                    contentDescription = "Ses Dalgası",
+                                    modifier = Modifier.size(width = 60.dp, height = 24.dp)
+                                )
+                            }
+
+                            // Finish & Add audio button
+                            Button(
+                                onClick = { handleRecordAudio() },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFE53935),
+                                    contentColor = PureWhite
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "Bitir & Ekle",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                NotionToolbar(
+                    onAddBlock = { type ->
+                        blocks.add(NoteBlock(type = type, content = ""))
+                    },
+                    onPickImage = {
+                        pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                    onRecordAudio = { handleRecordAudio() },
+                    onOpenSlashMenu = { showSlashSheet = true },
+                    isRecordingAudio = isRecordingAudio
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
@@ -378,28 +502,33 @@ fun NoteDetailScreen(
         ) {
             // Notion Page Header (Emoji Icon + Title)
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Page Emoji Icon
                     Box(
                         modifier = Modifier
                             .size(46.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.surface)
+                            .background(SoftOrangeLight)
                             .clickable { showEmojiSheet = true },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = selectedIcon ?: "➕",
-                            fontSize = 22.sp
-                        )
+                        if (selectedIcon != null) {
+                            Text(text = selectedIcon!!, fontSize = 24.sp)
+                        } else {
+                            Icon(
+                                painter = painterResource(id = R.drawable.apps_add),
+                                contentDescription = "İkon Seç",
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
 
+                    // Title with crisp contrast and clear placeholder
                     BasicTextField(
                         value = title,
                         onValueChange = { title = it },
@@ -412,10 +541,10 @@ fun NoteDetailScreen(
                         decorationBox = { innerTextField ->
                             if (title.isEmpty()) {
                                 Text(
-                                    text = "Başlıksız",
+                                    text = "Not Başlığı...",
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f)
                                 )
                             }
                             innerTextField()
@@ -424,7 +553,7 @@ fun NoteDetailScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
             // Dynamic Notion Blocks

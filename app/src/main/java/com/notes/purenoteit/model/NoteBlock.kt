@@ -33,6 +33,10 @@ object BlockParser {
         return PREFIX + gson.toJson(blocks)
     }
 
+    fun serialize(blocks: List<NoteBlock>): String {
+        return blocksToJson(blocks)
+    }
+
     fun parse(raw: String?): List<NoteBlock> {
         if (raw.isNullOrBlank()) {
             return listOf(NoteBlock(type = BlockType.PARAGRAPH, content = ""))

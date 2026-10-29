@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Divider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,9 +31,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,7 +70,7 @@ fun NotionBlockRow(
         BlockType.TODO -> TextStyle(
             fontSize = 15.sp,
             fontWeight = FontWeight.Normal,
-            color = if (block.isChecked) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onBackground,
+            color = if (block.isChecked) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onBackground,
             textDecoration = if (block.isChecked) TextDecoration.LineThrough else TextDecoration.None
         )
         BlockType.CALLOUT -> TextStyle(
@@ -110,7 +105,7 @@ fun NotionBlockRow(
                     Icon(
                         painter = painterResource(id = R.drawable.cancel),
                         contentDescription = "Sil",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                         modifier = Modifier.size(12.dp)
                     )
                 }
@@ -131,7 +126,7 @@ fun NotionBlockRow(
                         .clip(RoundedCornerShape(6.dp))
                         .border(
                             width = 1.5.dp,
-                            color = if (block.isChecked) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (block.isChecked) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             shape = RoundedCornerShape(6.dp)
                         )
                         .background(if (block.isChecked) VibrantOrange else Color.Transparent)
@@ -155,8 +150,33 @@ fun NotionBlockRow(
                     onValueChange = onContentChange,
                     textStyle = textStyle,
                     cursorBrush = SolidColor(VibrantOrange),
+                    decorationBox = { innerTextField ->
+                        if (block.content.isEmpty()) {
+                            Text(
+                                text = "Yapılacak görev...",
+                                style = textStyle.copy(
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+                                )
+                            )
+                        }
+                        innerTextField()
+                    },
                     modifier = Modifier.weight(1f)
                 )
+
+                if (block.content.isBlank()) {
+                    IconButton(
+                        onClick = onDeleteBlock,
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.cancel),
+                            contentDescription = "Sil",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
             }
         }
 
@@ -180,8 +200,33 @@ fun NotionBlockRow(
                     onValueChange = onContentChange,
                     textStyle = textStyle,
                     cursorBrush = SolidColor(VibrantOrange),
+                    decorationBox = { innerTextField ->
+                        if (block.content.isEmpty()) {
+                            Text(
+                                text = "Madde...",
+                                style = textStyle.copy(
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+                                )
+                            )
+                        }
+                        innerTextField()
+                    },
                     modifier = Modifier.weight(1f)
                 )
+
+                if (block.content.isBlank()) {
+                    IconButton(
+                        onClick = onDeleteBlock,
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.cancel),
+                            contentDescription = "Sil",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
             }
         }
 
@@ -206,6 +251,17 @@ fun NotionBlockRow(
                         onValueChange = onContentChange,
                         textStyle = textStyle,
                         cursorBrush = SolidColor(VibrantOrange),
+                        decorationBox = { innerTextField ->
+                            if (block.content.isEmpty()) {
+                                Text(
+                                    text = "Vurgulanmış not veya alıntı...",
+                                    style = textStyle.copy(
+                                        color = CharcoalGray.copy(alpha = 0.45f)
+                                    )
+                                )
+                            }
+                            innerTextField()
+                        },
                         modifier = Modifier.weight(1f)
                     )
 
@@ -278,11 +334,13 @@ fun NotionBlockRow(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { block.mediaPath?.let { onPlayAudio(it) } }
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { block.mediaPath?.let { onPlayAudio(it) } }
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .background(VibrantOrange),
                             contentAlignment = Alignment.Center
@@ -295,7 +353,7 @@ fun NotionBlockRow(
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         Column {
                             Text(
@@ -339,6 +397,24 @@ fun NotionBlockRow(
                     onValueChange = onContentChange,
                     textStyle = textStyle,
                     cursorBrush = SolidColor(VibrantOrange),
+                    decorationBox = { innerTextField ->
+                        if (block.content.isEmpty()) {
+                            val placeholderText = when (block.type) {
+                                BlockType.HEADING_1 -> "Başlık 1 (Büyük Başlık)..."
+                                BlockType.HEADING_2 -> "Başlık 2 (Alt Başlık)..."
+                                else -> "Not yazın veya '/' ile komutları açın..."
+                            }
+                            Text(
+                                text = placeholderText,
+                                style = textStyle.copy(
+                                    color = MaterialTheme.colorScheme.onBackground.copy(
+                                        alpha = if (block.type == BlockType.PARAGRAPH) 0.35f else 0.45f
+                                    )
+                                )
+                            )
+                        }
+                        innerTextField()
+                    },
                     modifier = Modifier.weight(1f)
                 )
 
