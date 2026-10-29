@@ -88,6 +88,7 @@ import com.notes.purenoteit.ui.components.EmojiPickerSheet
 import com.notes.purenoteit.ui.components.NotionBlockRow
 import com.notes.purenoteit.ui.components.NotionSlashDialog
 import com.notes.purenoteit.ui.components.NotionToolbar
+import com.notes.purenoteit.ui.components.SpotifyAudioVisualizer
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -122,6 +123,7 @@ fun NoteDetailScreen(
     val blocks = remember { mutableStateListOf<NoteBlock>() }
     var isRecordingAudio by remember { mutableStateOf(false) }
     var recordingSeconds by remember { mutableIntStateOf(0) }
+    var currentAmplitude by remember { mutableIntStateOf(0) }
 
     // Pulsing animation for audio recording
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -135,7 +137,7 @@ fun NoteDetailScreen(
         label = "pulseAlpha"
     )
 
-    // Recording timer
+    // Recording timer & live amplitude tracker
     LaunchedEffect(isRecordingAudio) {
         if (isRecordingAudio) {
             recordingSeconds = 0
@@ -143,6 +145,17 @@ fun NoteDetailScreen(
                 delay(1000L)
                 recordingSeconds++
             }
+        }
+    }
+
+    LaunchedEffect(isRecordingAudio) {
+        if (isRecordingAudio) {
+            while (true) {
+                currentAmplitude = audioRecorder.getMaxAmplitude()
+                delay(70L)
+            }
+        } else {
+            currentAmplitude = 0
         }
     }
 
@@ -450,29 +463,55 @@ fun NoteDetailScreen(
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
-                                // Soundwave GIF
-                                AsyncImage(
-                                    model = R.drawable.sound_wave_unscreen,
-                                    contentDescription = "Ses Dalgası",
-                                    modifier = Modifier.size(width = 60.dp, height = 24.dp)
+                                // Spotify Dynamic Equalizer Waveform
+                                SpotifyAudioVisualizer(
+                                    isPlayingOrRecording = isRecordingAudio,
+                                    currentAmplitude = currentAmplitude,
+                                    barCount = 14,
+                                    maxHeight = 24.dp,
+                                    minHeight = 4.dp,
+                                    barWidth = 2.5.dp,
+                                    barSpacing = 2.dp,
+                                    activeColor = Color(0xFFE53935)
                                 )
                             }
 
-                            // Finish & Add audio button
-                            Button(
-                                onClick = { handleRecordAudio() },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFE53935),
-                                    contentColor = PureWhite
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = "Bitir & Ekle",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Cancel Button
+                                IconButton(
+                                    onClick = {
+                                        audioRecorder.cancelRecording()
+                                        isRecordingAudio = false
+                                        context.showToastShort("Ses kaydı iptal edildi")
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.cancel),
+                                        contentDescription = "İptal",
+                                        tint = Color(0xFFE53935).copy(alpha = 0.7f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                // Finish & Add audio button
+                                Button(
+                                    onClick = { handleRecordAudio() },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFE53935),
+                                        contentColor = PureWhite
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "Bitir & Ekle",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -573,9 +612,7 @@ fun NoteDetailScreen(
                             blocks[0] = NoteBlock()
                         }
                     },
-                    onPlayAudio = { path ->
-                        audioRecorder.playRecording(path)
-                    }
+                    audioRecorder = audioRecorder
                 )
             }
         }
