@@ -27,7 +27,9 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
@@ -94,6 +96,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -744,8 +747,11 @@ fun HomeScreen(
             }
 
             // Pinned Notion Mobile Bottom Dock:
-            // Anchored cleanly to screen bottom, lifts smoothly by EXACTLY keyboard height (via safeDrawing),
-            // and never jumps into the center of the screen!
+            // Sits at the bottom above navigation bar when keyboard is closed.
+            // When keyboard is open, Android adjusts the window and the dock sits cleanly 6dp above the keyboard!
+            val density = LocalDensity.current
+            val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
+
             NotionMobileBottomDock(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
@@ -769,8 +775,8 @@ fun HomeScreen(
                 isDark = isDarkTheme,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+                    .then(
+                        if (!isKeyboardOpen) Modifier.navigationBarsPadding() else Modifier
                     )
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             )
