@@ -1,6 +1,8 @@
 package com.notes.purenoteit.ui.screens
 
 import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
@@ -22,11 +24,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -44,6 +48,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -76,6 +81,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -97,6 +103,8 @@ import com.notes.purenoteit.util.showToastShort
 import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 enum class NotionViewMode(val title: String, val iconRes: Int) {
     GRID("Kartlar", R.drawable.category),
@@ -128,6 +136,18 @@ fun HomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var isSearchExpanded by remember { mutableStateOf(false) }
     var currentViewMode by remember { mutableStateOf(NotionViewMode.GRID) }
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!matches.isNullOrEmpty()) {
+                searchQuery = matches[0]
+                isSearchExpanded = true
+            }
+        }
+    }
 
     // Dialog state for PIN unlock
     var pendingUnlockNoteId by remember { mutableStateOf<Int?>(null) }
@@ -498,22 +518,26 @@ fun HomeScreen(
                 }
             },
             floatingActionButton = {
-                FloatingActionButton(
-                    onClick = { onNavigateToAddNote(-1) },
-                    containerColor = CharcoalGray,
-                    contentColor = PureWhite,
-                    shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier
-                        .navigationBarsPadding()
-                        .padding(bottom = 8.dp, end = 4.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.plus_small),
-                        contentDescription = "Yeni Not",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                NotionMobileBottomDock(
+                    searchQuery = searchQuery,
+                    onSearchClick = { isSearchExpanded = true },
+                    onVoiceClick = {
+                        try {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Notlarda ara...")
+                            }
+                            speechLauncher.launch(intent)
+                        } catch (e: Exception) {
+                            context.showToastShort("Sesli arama cihazınızda desteklenmiyor")
+                        }
+                    },
+                    onAddNoteClick = { onNavigateToAddNote(-1) },
+                    isDark = isDarkTheme,
+                    modifier = Modifier.navigationBarsPadding()
+                )
             },
+            floatingActionButtonPosition = FabPosition.Center,
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             when (currentViewMode) {
@@ -580,8 +604,59 @@ fun HomeScreen(
                                 .padding(horizontal = 12.dp),
                             verticalItemSpacing = 10.dp,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)
                         ) {
+                            // Notion Mobile: "Son Kullanılanlar" (Recents) Cover Carousel (Görsel 5)
+                            if (searchQuery.isBlank() && filteredNotes.isNotEmpty()) {
+                                item(span = StaggeredGridItemSpan.FullLine) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 10.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = "Son Kullanılanlar",
+                                                    fontSize = 13.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "›",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                                )
+                                            }
+                                        }
+
+                                        LazyRow(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
+                                        ) {
+                                            val recentList = filteredNotes.take(6)
+                                            items(recentList, key = { "recent_${it.id}" }) { note ->
+                                                NotionRecentCoverCard(
+                                                    note = note,
+                                                    categoryList = categoryList,
+                                                    onClick = { handleNoteClick(note) },
+                                                    isDark = isDarkTheme
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             if (pinnedNotes.isNotEmpty()) {
                                 item(span = StaggeredGridItemSpan.FullLine) {
                                     Row(
@@ -623,6 +698,16 @@ fun HomeScreen(
                                             modifier = Modifier.padding(top = 10.dp, bottom = 4.dp, start = 4.dp)
                                         )
                                     }
+                                }
+                            } else if (searchQuery.isBlank() && filteredNotes.isNotEmpty()) {
+                                item(span = StaggeredGridItemSpan.FullLine) {
+                                    Text(
+                                        text = "Tüm Notlar",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
+                                    )
                                 }
                             }
 
@@ -912,6 +997,243 @@ private fun EmptyStateContent(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "Yeni Not Oluştur", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Notion Mobile "Son Kullanılanlar" (Recents) Cover Card.
+ * Inspired directly by Notion Mobile Official App (Image 5):
+ * - Aesthetic colored cover header (peach, mint, rose, sky, amber, lavender)
+ * - Overlapping Notion page icon / emoji badge
+ * - Bold title, clean date & category tag
+ */
+@Composable
+private fun NotionRecentCoverCard(
+    note: NoteData,
+    categoryList: List<CategoryData>,
+    onClick: () -> Unit,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val cat = categoryList.find { it.id == note.categoryId }
+    val coverColorsLight = listOf(
+        Color(0xFFFFEDD5), // Peach
+        Color(0xFFD1FAE5), // Mint
+        Color(0xFFFFE4E6), // Rose
+        Color(0xFFDBEAFE), // Sky
+        Color(0xFFFEF3C7), // Amber
+        Color(0xFFEDE9FE)  // Lavender
+    )
+    val coverColorsDark = listOf(
+        Color(0xFF382318),
+        Color(0xFF163124),
+        Color(0xFF361822),
+        Color(0xFF17283E),
+        Color(0xFF362C18),
+        Color(0xFF271A38)
+    )
+    val colorIndex = kotlin.math.abs((note.id * 31 + (note.categoryId ?: 0)).hashCode()) % coverColorsLight.size
+    val coverColor = if (isDark) coverColorsDark[colorIndex] else coverColorsLight[colorIndex]
+
+    Surface(
+        modifier = modifier
+            .width(135.dp)
+            .height(125.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        color = if (isDark) Color(0xFF1E1E22) else PureWhite,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isDark) Color(0xFF2A2A30) else BorderLight.copy(alpha = 0.6f)
+        ),
+        shadowElevation = 2.dp
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Top Cover Banner (40% height)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .background(coverColor)
+            )
+
+            // Overlapping Emoji Badge + Title + Date
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp)
+            ) {
+                // Emoji Icon Badge positioned at the boundary
+                Box(
+                    modifier = Modifier
+                        .offset(y = (-14).dp)
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(if (isDark) Color(0xFF26262B) else PureWhite)
+                        .border(
+                            1.dp,
+                            if (isDark) Color(0xFF36363E) else BorderLight.copy(alpha = 0.5f),
+                            RoundedCornerShape(7.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (!note.icon.isNullOrBlank()) note.icon!! else "📄",
+                        fontSize = 14.sp
+                    )
+                }
+
+                // Title and Date
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 18.dp, bottom = 6.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (note.title.isNullOrBlank()) "Başlıksız" else note.title!!,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) PureWhite else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 15.sp
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = SimpleDateFormat("d MMM", Locale("tr")).format(note.date),
+                            fontSize = 9.5.sp,
+                            color = if (isDark) PureWhite.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                        )
+                        if (cat != null) {
+                            Text(
+                                text = cat.name,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = VibrantOrange,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Notion Mobile Bottom Floating Dock (Ask AI / Search Pill + Circle Pen FAB).
+ * Faithful reproduction of Notion Mobile (Image 5):
+ * - Pill on the left: Search & Ask AI with Voice search microphone
+ * - Circle on the right: Floating Edit Pen for instant new note creation
+ */
+@Composable
+private fun NotionMobileBottomDock(
+    searchQuery: String,
+    onSearchClick: () -> Unit,
+    onVoiceClick: () -> Unit,
+    onAddNoteClick: () -> Unit,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Notion Search / Ask AI Pill
+        Surface(
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .clickable { onSearchClick() },
+            shape = RoundedCornerShape(24.dp),
+            color = if (isDark) Color(0xFF1E1E22) else PureWhite,
+            shadowElevation = 6.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isDark) Color(0xFF2E2E34) else BorderLight.copy(alpha = 0.8f)
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.search),
+                        contentDescription = "Ara",
+                        tint = if (isDark) PureWhite.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (searchQuery.isNotBlank()) searchQuery else "Notlarda ara veya sor...",
+                        fontSize = 13.sp,
+                        color = if (isDark) PureWhite.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                IconButton(
+                    onClick = onVoiceClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.microphone_lines),
+                        contentDescription = "Sesle Ara",
+                        tint = VibrantOrange,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+            }
+        }
+
+        // Notion Floating New Note Circle Button [ ✏️ ]
+        Surface(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .clickable { onAddNoteClick() },
+            shape = CircleShape,
+            color = if (isDark) Color(0xFF222228) else PureWhite,
+            shadowElevation = 6.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isDark) Color(0xFF2E2E34) else BorderLight.copy(alpha = 0.8f)
+            )
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.file_edit),
+                    contentDescription = "Yeni Not",
+                    tint = VibrantOrange,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }

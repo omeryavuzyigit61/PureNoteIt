@@ -32,6 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,8 +73,11 @@ private val MONTH_NAMES = listOf(
     "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
 )
 
-enum class CalendarTabMode {
-    WEEK, MONTH
+enum class CalendarTabMode(val label: String, val dayCount: Int) {
+    FIVE_DAYS("5 Gün", 5),
+    THREE_DAYS("3 Gün", 3),
+    ONE_DAY("1 Gün", 1),
+    MONTH("Aylık", 30)
 }
 
 data class CalendarDay(
@@ -85,54 +90,66 @@ data class NotionCategoryPalette(
     val lightBg: Color,
     val darkBg: Color,
     val accentBar: Color,
-    val textColor: Color,
-    val badgeBg: Color
+    val lightText: Color,
+    val darkText: Color,
+    val badgeBgLight: Color,
+    val badgeBgDark: Color
 )
 
 fun getCategoryPalette(categoryId: Int?, categoryName: String?): NotionCategoryPalette {
     return when (categoryId ?: 1) {
         1 -> NotionCategoryPalette(
-            lightBg = Color(0xFFFFF3E0), // Soft Peach
-            darkBg = Color(0xFF332014),
-            accentBar = Color(0xFFFF9800),
-            textColor = Color(0xFFE65100),
-            badgeBg = Color(0xFFFFE0B2)
+            lightBg = Color(0xFFFFF7ED), // Soft Orange Tint
+            darkBg = Color(0xFF241E1A),  // Deep Warm Charcoal
+            accentBar = Color(0xFFFF7A00), // Vibrant Orange
+            lightText = Color(0xFF9A3412),
+            darkText = PureWhite,
+            badgeBgLight = Color(0xFFFFEDD5),
+            badgeBgDark = Color(0xFF382314)
         )
         2 -> NotionCategoryPalette(
-            lightBg = Color(0xFFE8F5E9), // Soft Mint
-            darkBg = Color(0xFF142C19),
-            accentBar = Color(0xFF4CAF50),
-            textColor = Color(0xFF1B5E20),
-            badgeBg = Color(0xFFC8E6C9)
+            lightBg = Color(0xFFF0FDF4), // Soft Mint
+            darkBg = Color(0xFF16231A),  // Deep Green Charcoal
+            accentBar = Color(0xFF10B981), // Emerald
+            lightText = Color(0xFF065F46),
+            darkText = PureWhite,
+            badgeBgLight = Color(0xFFD1FAE5),
+            badgeBgDark = Color(0xFF133221)
         )
         3 -> NotionCategoryPalette(
-            lightBg = Color(0xFFFCE4EC), // Soft Rose
-            darkBg = Color(0xFF331620),
-            accentBar = Color(0xFFE91E63),
-            textColor = Color(0xFF880E4F),
-            badgeBg = Color(0xFFF8BBD0)
+            lightBg = Color(0xFFFFF1F2), // Soft Rose
+            darkBg = Color(0xFF26181C),  // Deep Rose Charcoal
+            accentBar = Color(0xFFF43F5E), // Rose
+            lightText = Color(0xFF9F1239),
+            darkText = PureWhite,
+            badgeBgLight = Color(0xFFFFE4E6),
+            badgeBgDark = Color(0xFF3B1720)
         )
         4 -> NotionCategoryPalette(
-            lightBg = Color(0xFFEDE7F6), // Soft Lavender
-            darkBg = Color(0xFF221733),
-            accentBar = Color(0xFF9C27B0),
-            textColor = Color(0xFF4A148C),
-            badgeBg = Color(0xFFD1C4E9)
+            lightBg = Color(0xFFF5F3FF), // Soft Purple
+            darkBg = Color(0xFF1F1A28),  // Deep Purple Charcoal
+            accentBar = Color(0xFF8B5CF6), // Purple
+            lightText = Color(0xFF5B21B6),
+            darkText = PureWhite,
+            badgeBgLight = Color(0xFFEDE9FE),
+            badgeBgDark = Color(0xFF2C1F3F)
         )
         5 -> NotionCategoryPalette(
-            lightBg = Color(0xFFE1F5FE), // Soft Sky Blue
-            darkBg = Color(0xFF132733),
-            accentBar = Color(0xFF03A9F4),
-            textColor = Color(0xFF01579B),
-            badgeBg = Color(0xFFB3E5FC)
+            lightBg = Color(0xFFEFF6FF), // Soft Sky
+            darkBg = Color(0xFF171E28),  // Deep Blue Charcoal
+            accentBar = Color(0xFF3B82F6), // Blue
+            lightText = Color(0xFF1E40AF),
+            darkText = PureWhite,
+            badgeBgLight = Color(0xFFDBEAFE),
+            badgeBgDark = Color(0xFF17283E)
         )
         else -> {
             val hash = (categoryName ?: "").hashCode()
             when (kotlin.math.abs(hash) % 4) {
-                0 -> NotionCategoryPalette(Color(0xFFFFF8E1), Color(0xFF332A13), Color(0xFFFFB300), Color(0xFFF57F17), Color(0xFFFFECB3))
-                1 -> NotionCategoryPalette(Color(0xFFEDE7F6), Color(0xFF211733), Color(0xFF7E57C2), Color(0xFF311B92), Color(0xFFD1C4E9))
-                2 -> NotionCategoryPalette(Color(0xFFE0F7FA), Color(0xFF132D30), Color(0xFF00ACC1), Color(0xFF006064), Color(0xFFB2EBF2))
-                else -> NotionCategoryPalette(Color(0xFFFBE9E7), Color(0xFF331B15), Color(0xFFFF7043), Color(0xFFBF360C), Color(0xFFFFCCBC))
+                0 -> NotionCategoryPalette(Color(0xFFFFFBEB), Color(0xFF242017), Color(0xFFF59E0B), Color(0xFF92400E), PureWhite, Color(0xFFFEF3C7), Color(0xFF362512))
+                1 -> NotionCategoryPalette(Color(0xFFF3E8FF), Color(0xFF201828), Color(0xFFA855F7), Color(0xFF6B21A8), PureWhite, Color(0xFFF3E8FF), Color(0xFF311C3D))
+                2 -> NotionCategoryPalette(Color(0xFFECFEFF), Color(0xFF152225), Color(0xFF06B6D4), Color(0xFF0E7490), PureWhite, Color(0xFFCFFAFE), Color(0xFF122C33))
+                else -> NotionCategoryPalette(Color(0xFFFFF7ED), Color(0xFF241C18), Color(0xFFEA580C), Color(0xFF9A3412), PureWhite, Color(0xFFFFEDD5), Color(0xFF381F17))
             }
         }
     }
@@ -154,7 +171,7 @@ fun NotionCalendarView(
     onAddNoteForDate: (targetDateMs: Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var calendarTab by remember { mutableStateOf(CalendarTabMode.WEEK) }
+    var calendarTab by remember { mutableStateOf(CalendarTabMode.FIVE_DAYS) }
 
     var displayedCalendar by remember {
         mutableStateOf(Calendar.getInstance())
@@ -168,24 +185,26 @@ fun NotionCalendarView(
         generateMonthDays(displayedCalendar)
     }
 
-    // Days for the currently displayed week (Monday to Sunday)
-    val currentWeekDays = remember(displayedCalendar.get(Calendar.YEAR), displayedCalendar.get(Calendar.WEEK_OF_YEAR)) {
-        generateWeekDays(displayedCalendar)
+    val displayedDays = remember(displayedCalendar.timeInMillis, calendarTab) {
+        generateDaysForMode(displayedCalendar, calendarTab)
     }
 
-    val isDark = isSystemInDarkTheme()
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
-        // Notion Calendar Header: Month + Tab Switcher (Haftalık / Aylık) + Navigation
+        // Notion Calendar Header: Month + Tab Switcher (5 Gün / 3 Gün / 1 Gün / Aylık) + Navigation
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.6f))
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isDark) Color(0xFF2A2A2E) else BorderLight.copy(alpha = 0.6f)
+            )
         ) {
             Column(
                 modifier = Modifier
@@ -210,7 +229,7 @@ fun NotionCalendarView(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(SoftOrangeLight)
+                                .background(if (isDark) Color(0xFF2E1C12) else SoftOrangeLight)
                                 .clickable {
                                     val now = Calendar.getInstance()
                                     displayedCalendar = now.clone() as Calendar
@@ -221,7 +240,7 @@ fun NotionCalendarView(
                         ) {
                             Text(
                                 text = "Bugün",
-                                fontSize = 11.sp,
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = VibrantOrange
                             )
@@ -233,10 +252,11 @@ fun NotionCalendarView(
                         IconButton(
                             onClick = {
                                 val newCal = displayedCalendar.clone() as Calendar
-                                if (calendarTab == CalendarTabMode.WEEK) {
-                                    newCal.add(Calendar.WEEK_OF_YEAR, -1)
-                                } else {
-                                    newCal.add(Calendar.MONTH, -1)
+                                when (calendarTab) {
+                                    CalendarTabMode.FIVE_DAYS -> newCal.add(Calendar.DAY_OF_YEAR, -5)
+                                    CalendarTabMode.THREE_DAYS -> newCal.add(Calendar.DAY_OF_YEAR, -3)
+                                    CalendarTabMode.ONE_DAY -> newCal.add(Calendar.DAY_OF_YEAR, -1)
+                                    CalendarTabMode.MONTH -> newCal.add(Calendar.MONTH, -1)
                                 }
                                 displayedCalendar = newCal
                             },
@@ -254,10 +274,11 @@ fun NotionCalendarView(
                         IconButton(
                             onClick = {
                                 val newCal = displayedCalendar.clone() as Calendar
-                                if (calendarTab == CalendarTabMode.WEEK) {
-                                    newCal.add(Calendar.WEEK_OF_YEAR, 1)
-                                } else {
-                                    newCal.add(Calendar.MONTH, 1)
+                                when (calendarTab) {
+                                    CalendarTabMode.FIVE_DAYS -> newCal.add(Calendar.DAY_OF_YEAR, 5)
+                                    CalendarTabMode.THREE_DAYS -> newCal.add(Calendar.DAY_OF_YEAR, 3)
+                                    CalendarTabMode.ONE_DAY -> newCal.add(Calendar.DAY_OF_YEAR, 1)
+                                    CalendarTabMode.MONTH -> newCal.add(Calendar.MONTH, 1)
                                 }
                                 displayedCalendar = newCal
                             },
@@ -273,49 +294,36 @@ fun NotionCalendarView(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // View Switcher: "Haftalık" vs "Aylık" (Notion Calendar Style)
+                // View Switcher: "5 Gün", "3 Gün", "1 Gün", "Aylık" (Notion Calendar Style)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.background)
+                        .background(if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.background)
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (calendarTab == CalendarTabMode.WEEK) VibrantOrange else Color.Transparent)
-                            .clickable { calendarTab = CalendarTabMode.WEEK }
-                            .padding(vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Haftalık Kolon Takvim",
-                            fontSize = 12.sp,
-                            fontWeight = if (calendarTab == CalendarTabMode.WEEK) FontWeight.Bold else FontWeight.Medium,
-                            color = if (calendarTab == CalendarTabMode.WEEK) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (calendarTab == CalendarTabMode.MONTH) VibrantOrange else Color.Transparent)
-                            .clickable { calendarTab = CalendarTabMode.MONTH }
-                            .padding(vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Aylık Tablo Görünümü",
-                            fontSize = 12.sp,
-                            fontWeight = if (calendarTab == CalendarTabMode.MONTH) FontWeight.Bold else FontWeight.Medium,
-                            color = if (calendarTab == CalendarTabMode.MONTH) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
+                    for (mode in CalendarTabMode.values()) {
+                        val isSelected = calendarTab == mode
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) VibrantOrange else Color.Transparent)
+                                .clickable { calendarTab = mode }
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = mode.label,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
@@ -323,24 +331,25 @@ fun NotionCalendarView(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Body: Authentic Notion Multi-Column Week Grid vs Month Grid
-        if (calendarTab == CalendarTabMode.WEEK) {
-            NotionMultiColumnWeekView(
-                weekDays = currentWeekDays,
-                notes = notes,
-                categories = categories,
-                selectedCalendar = selectedCalendar,
-                onNoteClick = onNoteClick,
-                onAddNoteForDate = onAddNoteForDate,
-                isDark = isDark
-            )
-        } else {
+        // Body: Authentic Notion Multi-Column Schedule vs Month Grid
+        if (calendarTab == CalendarTabMode.MONTH) {
             NotionMonthScheduleView(
                 monthDays = currentMonthDays,
                 notes = notes,
                 categories = categories,
                 selectedCalendar = selectedCalendar,
                 onSelectDay = { selectedCalendar = it },
+                onNoteClick = onNoteClick,
+                onAddNoteForDate = onAddNoteForDate,
+                isDark = isDark
+            )
+        } else {
+            NotionMultiColumnWeekView(
+                days = displayedDays,
+                tabMode = calendarTab,
+                notes = notes,
+                categories = categories,
+                selectedCalendar = selectedCalendar,
                 onNoteClick = onNoteClick,
                 onAddNoteForDate = onAddNoteForDate,
                 isDark = isDark
@@ -357,7 +366,8 @@ fun NotionCalendarView(
  */
 @Composable
 private fun NotionMultiColumnWeekView(
-    weekDays: List<CalendarDay>,
+    days: List<CalendarDay>,
+    tabMode: CalendarTabMode,
     notes: List<NoteData>,
     categories: List<CategoryData>,
     selectedCalendar: Calendar,
@@ -368,8 +378,8 @@ private fun NotionMultiColumnWeekView(
     val listState = rememberLazyListState()
 
     // Automatically scroll to Today so user NEVER has to scroll down or search for today
-    val todayIndex = remember(weekDays) {
-        weekDays.indexOfFirst { isSameDay(it.calendar, Calendar.getInstance()) }
+    val todayIndex = remember(days) {
+        days.indexOfFirst { isSameDay(it.calendar, Calendar.getInstance()) }
     }
 
     LaunchedEffect(todayIndex) {
@@ -382,40 +392,68 @@ private fun NotionMultiColumnWeekView(
         modifier = Modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(18.dp)),
-        color = MaterialTheme.colorScheme.surface
+            .border(
+                1.dp,
+                if (isDark) Color(0xFF2A2A2E) else BorderLight.copy(alpha = 0.6f),
+                RoundedCornerShape(18.dp)
+            ),
+        color = if (isDark) Color(0xFF131316) else MaterialTheme.colorScheme.surface
     ) {
         LazyRow(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
         ) {
-            items(weekDays) { day ->
+            items(days) { day ->
                 val isToday = isSameDay(day.calendar, Calendar.getInstance())
                 val dayNotes = notes.filter { note ->
                     val noteCal = Calendar.getInstance().apply { timeInMillis = note.date }
                     isSameDay(noteCal, day.calendar)
                 }
 
+                val columnWidth = when (tabMode) {
+                    CalendarTabMode.ONE_DAY -> 330.dp
+                    CalendarTabMode.THREE_DAYS -> 190.dp
+                    else -> 145.dp
+                }
+
+                val columnBg = if (isToday) {
+                    if (isDark) Color(0xFF221A14) else SoftOrangeLight.copy(alpha = 0.35f)
+                } else {
+                    if (isDark) Color(0xFF18181C) else Color(0xFFFAFAFC)
+                }
+
+                val columnBorder = if (isToday) {
+                    VibrantOrange.copy(alpha = 0.7f)
+                } else {
+                    if (isDark) Color(0xFF2A2A2E) else Color(0xFFE5E7EB)
+                }
+
                 // Notion Day Column (Notes reside directly inside this column container!)
                 Column(
                     modifier = Modifier
-                        .width(175.dp)
+                        .width(columnWidth)
                         .fillMaxHeight()
                         .padding(horizontal = 4.dp)
                         .border(
                             width = 1.dp,
-                            color = if (isToday) VibrantOrange.copy(alpha = 0.4f) else BorderLight.copy(alpha = 0.4f),
+                            color = columnBorder,
                             shape = RoundedCornerShape(14.dp)
                         )
                         .clip(RoundedCornerShape(14.dp))
-                        .background(if (isToday) SoftOrangeLight.copy(alpha = 0.25f) else Color.Transparent)
+                        .background(columnBg)
                 ) {
                     // Column Header: Day Name + Date Pill (matching Notion Calendar)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(if (isToday) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            .background(
+                                if (isToday) {
+                                    if (isDark) Color(0xFF2E1C12) else SoftOrangeLight
+                                } else {
+                                    if (isDark) Color(0xFF1E1E22) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                }
+                            )
                             .padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -425,7 +463,7 @@ private fun NotionMultiColumnWeekView(
                                 text = SimpleDateFormat("EEE", Locale("tr")).format(day.calendar.time),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isToday) VibrantOrange else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                color = if (isToday) VibrantOrange else if (isDark) PureWhite.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Box(
@@ -439,7 +477,7 @@ private fun NotionMultiColumnWeekView(
                                     text = "${day.dayOfMonth}",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isToday) PureWhite else MaterialTheme.colorScheme.onSurface
+                                    color = if (isToday) PureWhite else if (isDark) PureWhite else MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -448,7 +486,7 @@ private fun NotionMultiColumnWeekView(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.surface)
+                                .background(if (isDark) Color(0xFF2E1C12) else MaterialTheme.colorScheme.surface)
                                 .clickable { onAddNoteForDate(day.calendar.timeInMillis) }
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
@@ -461,7 +499,7 @@ private fun NotionMultiColumnWeekView(
                         }
                     }
 
-                    // Inside the Column: Vertical scrollable list of notes for this day
+                    // Inside the Column: Vertical scrollable list of notes + Notion 24h Timeline
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -470,28 +508,8 @@ private fun NotionMultiColumnWeekView(
                             .padding(6.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (dayNotes.isEmpty()) {
-                            // Dashed Empty Slot inside column (tap to add)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(90.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-                                    .border(1.dp, BorderLight.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                                    .clickable { onAddNoteForDate(day.calendar.timeInMillis) }
-                                    .padding(8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "+ Not Ekle",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        } else {
+                        // 1. Day Notes (Rendered directly in the column with crisp contrast)
+                        if (dayNotes.isNotEmpty()) {
                             dayNotes.forEach { note ->
                                 NotionCalendarEventCard(
                                     note = note,
@@ -501,22 +519,79 @@ private fun NotionMultiColumnWeekView(
                                     isColumnMode = true
                                 )
                             }
+                        }
 
-                            // Quick add button under notes
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { onAddNoteForDate(day.calendar.timeInMillis) }
-                                    .padding(vertical = 4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "+ Not Ekle",
-                                    fontSize = 10.sp,
-                                    color = VibrantOrange,
-                                    fontWeight = FontWeight.Bold
-                                )
+                        // 2. Notion Timeline Hours with Live Now Indicator (Görsel 4'ten Esinlenildi)
+                        val timelineMilestones = listOf(9, 11, 13, 15, 17, 19, 21)
+                        val nowCal = Calendar.getInstance()
+                        val currentHour = nowCal.get(Calendar.HOUR_OF_DAY)
+
+                        for (hour in timelineMilestones) {
+                            val slotCal = day.calendar.clone() as Calendar
+                            slotCal.set(Calendar.HOUR_OF_DAY, hour)
+                            slotCal.set(Calendar.MINUTE, 0)
+
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                // Live "Now" Indicator Line if today and matching current hour block
+                                if (isToday && (currentHour == hour || (currentHour > hour && currentHour < hour + 2))) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(Color(0xFFEF4444))
+                                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                                        ) {
+                                            Text(
+                                                text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(nowCal.time),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = PureWhite
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        HorizontalDivider(
+                                            modifier = Modifier.weight(1f),
+                                            thickness = 1.5.dp,
+                                            color = Color(0xFFEF4444)
+                                        )
+                                    }
+                                }
+
+                                // Timeline Slot
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { onAddNoteForDate(slotCal.timeInMillis) }
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "${hour.toString().padStart(2, '0')}:00",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDark) PureWhite.copy(alpha = 0.4f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    )
+                                    HorizontalDivider(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 6.dp),
+                                        thickness = 0.5.dp,
+                                        color = if (isDark) Color(0xFF2A2A2E) else Color(0xFFE5E7EB)
+                                    )
+                                    Text(
+                                        text = "+",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VibrantOrange.copy(alpha = 0.7f)
+                                    )
+                                }
                             }
                         }
                     }
@@ -564,8 +639,11 @@ private fun NotionMonthScheduleView(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.6f))
+        color = if (isDark) Color(0xFF161619) else MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isDark) Color(0xFF2A2A2E) else BorderLight.copy(alpha = 0.6f)
+        )
     ) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
@@ -590,12 +668,13 @@ private fun NotionMonthScheduleView(
                         .clip(RoundedCornerShape(8.dp))
                         .border(
                             width = if (isSelected) 1.5.dp else 0.5.dp,
-                            color = if (isSelected) VibrantOrange else BorderLight.copy(alpha = 0.4f),
+                            color = if (isSelected) VibrantOrange else if (isDark) Color(0xFF2A2A2E) else BorderLight.copy(alpha = 0.4f),
                             shape = RoundedCornerShape(8.dp)
                         )
                         .background(
                             when {
-                                isToday -> SoftOrangeLight.copy(alpha = 0.5f)
+                                isToday -> if (isDark) Color(0xFF2E1C12) else SoftOrangeLight.copy(alpha = 0.5f)
+                                isSelected -> if (isDark) Color(0xFF1F1F24) else Color(0xFFF3F4F6)
                                 else -> Color.Transparent
                             }
                         )
@@ -613,8 +692,8 @@ private fun NotionMonthScheduleView(
                             fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
                             color = when {
                                 isToday -> VibrantOrange
-                                !day.isCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
-                                else -> MaterialTheme.colorScheme.onSurface
+                                !day.isCurrentMonth -> if (isDark) PureWhite.copy(alpha = 0.25f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+                                else -> if (isDark) PureWhite.copy(alpha = 0.9f) else MaterialTheme.colorScheme.onSurface
                             },
                             modifier = Modifier.padding(start = 2.dp, top = 1.dp)
                         )
@@ -670,14 +749,14 @@ private fun NotionMonthScheduleView(
             text = dateLabel,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = if (isDark) PureWhite else MaterialTheme.colorScheme.onSurface
         )
 
         // Add note for this date
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .background(CharcoalGray)
+                .background(VibrantOrange)
                 .clickable { onAddNoteForDate(selectedCalendar.timeInMillis) }
                 .padding(horizontal = 10.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center
@@ -713,7 +792,7 @@ private fun NotionMonthScheduleView(
             Text(
                 text = "Bu tarihte kayıtlı bir not yok.",
                 fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                color = if (isDark) PureWhite.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
             )
         }
     } else {
@@ -764,7 +843,10 @@ fun NotionCalendarEventCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(10.dp),
         color = bgColor,
-        border = androidx.compose.foundation.BorderStroke(1.dp, palette.accentBar.copy(alpha = 0.35f))
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isDark) Color(0xFF2E2E34) else palette.accentBar.copy(alpha = 0.25f)
+        )
     ) {
         Row(
             modifier = Modifier.fillMaxWidth()
@@ -802,7 +884,7 @@ fun NotionCalendarEventCard(
                             text = if (note.title.isNullOrBlank()) "Başlıksız" else note.title!!,
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = if (isDark) PureWhite else Color(0xFF18181B),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -812,14 +894,14 @@ fun NotionCalendarEventCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(5.dp))
-                            .background(palette.badgeBg.copy(alpha = if (isDark) 0.3f else 0.8f))
+                            .background(if (isDark) palette.badgeBgDark else palette.badgeBgLight)
                             .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = timeLabel,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isDark) PureWhite else palette.textColor
+                            color = if (isDark) PureWhite else palette.lightText
                         )
                     }
                 }
@@ -835,14 +917,14 @@ fun NotionCalendarEventCard(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(5.dp))
-                                .background(palette.accentBar.copy(alpha = 0.15f))
+                                .background(if (isDark) palette.badgeBgDark else palette.badgeBgLight)
                                 .padding(horizontal = 5.dp, vertical = 1.dp)
                         ) {
                             Text(
                                 text = cat.name,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (isDark) PureWhite else palette.textColor
+                                color = if (isDark) PureWhite else palette.lightText
                             )
                         }
                     }
@@ -852,14 +934,14 @@ fun NotionCalendarEventCard(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(5.dp))
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                                .background(if (isDark) Color(0xFF2E2E34) else MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
                                 .padding(horizontal = 5.dp, vertical = 1.dp)
                         ) {
                             Text(
                                 text = "✓ ${note.completedTasks}/${note.totalTasks}",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                color = if (isDark) PureWhite.copy(alpha = 0.85f) else Color(0xFF374151)
                             )
                         }
                     }
@@ -872,6 +954,55 @@ fun NotionCalendarEventCard(
 private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
     return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
             cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+}
+
+private fun generateDaysForMode(displayedCalendar: Calendar, mode: CalendarTabMode): List<CalendarDay> {
+    val days = mutableListOf<CalendarDay>()
+    val cal = displayedCalendar.clone() as Calendar
+
+    when (mode) {
+        CalendarTabMode.FIVE_DAYS -> {
+            // Notion Calendar 5 Days: Mon to Fri (or week start)
+            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+            val diffToMonday = if (dayOfWeek == Calendar.SUNDAY) -6 else Calendar.MONDAY - dayOfWeek
+            cal.add(Calendar.DAY_OF_MONTH, diffToMonday)
+            for (i in 0 until 5) {
+                days.add(
+                    CalendarDay(
+                        dayOfMonth = cal.get(Calendar.DAY_OF_MONTH),
+                        isCurrentMonth = cal.get(Calendar.MONTH) == displayedCalendar.get(Calendar.MONTH),
+                        calendar = cal.clone() as Calendar
+                    )
+                )
+                cal.add(Calendar.DAY_OF_MONTH, 1)
+            }
+        }
+        CalendarTabMode.THREE_DAYS -> {
+            for (i in 0 until 3) {
+                days.add(
+                    CalendarDay(
+                        dayOfMonth = cal.get(Calendar.DAY_OF_MONTH),
+                        isCurrentMonth = cal.get(Calendar.MONTH) == displayedCalendar.get(Calendar.MONTH),
+                        calendar = cal.clone() as Calendar
+                    )
+                )
+                cal.add(Calendar.DAY_OF_MONTH, 1)
+            }
+        }
+        CalendarTabMode.ONE_DAY -> {
+            days.add(
+                CalendarDay(
+                    dayOfMonth = cal.get(Calendar.DAY_OF_MONTH),
+                    isCurrentMonth = cal.get(Calendar.MONTH) == displayedCalendar.get(Calendar.MONTH),
+                    calendar = cal.clone() as Calendar
+                )
+            )
+        }
+        CalendarTabMode.MONTH -> {
+            return generateMonthDays(displayedCalendar)
+        }
+    }
+    return days
 }
 
 private fun generateWeekDays(displayedCalendar: Calendar): List<CalendarDay> {

@@ -65,7 +65,7 @@ fun NotionListView(
             .fillMaxSize()
             .padding(horizontal = 14.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(bottom = 80.dp)
+        contentPadding = PaddingValues(bottom = 96.dp)
     ) {
         items(notes, key = { it.id }) { note ->
             NotionListRow(
