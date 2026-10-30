@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -61,7 +62,7 @@ class MainActivity : AppCompatActivity() {
                 mutableStateOf(saved ?: false)
             }
 
-            var showSplash by remember { mutableStateOf(true) }
+            var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
 
             PureNoteItTheme(darkTheme = isDarkTheme) {
                 Crossfade(targetState = showSplash, label = "splashTransition") { isSplash ->

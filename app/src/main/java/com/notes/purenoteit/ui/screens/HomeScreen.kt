@@ -130,6 +130,7 @@ import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 enum class NotionViewMode(val title: String, val iconRes: Int) {
@@ -190,6 +191,13 @@ fun HomeScreen(
     var pendingUnlockNoteId by remember { mutableStateOf<Int?>(null) }
     var showPinDialog by remember { mutableStateOf(false) }
     var enteredPin by remember { mutableStateOf("") }
+
+    // Dialog state for Daily Agenda Confirmation
+    var showAgendaConfirmDialog by remember { mutableStateOf(false) }
+    val todayDateStr = remember { SimpleDateFormat("d MMMM yyyy", Locale("tr")).format(Date()) }
+    val existingTodayAgendaNote = remember(noteList, todayDateStr) {
+        noteList.firstOrNull { it.title?.contains(todayDateStr) == true && it.icon == "📅" }
+    }
 
     LaunchedEffect(Unit) {
         noteViewModel.getAllNotes()
@@ -373,11 +381,7 @@ fun HomeScreen(
                         onClick = {
                             scope.launch {
                                 drawerState.close()
-                                noteViewModel.createDailyAgenda { newNote ->
-                                    if (newNote.id > 0) {
-                                        onNavigateToAddNote(newNote.id)
-                                    }
-                                }
+                                showAgendaConfirmDialog = true
                             }
                         }
                     )
@@ -901,6 +905,84 @@ fun HomeScreen(
                 }
             },
             shape = RoundedCornerShape(18.dp)
+        )
+    }
+
+    // Daily Agenda Confirmation / Selector Dialog (Paket 2)
+    if (showAgendaConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showAgendaConfirmDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "📅", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (existingTodayAgendaNote != null) "Günün Ajandası Zaten Var" else "Günün Ajandası",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = if (existingTodayAgendaNote != null) {
+                        "Bugün için oluşturulmuş bir ajanda notunuz bulunuyor (\"${existingTodayAgendaNote.title}\"). Mevcut ajandayı mı açmak istersiniz, yoksa yeni bir tane mi oluşturulsun?"
+                    } else {
+                        "Bugün ($todayDateStr) için günün mottosu, öncelikli kontrol listesi görevleri ve not bölümlerini içeren hazır planlama şablonu oluşturulsun mu?"
+                    },
+                    fontSize = 13.5.sp,
+                    lineHeight = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAgendaConfirmDialog = false
+                        if (existingTodayAgendaNote != null) {
+                            onNavigateToAddNote(existingTodayAgendaNote.id)
+                        } else {
+                            noteViewModel.createDailyAgenda { newNote ->
+                                if (newNote.id > 0) {
+                                    onNavigateToAddNote(newNote.id)
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = VibrantOrange),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = if (existingTodayAgendaNote != null) "Mevcut Olanı Aç" else "Oluştur ve Aç",
+                        color = PureWhite,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (existingTodayAgendaNote != null) {
+                        TextButton(
+                            onClick = {
+                                showAgendaConfirmDialog = false
+                                noteViewModel.createDailyAgenda { newNote ->
+                                    if (newNote.id > 0) {
+                                        onNavigateToAddNote(newNote.id)
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("Yeni Oluştur", color = VibrantOrange, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    TextButton(onClick = { showAgendaConfirmDialog = false }) {
+                        Text("Vazgeç", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 }
