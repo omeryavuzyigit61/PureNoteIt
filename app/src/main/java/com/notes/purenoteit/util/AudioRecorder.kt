@@ -34,9 +34,17 @@ class AudioRecorder(private val context: Context) {
             }
 
             mediaRecorder = recorder.apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
+                try {
+                    setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+                } catch (e: Exception) {
+                    setAudioSource(MediaRecorder.AudioSource.MIC)
+                }
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                // Studio HD Quality: 192 kbps bitrate, 48 kHz ultra HD sampling rate
+                setAudioEncodingBitRate(192000)
+                setAudioSamplingRate(48000)
+                setAudioChannels(1)
                 setOutputFile(filePath)
                 prepare()
                 start()

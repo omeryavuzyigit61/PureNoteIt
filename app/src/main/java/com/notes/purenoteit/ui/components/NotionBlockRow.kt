@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -101,20 +105,76 @@ fun NotionBlockRow(
         )
     }
 
-    // Mini Reorder Bar (Up / Down / Delete)
+    // Reorder Bar with both Direct Finger Drag Handle (⠿) and 1-Click Arrows (▲ / ▼)
     @Composable
     fun BlockReorderControls(
         isDarkContainer: Boolean = false,
         modifier: Modifier = Modifier
     ) {
+        var dragAccumulator by remember { mutableFloatStateOf(0f) }
+        var isDraggingThisBlock by remember { mutableStateOf(false) }
+
         Row(
             modifier = modifier
+                .graphicsLayer {
+                    if (isDraggingThisBlock) {
+                        scaleX = 1.08f
+                        scaleY = 1.08f
+                    }
+                }
                 .clip(RoundedCornerShape(8.dp))
-                .background(if (isDarkContainer) CharcoalGray.copy(alpha = 0.85f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                .background(
+                    if (isDraggingThisBlock) VibrantOrange
+                    else if (isDarkContainer) CharcoalGray.copy(alpha = 0.85f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                )
                 .padding(horizontal = 2.dp, vertical = 1.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            // Notion ⠿ Touch-and-Drag Handle (Finger Reorder)
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = {
+                                isDraggingThisBlock = true
+                                dragAccumulator = 0f
+                            },
+                            onDragEnd = {
+                                isDraggingThisBlock = false
+                                dragAccumulator = 0f
+                            },
+                            onDragCancel = {
+                                isDraggingThisBlock = false
+                                dragAccumulator = 0f
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragAccumulator += dragAmount.y
+                                val threshold = 34f // px threshold for swap
+                                if (dragAccumulator < -threshold && onMoveUp != null) {
+                                    onMoveUp()
+                                    dragAccumulator = 0f
+                                } else if (dragAccumulator > threshold && onMoveDown != null) {
+                                    onMoveDown()
+                                    dragAccumulator = 0f
+                                }
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "⠿",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDraggingThisBlock || isDarkContainer) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+
             if (onMoveUp != null) {
                 IconButton(
                     onClick = onMoveUp,
@@ -124,7 +184,7 @@ fun NotionBlockRow(
                         text = "▲",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDarkContainer) PureWhite else MaterialTheme.colorScheme.onSurface
+                        color = if (isDarkContainer || isDraggingThisBlock) PureWhite else MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -137,7 +197,7 @@ fun NotionBlockRow(
                         text = "▼",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDarkContainer) PureWhite else MaterialTheme.colorScheme.onSurface
+                        color = if (isDarkContainer || isDraggingThisBlock) PureWhite else MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -148,7 +208,7 @@ fun NotionBlockRow(
                 Icon(
                     painter = painterResource(id = R.drawable.cancel),
                     contentDescription = "Sil",
-                    tint = if (isDarkContainer) PureWhite.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    tint = if (isDarkContainer || isDraggingThisBlock) PureWhite.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.size(11.dp)
                 )
             }
