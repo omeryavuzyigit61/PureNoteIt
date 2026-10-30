@@ -114,9 +114,11 @@ import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.ui.components.NotionCalendarView
+import com.notes.purenoteit.ui.components.NotionGraphView
 import com.notes.purenoteit.ui.components.NotionKanbanBoard
 import com.notes.purenoteit.ui.components.NotionListView
 import com.notes.purenoteit.ui.components.NotionNoteCard
+import com.notes.purenoteit.ui.components.NotionStreamView
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -134,7 +136,9 @@ enum class NotionViewMode(val title: String, val iconRes: Int) {
     GRID("Kartlar", R.drawable.category),
     LIST("Liste", R.drawable.ic_checklist),
     BOARD("Pano", R.drawable.category_alt),
-    CALENDAR("Takvim", R.drawable.calendar)
+    CALENDAR("Takvim", R.drawable.calendar),
+    GRAPH("Ağ", R.drawable.ic_network_graph),
+    STREAM("Akış", R.drawable.ic_stream_timeline)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -155,6 +159,8 @@ fun HomeScreen(
 
     val noteList by noteViewModel.noteList.observeAsState(emptyList())
     val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
+    val allLinks by noteViewModel.allLinks.observeAsState(emptyList())
+    val streamItems by noteViewModel.streamItems.observeAsState(emptyList())
 
     var selectedCategory by remember { mutableStateOf("Tümü") }
     var searchQuery by remember { mutableStateOf("") }
@@ -188,6 +194,8 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         noteViewModel.getAllNotes()
         categoryViewModel.getAllCategories()
+        noteViewModel.getAllLinks()
+        noteViewModel.loadStreamItems()
     }
 
     // Refresh notes whenever returning from detail or other screens
@@ -197,6 +205,8 @@ fun HomeScreen(
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 noteViewModel.getAllNotes()
                 categoryViewModel.getAllCategories()
+                noteViewModel.getAllLinks()
+                noteViewModel.loadStreamItems()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -355,6 +365,23 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Menu Item: Daily Agenda Automation (Paket 2)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.calendar,
+                        title = "Günün Ajandası",
+                        subtitle = "Otomatik günlük plan şablonu oluştur",
+                        onClick = {
+                            scope.launch {
+                                drawerState.close()
+                                noteViewModel.createDailyAgenda { newNote ->
+                                    onNavigateToAddNote(newNote.id)
+                                }
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Menu Item: Dark Mode Switch
                     Surface(
                         modifier = Modifier
@@ -500,7 +527,7 @@ fun HomeScreen(
                         }
 
                         // Horizontal Category Chips (Visible in Grid, List & Board views)
-                        if (currentViewMode != NotionViewMode.CALENDAR) {
+                        if (currentViewMode != NotionViewMode.CALENDAR && currentViewMode != NotionViewMode.GRAPH && currentViewMode != NotionViewMode.STREAM) {
                             Spacer(modifier = Modifier.height(10.dp))
 
                             Row(
@@ -561,6 +588,31 @@ fun HomeScreen(
                         onAddNoteForDate = { targetDate ->
                             onNavigateToAddNoteWithDate(-1, targetDate)
                         },
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                }
+
+                NotionViewMode.GRAPH -> {
+                    NotionGraphView(
+                        notes = filteredNotes,
+                        links = allLinks,
+                        onNodeClick = handleNoteClick,
+                        isDark = isDarkTheme,
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                }
+
+                NotionViewMode.STREAM -> {
+                    NotionStreamView(
+                        streamItems = streamItems,
+                        onAddItem = { content -> noteViewModel.addStreamItem(content) },
+                        onDeleteItem = { id -> noteViewModel.deleteStreamItem(id) },
+                        onConvertToNote = { ids, title ->
+                            noteViewModel.convertStreamItemsToNote(ids, title) { newNote ->
+                                onNavigateToAddNote(newNote.id)
+                            }
+                        },
+                        isDark = isDarkTheme,
                         modifier = Modifier.padding(paddingValues)
                     )
                 }
@@ -755,32 +807,34 @@ fun HomeScreen(
             val navBottom = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
             val bottomDockInset = maxOf(imeBottom, navBottom)
 
-            NotionMobileBottomDock(
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                onFocusChanged = { isSearchFocused = it },
-                onVoiceClick = {
-                    try {
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Notlarda ara...")
+            if (currentViewMode != NotionViewMode.STREAM) {
+                NotionMobileBottomDock(
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
+                    onFocusChanged = { isSearchFocused = it },
+                    onVoiceClick = {
+                        try {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Notlarda ara...")
+                            }
+                            speechLauncher.launch(intent)
+                        } catch (e: Exception) {
+                            context.showToastShort("Sesli arama cihazınızda desteklenmiyor")
                         }
-                        speechLauncher.launch(intent)
-                    } catch (e: Exception) {
-                        context.showToastShort("Sesli arama cihazınızda desteklenmiyor")
-                    }
-                },
-                onAddNoteClick = {
-                    focusManager.clearFocus()
-                    keyboardController?.hide()
-                    onNavigateToAddNote(-1)
-                },
-                isDark = isDarkTheme,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = bottomDockInset + 6.dp)
-                    .padding(horizontal = 16.dp)
-            )
+                    },
+                    onAddNoteClick = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                        onNavigateToAddNote(-1)
+                    },
+                    isDark = isDarkTheme,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = bottomDockInset + 6.dp)
+                        .padding(horizontal = 16.dp)
+                )
+            }
         }
     }
 

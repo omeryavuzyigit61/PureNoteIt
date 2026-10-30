@@ -128,6 +128,9 @@ class MainActivity : AppCompatActivity() {
                                     categoryViewModel = categoryViewModel,
                                     onNavigateBack = {
                                         navController.popBackStack()
+                                    },
+                                    onNavigateToNote = { targetId ->
+                                        navController.navigate("noteDetail/$targetId")
                                     }
                                 )
                             }

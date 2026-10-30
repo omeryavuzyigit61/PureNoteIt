@@ -20,6 +20,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +31,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -73,6 +78,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -119,10 +125,18 @@ fun NoteDetailScreen(
     initialDate: Long = -1L,
     noteViewModel: NoteViewModel,
     categoryViewModel: CategoryViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToNote: ((Int) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val audioRecorder = remember { AudioRecorder(context) }
+    val backlinks by noteViewModel.backlinks.observeAsState(emptyList())
+
+    LaunchedEffect(noteId) {
+        if (noteId != -1) {
+            noteViewModel.loadBacklinksForNote(noteId)
+        }
+    }
 
     var title by remember { mutableStateOf("") }
     var selectedIcon by remember { mutableStateOf<String?>(null) }
@@ -367,8 +381,10 @@ fun NoteDetailScreen(
         }
         noteViewModel.upsert(note)
 
-        // Schedule or cancel alarm with ReminderManager
+        // Sync bi-directional [[Note]] links (Paket 1)
         val targetId = if (noteId != -1) noteId else note.hashCode()
+        val allContentText = title + " " + blocks.joinToString(" ") { it.content + " " + it.toggleBody }
+        noteViewModel.syncNoteLinks(targetId, allContentText)
         if (reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone) {
             val noteDescPreview = blocks.firstOrNull { it.content.isNotBlank() }?.content ?: ""
             ReminderManager.scheduleReminder(
@@ -531,10 +547,14 @@ fun NoteDetailScreen(
             )
         },
         bottomBar = {
+            val density = LocalDensity.current
+            val imeBottom = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+            val navBottom = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
+            val bottomBarInset = maxOf(imeBottom, navBottom)
+
             Column(
                 modifier = Modifier
-                    .navigationBarsPadding()
-                    .imePadding()
+                    .padding(bottom = bottomBarInset)
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 // Live Audio Recording Banner with Timer & Soundwave
@@ -728,6 +748,15 @@ fun NoteDetailScreen(
                     onCheckedChange = { isChecked ->
                         blocks[index] = block.copy(isChecked = isChecked)
                     },
+                    onToggleExpand = {
+                        blocks[index] = block.copy(isExpanded = !block.isExpanded)
+                    },
+                    onToggleBodyChange = { newBody ->
+                        blocks[index] = block.copy(toggleBody = newBody)
+                    },
+                    onTableChange = { newTable ->
+                        blocks[index] = block.copy(tableData = newTable)
+                    },
                     onDeleteBlock = {
                         if (blocks.size > 1) {
                             blocks.removeAt(index)
@@ -754,6 +783,63 @@ fun NoteDetailScreen(
                     },
                     audioRecorder = audioRecorder
                 )
+            }
+
+            // Backlinks Section (Bu Nota Referans Veren Diğer Notlar - Paket 1)
+            if (noteId != -1 && backlinks.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(14.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "🔗", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Bu Nota Bağlantılar (${backlinks.size})",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (bNote in backlinks) {
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable { onNavigateToNote?.invoke(bNote.id) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = bNote.icon ?: "📝", fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = bNote.title ?: "Başlıksız Not",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

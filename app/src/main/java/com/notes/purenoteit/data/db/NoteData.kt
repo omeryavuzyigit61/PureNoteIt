@@ -51,7 +51,9 @@ data class NoteData(
     @ColumnInfo(name = "reminderSound")
     var reminderSound: String? = null,
     @ColumnInfo(name = "isReminderDone", defaultValue = "0")
-    var isReminderDone: Boolean = false
+    var isReminderDone: Boolean = false,
+    @ColumnInfo(name = "richBlocksJson")
+    var richBlocksJson: String? = null
 ) : Serializable {
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0

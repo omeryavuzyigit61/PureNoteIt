@@ -1,6 +1,8 @@
 package com.notes.purenoteit.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -65,6 +67,7 @@ import com.notes.purenoteit.ui.theme.SoftYellowLight
 import com.notes.purenoteit.ui.theme.VibrantOrange
 import com.notes.purenoteit.util.AudioRecorder
 import java.io.File
+import java.util.Locale
 
 /**
  * Notion Block Row Component.
@@ -84,6 +87,9 @@ fun NotionBlockRow(
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
     onEditDrawing: ((String) -> Unit)? = null,
+    onToggleExpand: (() -> Unit)? = null,
+    onToggleBodyChange: ((String) -> Unit)? = null,
+    onTableChange: ((List<List<String>>) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -470,6 +476,259 @@ fun NotionBlockRow(
                         )
 
                         BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
+                    }
+                }
+            }
+
+            BlockType.TOGGLE -> {
+                val arrowRotation by animateFloatAsState(
+                    targetValue = if (block.isExpanded) 90f else 0f,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "toggleArrow"
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { onToggleExpand?.invoke() },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Text(
+                                text = "▶",
+                                fontSize = 12.sp,
+                                color = VibrantOrange,
+                                modifier = Modifier.graphicsLayer { rotationZ = arrowRotation }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        BasicTextField(
+                            value = block.content,
+                            onValueChange = onContentChange,
+                            textStyle = textStyle.copy(fontWeight = FontWeight.SemiBold),
+                            cursorBrush = SolidColor(VibrantOrange),
+                            decorationBox = { innerTextField ->
+                                if (block.content.isEmpty()) {
+                                    Text(
+                                        text = "Açılır başlık (Toggle)...",
+                                        style = textStyle.copy(
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    )
+                                }
+                                innerTextField()
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
+                    }
+
+                    AnimatedVisibility(
+                        visible = block.isExpanded,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 14.dp, top = 6.dp, bottom = 4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(2.dp)
+                                    .height(48.dp)
+                                    .background(VibrantOrange.copy(alpha = 0.35f))
+                            )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            BasicTextField(
+                                value = block.toggleBody,
+                                onValueChange = { onToggleBodyChange?.invoke(it) },
+                                textStyle = textStyle.copy(fontSize = 13.5.sp),
+                                cursorBrush = SolidColor(VibrantOrange),
+                                decorationBox = { innerTextField ->
+                                    if (block.toggleBody.isEmpty()) {
+                                        Text(
+                                            text = "Gizlenen içerik detayları...",
+                                            style = textStyle.copy(
+                                                fontSize = 13.5.sp,
+                                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+                                            )
+                                        )
+                                    }
+                                    innerTextField()
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            BlockType.TABLE -> {
+                val tableRows = if (block.tableData.isNotEmpty()) block.tableData else listOf(
+                    listOf("Öğe", "Tutar (₺)", "Not"),
+                    listOf("Örnek 1", "150", "Onaylandı"),
+                    listOf("Örnek 2", "350", "Beklemede")
+                )
+
+                // Calculate column 1 (numeric) sum if present
+                val numericSum = remember(tableRows) {
+                    var sum = 0.0
+                    var hasNumeric = false
+                    for (i in 1..tableRows.lastIndex) {
+                        val row = tableRows[i]
+                        if (row.size > 1) {
+                            val parsed = row[1].trim().replace(",", ".").toDoubleOrNull()
+                            if (parsed != null) {
+                                sum += parsed
+                                hasNumeric = true
+                            }
+                        }
+                    }
+                    if (hasNumeric) sum else null
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                    shadowElevation = 1.dp
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "📊", fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Dinamik Tablo",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            BlockReorderControls()
+                        }
+
+                        // Table Grid
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        ) {
+                            tableRows.forEachIndexed { rIndex, row ->
+                                val isHeader = rIndex == 0
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(if (isHeader) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent)
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    row.forEachIndexed { cIndex, cellText ->
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .padding(horizontal = 4.dp)
+                                        ) {
+                                            BasicTextField(
+                                                value = cellText,
+                                                onValueChange = { newCell ->
+                                                    val updated = tableRows.mapIndexed { r, ro ->
+                                                        if (r == rIndex) {
+                                                            ro.mapIndexed { c, v -> if (c == cIndex) newCell else v }
+                                                        } else ro
+                                                    }
+                                                    onTableChange?.invoke(updated)
+                                                },
+                                                textStyle = textStyle.copy(
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isHeader) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isHeader) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                                                ),
+                                                cursorBrush = SolidColor(VibrantOrange),
+                                                decorationBox = { inner ->
+                                                    if (cellText.isEmpty()) {
+                                                        Text(
+                                                            text = if (isHeader) "Sütun ${cIndex + 1}" else "...",
+                                                            style = textStyle.copy(
+                                                                fontSize = 12.sp,
+                                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                            )
+                                                        )
+                                                    }
+                                                    inner()
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+                                if (rIndex < tableRows.lastIndex) {
+                                    HorizontalDivider(
+                                        thickness = 0.5.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Footer: Add Row + Numeric Sum
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(SoftOrangeLight)
+                                    .clickable {
+                                        val colCount = if (tableRows.isNotEmpty()) tableRows[0].size else 3
+                                        val newRow = List(colCount) { "" }
+                                        val updated = tableRows + listOf(newRow)
+                                        onTableChange?.invoke(updated)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = "+ Satır Ekle",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            }
+
+                            if (numericSum != null) {
+                                Text(
+                                    text = "∑ Toplam: " + if (numericSum % 1.0 == 0.0) "${numericSum.toLong()} ₺" else "${String.format(Locale.US, "%.2f", numericSum)} ₺",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            }
+                        }
                     }
                 }
             }

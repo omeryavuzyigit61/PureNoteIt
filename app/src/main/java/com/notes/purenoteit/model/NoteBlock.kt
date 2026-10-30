@@ -11,6 +11,8 @@ enum class BlockType {
     TODO,
     BULLET_LIST,
     CALLOUT,
+    TOGGLE,
+    TABLE,
     DIVIDER,
     AUDIO,
     IMAGE,
@@ -23,7 +25,10 @@ data class NoteBlock(
     var content: String = "",
     var isChecked: Boolean = false,
     var calloutIcon: String = "💡",
-    var mediaPath: String? = null
+    var mediaPath: String? = null,
+    var isExpanded: Boolean = true,
+    var tableData: List<List<String>> = emptyList(),
+    var toggleBody: String = ""
 )
 
 object BlockParser {
@@ -100,13 +105,15 @@ object BlockParser {
 
     fun toPlainTextSummary(blocks: List<NoteBlock>, maxLines: Int = 4): String {
         return blocks
-            .filter { it.type != BlockType.DIVIDER && it.content.isNotBlank() }
+            .filter { it.type != BlockType.DIVIDER && (it.content.isNotBlank() || it.tableData.isNotEmpty()) }
             .take(maxLines)
             .joinToString("\n") { block ->
                 when (block.type) {
                     BlockType.TODO -> if (block.isChecked) "☑ ${block.content}" else "☐ ${block.content}"
                     BlockType.BULLET_LIST -> "• ${block.content}"
                     BlockType.CALLOUT -> "${block.calloutIcon} ${block.content}"
+                    BlockType.TOGGLE -> "▶ ${block.content}"
+                    BlockType.TABLE -> "📊 Tablo (${if (block.tableData.isNotEmpty()) block.tableData.size - 1 else 0} satır)"
                     else -> block.content
                 }
             }
