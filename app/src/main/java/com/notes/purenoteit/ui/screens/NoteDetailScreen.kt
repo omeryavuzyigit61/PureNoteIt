@@ -107,6 +107,7 @@ import java.io.File
 @Composable
 fun NoteDetailScreen(
     noteId: Int,
+    initialDate: Long = -1L,
     noteViewModel: NoteViewModel,
     categoryViewModel: CategoryViewModel,
     onNavigateBack: () -> Unit
@@ -121,7 +122,7 @@ fun NoteDetailScreen(
     var selectedCategoryId by remember { mutableStateOf(1) }
     var selectedCategoryName by remember { mutableStateOf("Not") }
     var noteStatus by remember { mutableStateOf("TODO") }
-    var noteDate by remember { mutableStateOf(System.currentTimeMillis()) }
+    var noteDate by remember { mutableStateOf(if (initialDate > 0) initialDate else System.currentTimeMillis()) }
 
     val blocks = remember { mutableStateListOf<NoteBlock>() }
     var isRecordingAudio by remember { mutableStateOf(false) }
@@ -216,11 +217,20 @@ fun NoteDetailScreen(
         }
     }
 
-    // Category name resolver
+    LaunchedEffect(Unit) {
+        categoryViewModel.getAllCategories()
+    }
+
+    // Category name resolver with safe fallback
     LaunchedEffect(categoryList, selectedCategoryId) {
-        val cat = categoryList.find { it.id == selectedCategoryId }
-        if (cat != null) {
-            selectedCategoryName = cat.name
+        if (categoryList.isNotEmpty()) {
+            val cat = categoryList.find { it.id == selectedCategoryId }
+            if (cat != null) {
+                selectedCategoryName = cat.name
+            } else {
+                selectedCategoryId = categoryList.first().id
+                selectedCategoryName = categoryList.first().name
+            }
         }
     }
 
@@ -294,13 +304,21 @@ fun NoteDetailScreen(
         val images = blocks.filter { it.type == BlockType.IMAGE && it.mediaPath != null }.map { it.mediaPath!! }
         val sounds = blocks.filter { it.type == BlockType.AUDIO && it.mediaPath != null }.map { it.mediaPath!! }
 
+        val validCategoryId = if (categoryList.any { it.id == selectedCategoryId }) {
+            selectedCategoryId
+        } else if (categoryList.isNotEmpty()) {
+            categoryList.first().id
+        } else {
+            1
+        }
+
         val note = NoteData(
             title = if (title.isBlank()) "Başlıksız Not" else title.trim(),
             description = finalContent,
             date = if (noteDate > 0) noteDate else System.currentTimeMillis(),
             images = images,
             isPassword = isPassword,
-            categoryId = selectedCategoryId,
+            categoryId = validCategoryId,
             sounds = sounds,
             isPinned = isPinned,
             icon = selectedIcon,

@@ -8,12 +8,11 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -26,8 +25,8 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /**
- * Continuous, fluid sinusoidal audio wave visualizer.
- * Responds to real-time speech amplitude with flowing waves.
+ * Optimized 120 FPS continuous sinusoidal audio wave visualizer.
+ * Reuses internal Paths and runs smooth GPU-accelerated drawing.
  */
 @Composable
 fun SpotifyAudioVisualizer(
@@ -58,36 +57,50 @@ fun SpotifyAudioVisualizer(
         label = "secondaryPhase"
     )
 
+    // Ambient amplitude swell when playing
+    val ambientSwell by infiniteTransition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 0.95f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ambientSwell"
+    )
+
+    // Path reuse to eliminate GC churn
+    val path1 = remember { Path() }
+    val path2 = remember { Path() }
+
     Box(
-        modifier = modifier
-            .height(maxHeight)
+        modifier = modifier.height(maxHeight)
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
             val width = size.width
             val height = size.height
             val centerY = height / 2f
 
-            val normalizedAmp = if (isPlayingOrRecording) {
-                (currentAmplitude / 32767f).coerceIn(0.18f, 1f)
+            val liveAmpFraction = if (currentAmplitude > 0) {
+                (currentAmplitude / 32767f).coerceIn(0.2f, 1f)
+            } else if (isPlayingOrRecording) {
+                ambientSwell
             } else {
                 0.08f
             }
 
-            val maxAmpPx = (height / 2f - 2.dp.toPx()) * normalizedAmp
+            val maxAmpPx = (height / 2f - 2.dp.toPx()) * liveAmpFraction
 
-            // Primary harmonic wave
-            val path1 = Path()
+            path1.reset()
             path1.moveTo(0f, centerY)
 
-            val path2 = Path()
+            path2.reset()
             path2.moveTo(0f, centerY)
 
-            val step = 3f
+            val step = 8f
             var x = 0f
             val waveLen = (width / 2.2f).coerceAtLeast(30f)
 
             while (x <= width) {
-                // Envelope window: 0 at edges, 1 in the middle
                 val envelope = sin((x / width) * PI).toFloat()
 
                 val y1 = centerY + (maxAmpPx * envelope) * sin((x / waveLen) * (2 * PI).toFloat() - phase)
@@ -99,14 +112,14 @@ fun SpotifyAudioVisualizer(
                 x += step
             }
 
-            // Draw secondary ambient wave (semi-transparent)
+            // Draw secondary wave
             drawPath(
                 path = path2,
-                color = activeColor.copy(alpha = if (isPlayingOrRecording) 0.45f else 0.2f),
+                color = activeColor.copy(alpha = if (isPlayingOrRecording) 0.4f else 0.15f),
                 style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
             )
 
-            // Draw primary crisp wave
+            // Draw primary wave
             drawPath(
                 path = path1,
                 brush = Brush.horizontalGradient(

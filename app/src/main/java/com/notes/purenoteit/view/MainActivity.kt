@@ -37,6 +37,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Ensure default categories exist and notes are loaded
+        categoryViewModel.seedDefaultCategories()
+        noteViewModel.getAllNotes()
+
         val prefs = SharedPrefencesUtil(applicationContext)
 
         setContent {
@@ -65,6 +69,9 @@ class MainActivity : AppCompatActivity() {
                                     onNavigateToAddNote = { noteId ->
                                         navController.navigate("note_detail/$noteId")
                                     },
+                                    onNavigateToAddNoteWithDate = { noteId, date ->
+                                        navController.navigate("note_detail/$noteId?initialDate=$date")
+                                    },
                                     onNavigateToPasswordSettings = {
                                         navController.navigate("password_settings")
                                     },
@@ -80,17 +87,23 @@ class MainActivity : AppCompatActivity() {
                             }
 
                             composable(
-                                route = "note_detail/{noteId}",
+                                route = "note_detail/{noteId}?initialDate={initialDate}",
                                 arguments = listOf(
                                     navArgument("noteId") {
                                         type = NavType.IntType
                                         defaultValue = -1
+                                    },
+                                    navArgument("initialDate") {
+                                        type = NavType.LongType
+                                        defaultValue = -1L
                                     }
                                 )
                             ) { backStackEntry ->
                                 val noteId = backStackEntry.arguments?.getInt("noteId") ?: -1
+                                val initialDate = backStackEntry.arguments?.getLong("initialDate") ?: -1L
                                 NoteDetailScreen(
                                     noteId = noteId,
+                                    initialDate = initialDate,
                                     noteViewModel = noteViewModel,
                                     categoryViewModel = categoryViewModel,
                                     onNavigateBack = {

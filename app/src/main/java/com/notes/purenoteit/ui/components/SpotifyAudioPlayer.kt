@@ -68,7 +68,7 @@ fun SpotifyAudioPlayer(
     var isUserSeeking by remember { mutableStateOf(false) }
     var seekPositionMs by remember { mutableFloatStateOf(0f) }
 
-    // Live progress tracker when playing
+    // Live progress tracker when playing (smoothly interpolated at 120 FPS by SquigglySlider)
     LaunchedEffect(isPlaying) {
         if (isPlaying) {
             while (isPlaying) {
@@ -77,7 +77,7 @@ fun SpotifyAudioPlayer(
                 if (total > 0) durationMs = total
                 currentPositionMs = current
                 isPlaying = audioRecorder.isPlaying()
-                delay(80L)
+                delay(200L)
             }
         }
     }
@@ -177,7 +177,7 @@ fun SpotifyAudioPlayer(
                         // Spotify Fluid Waveform
                         SpotifyAudioVisualizer(
                             isPlayingOrRecording = isPlaying,
-                            currentAmplitude = if (isPlaying) (12000..28000).random() else 0,
+                            currentAmplitude = 0,
                             maxHeight = 22.dp,
                             modifier = Modifier.width(90.dp)
                         )

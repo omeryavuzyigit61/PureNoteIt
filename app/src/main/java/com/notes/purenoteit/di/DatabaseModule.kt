@@ -2,6 +2,8 @@ package com.notes.purenoteit.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.notes.purenoteit.data.db.CategoryDao
 import com.notes.purenoteit.data.db.NoteDatabase
 import dagger.Module
@@ -19,6 +21,21 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): NoteDatabase =
         Room.databaseBuilder(context, NoteDatabase::class.java, "notes")
             .fallbackToDestructiveMigration()
+            .addCallback(object : RoomDatabase.Callback() {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    super.onCreate(db)
+                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (1, 'Not', 0)")
+                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (2, 'Günlük', 0)")
+                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (3, 'Önemli', 0)")
+                }
+
+                override fun onOpen(db: SupportSQLiteDatabase) {
+                    super.onOpen(db)
+                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (1, 'Not', 0)")
+                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (2, 'Günlük', 0)")
+                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (3, 'Önemli', 0)")
+                }
+            })
             .build()
 
     @Provides

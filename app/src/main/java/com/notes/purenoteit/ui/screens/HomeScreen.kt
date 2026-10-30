@@ -107,6 +107,7 @@ fun HomeScreen(
     noteViewModel: NoteViewModel,
     categoryViewModel: CategoryViewModel,
     onNavigateToAddNote: (noteId: Int) -> Unit,
+    onNavigateToAddNoteWithDate: (noteId: Int, initialDate: Long) -> Unit = { id, _ -> onNavigateToAddNote(id) },
     onNavigateToPasswordSettings: () -> Unit,
     onNavigateToCategorySettings: () -> Unit,
     onToggleDarkTheme: (Boolean) -> Unit,
@@ -132,6 +133,21 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         noteViewModel.getAllNotes()
         categoryViewModel.getAllCategories()
+    }
+
+    // Refresh notes whenever returning from detail or other screens
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                noteViewModel.getAllNotes()
+                categoryViewModel.getAllCategories()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     // Filter notes
@@ -518,7 +534,7 @@ fun HomeScreen(
                         categories = categoryList,
                         onNoteClick = handleNoteClick,
                         onAddNoteForDate = { targetDate ->
-                            onNavigateToAddNote(-1)
+                            onNavigateToAddNoteWithDate(-1, targetDate)
                         },
                         modifier = Modifier.padding(paddingValues)
                     )

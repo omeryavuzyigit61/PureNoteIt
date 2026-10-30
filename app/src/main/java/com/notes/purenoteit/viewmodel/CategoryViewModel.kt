@@ -19,6 +19,27 @@ class CategoryViewModel @Inject constructor(private val repository: CategoryRepo
     private val compositeDisposable = CompositeDisposable()
     private val _categoryList = MutableLiveData<List<CategoryData>>()
     val categoryList: LiveData<List<CategoryData>> = _categoryList
+
+    fun seedDefaultCategories() {
+        repository.areDefaultCategoriesPresent()
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({ present ->
+                if (!present) {
+                    upsert(CategoryData("Not", false, id = 1))
+                    upsert(CategoryData("Günlük", false, id = 2))
+                    upsert(CategoryData("Önemli", false, id = 3))
+                } else {
+                    getAllCategories()
+                }
+            }, {
+                upsert(CategoryData("Not", false, id = 1))
+                upsert(CategoryData("Günlük", false, id = 2))
+                upsert(CategoryData("Önemli", false, id = 3))
+            }).let {
+                compositeDisposable.add(it)
+            }
+    }
     fun getAllCategories() {
         repository.getAllCategories()
             .subscribeOn(Schedulers.io())
