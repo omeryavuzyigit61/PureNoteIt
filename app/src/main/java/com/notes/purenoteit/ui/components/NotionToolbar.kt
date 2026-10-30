@@ -45,6 +45,7 @@ fun NotionToolbar(
     onRecordAudio: () -> Unit,
     onOpenDrawing: () -> Unit,
     onOpenSlashMenu: () -> Unit,
+    onLinkNote: (() -> Unit)? = null,
     isRecordingAudio: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -122,6 +123,14 @@ fun NotionToolbar(
                 iconRes = R.drawable.ic_table,
                 label = "Tablo",
                 onClick = { onAddBlock(BlockType.TABLE) },
+                iconTint = VibrantOrange
+            )
+
+            // Not Bağla (Bi-directional Link [[Note]])
+            ToolbarItem(
+                iconRes = R.drawable.ic_network_graph,
+                label = "Not Bağla",
+                onClick = { onLinkNote?.invoke() },
                 iconTint = VibrantOrange
             )
 

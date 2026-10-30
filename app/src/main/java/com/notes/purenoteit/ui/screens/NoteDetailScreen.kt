@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
@@ -57,6 +58,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -210,6 +212,9 @@ fun NoteDetailScreen(
     var showStatusMenu by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
+    var showLinkNotePicker by remember { mutableStateOf(false) }
+    var linkSearchQuery by remember { mutableStateOf("") }
+    val allNotesForLinking by noteViewModel.noteList.observeAsState(emptyList())
 
     val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
 
@@ -381,25 +386,24 @@ fun NoteDetailScreen(
         if (noteId != -1) {
             note.id = noteId
         }
-        noteViewModel.upsert(note)
 
-        // Sync bi-directional [[Note]] links (Paket 1)
-        val targetId = if (noteId != -1) noteId else note.hashCode()
+        // Save note and safely sync bi-directional [[Note]] links with real SQLite ID (Paket 1)
         val allContentText = title + " " + blocks.joinToString(" ") { it.content + " " + it.toggleBody }
-        noteViewModel.syncNoteLinks(targetId, allContentText)
-        if (reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone) {
-            val noteDescPreview = blocks.firstOrNull { it.content.isNotBlank() }?.content ?: ""
-            ReminderManager.scheduleReminder(
-                context = context,
-                noteId = targetId,
-                noteTitle = note.title ?: "Başlıksız Not",
-                noteDesc = noteDescPreview,
-                reminderTimeMs = reminderTime!!,
-                reminderType = reminderType,
-                soundType = reminderSound
-            )
-        } else if (reminderTime == null && targetId != 0) {
-            ReminderManager.cancelReminder(context, targetId)
+        noteViewModel.saveNote(note, contentForLinks = allContentText) { actualId ->
+            if (reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone) {
+                val noteDescPreview = blocks.firstOrNull { it.content.isNotBlank() }?.content ?: ""
+                ReminderManager.scheduleReminder(
+                    context = context,
+                    noteId = actualId,
+                    noteTitle = note.title ?: "Başlıksız Not",
+                    noteDesc = noteDescPreview,
+                    reminderTimeMs = reminderTime!!,
+                    reminderType = reminderType,
+                    soundType = reminderSound
+                )
+            } else if (reminderTime == null && actualId != 0) {
+                ReminderManager.cancelReminder(context, actualId)
+            }
         }
 
         onNavigateBack()
@@ -671,6 +675,7 @@ fun NoteDetailScreen(
                         showDrawingSheet = true
                     },
                     onOpenSlashMenu = { showSlashSheet = true },
+                    onLinkNote = { showLinkNotePicker = true },
                     isRecordingAudio = isRecordingAudio
                 )
             }
@@ -868,6 +873,141 @@ fun NoteDetailScreen(
                 }
             }
         )
+    }
+
+    // Link Note Picker Sheet (Paket 1: Çift Yönlü Bağlantı Seçici)
+    if (showLinkNotePicker) {
+        val filteredLinkNotes = remember(allNotesForLinking, linkSearchQuery, noteId) {
+            allNotesForLinking
+                .filter { it.id != noteId }
+                .filter { linkSearchQuery.isBlank() || it.title?.contains(linkSearchQuery, ignoreCase = true) == true }
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = {
+                showLinkNotePicker = false
+                linkSearchQuery = ""
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "🔗", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Not Bağla (Bi-directional Link)",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Seçilen not, metne [[Başlık]] formatında eklenecek ve çift yönlü bağlanacaktır.",
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = linkSearchQuery,
+                    onValueChange = { linkSearchQuery = it },
+                    placeholder = { Text("Bağlanacak notu arayın...", fontSize = 13.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = VibrantOrange,
+                        unfocusedBorderColor = BorderLight
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (filteredLinkNotes.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (linkSearchQuery.isBlank()) "Bağlanabilecek başka not bulunamadı." else "Eşleşen not bulunamadı.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 320.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(filteredLinkNotes, key = { it.id }) { targetNote ->
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        val linkText = "[[${targetNote.title ?: "Başlıksız Not"}]] "
+                                        if (blocks.isNotEmpty() && blocks.last().content.isBlank() && blocks.last().type == BlockType.PARAGRAPH) {
+                                            blocks[blocks.lastIndex] = blocks.last().copy(content = linkText)
+                                        } else {
+                                            blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = linkText))
+                                        }
+                                        showLinkNotePicker = false
+                                        linkSearchQuery = ""
+                                        context.showToastShort("\"${targetNote.title}\" nota bağlandı")
+                                    },
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = targetNote.icon ?: "📝", fontSize = 18.sp)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = targetNote.title ?: "Başlıksız Not",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = if (targetNote.totalTasks > 0) "${targetNote.completedTasks}/${targetNote.totalTasks} Görev" else "Not",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Text(
+                                        text = "+ Bağla",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VibrantOrange
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
     }
 
     // Drawing Canvas Sheet (Supports both creating new and editing existing drawings)

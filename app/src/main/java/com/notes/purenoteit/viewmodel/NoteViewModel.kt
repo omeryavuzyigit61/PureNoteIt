@@ -65,6 +65,29 @@ class NoteViewModel @Inject constructor(
             }
     }
 
+    fun saveNote(item: NoteData, contentForLinks: String? = null, onSaved: ((Int) -> Unit)? = null) {
+        val saveSingle = if (item.id > 0) {
+            repository.upsert(item).toSingleDefault(item.id.toLong())
+        } else {
+            repository.insertNote(item)
+        }
+
+        saveSingle
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({ generatedId ->
+                val actualId = generatedId.toInt()
+                item.id = actualId
+                getAllNotes()
+                if (!contentForLinks.isNullOrBlank()) {
+                    syncNoteLinks(actualId, contentForLinks)
+                }
+                onSaved?.invoke(actualId)
+            }, { error ->
+                Log.e("NoteViewModel", "Error saving note: ${error.message}")
+            }).let { compositeDisposable.add(it) }
+    }
+
     fun delete(item: NoteData) {
         repository.delete(item).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
