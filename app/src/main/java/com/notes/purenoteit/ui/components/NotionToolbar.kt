@@ -135,6 +135,14 @@ fun NotionToolbar(
                 iconTint = VibrantOrange
             )
 
+            // Alt Sayfa (Nested Sub-Page)
+            ToolbarItem(
+                iconRes = R.drawable.ic_subpage,
+                label = "Alt Sayfa",
+                onClick = { onAddBlock(BlockType.SUB_PAGE) },
+                iconTint = VibrantOrange
+            )
+
             // Vurgu / Alıntı Kutusu (Callout / Quote)
             ToolbarItem(
                 iconRes = R.drawable.ic_format_quote,

@@ -209,7 +209,9 @@ fun NoteDetailScreen(
     var showSlashSheet by remember { mutableStateOf(false) }
     var showDrawingSheet by remember { mutableStateOf(false) }
     var showExportSheet by remember { mutableStateOf(false) }
+    var showOcrSourceSheet by remember { mutableStateOf(false) }
     var isScanningOcr by remember { mutableStateOf(false) }
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     var editingDrawingPath by remember { mutableStateOf<String?>(null) }
     var editingDrawingBlockIndex by remember { mutableStateOf<Int?>(null) }
     var showCategoryMenu by remember { mutableStateOf(false) }
@@ -253,22 +255,20 @@ fun NoteDetailScreen(
     }
 
     fun navigateToNoteByTitle(targetTitle: String) {
-        val trimmed = targetTitle.trim()
-        if (trimmed.isNotBlank()) {
-            val found = allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
-            if (found != null) {
-                onNavigateToNote?.invoke(found.id)
-            } else {
-                val newNote = NoteData(
-                    title = trimmed,
-                    description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
-                    date = System.currentTimeMillis(),
-                    categoryId = selectedCategoryId
-                )
-                noteViewModel.saveNote(newNote, contentForLinks = null) { newId ->
-                    context.showToastShort("\"$trimmed\" oluşturuldu ve açıldı")
-                    onNavigateToNote?.invoke(newId)
-                }
+        val trimmed = if (targetTitle.isBlank()) "Yeni Alt Sayfa" else targetTitle.trim()
+        val found = allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
+        if (found != null) {
+            onNavigateToNote?.invoke(found.id)
+        } else {
+            val newNote = NoteData(
+                title = trimmed,
+                description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
+                date = System.currentTimeMillis(),
+                categoryId = selectedCategoryId
+            )
+            noteViewModel.saveNote(newNote, contentForLinks = null) { newId ->
+                context.showToastShort("\"$trimmed\" oluşturuldu ve açıldı")
+                onNavigateToNote?.invoke(newId)
             }
         }
     }
@@ -388,6 +388,74 @@ fun NoteDetailScreen(
                     context.showToastShort("Metin tarama hatası: ${e.message}")
                 }
             )
+        }
+    }
+
+    // Camera OCR Capture
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempCameraUri != null) {
+            isScanningOcr = true
+            recordUndoState()
+            TextRecognitionHelper.recognizeTextFromImage(
+                context = context,
+                imageUri = tempCameraUri!!,
+                onSuccess = { recognizedLines ->
+                    isScanningOcr = false
+                    val validLines = recognizedLines.filter { it.isNotBlank() }
+                    if (validLines.isNotEmpty()) {
+                        for (line in validLines) {
+                            blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = line))
+                        }
+                        context.showToastShort("Yapay zeka metni çıkardı (${validLines.size} satır)!")
+                    } else {
+                        context.showToastShort("Görselde okunabilir metin bulunamadı")
+                    }
+                },
+                onError = { e ->
+                    isScanningOcr = false
+                    context.showToastShort("Metin tarama hatası: ${e.message}")
+                }
+            )
+        }
+    }
+
+    fun launchCameraOcr() {
+        try {
+            val dir = File(context.cacheDir, "camera_ocr").apply { mkdirs() }
+            val file = File(dir, "ocr_${System.currentTimeMillis()}.jpg")
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.provider",
+                file
+            )
+            tempCameraUri = uri
+            takePictureLauncher.launch(uri)
+        } catch (e: Exception) {
+            context.showToastShort("Kamera başlatılamadı: ${e.message}")
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            launchCameraOcr()
+        } else {
+            context.showToastShort("Kamera ile metin taramak için kamera izni gereklidir")
+        }
+    }
+
+    fun checkCameraAndLaunch() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            launchCameraOcr()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -516,13 +584,13 @@ fun NoteDetailScreen(
                     IconButton(
                         onClick = { handleUndo() },
                         enabled = undoStack.isNotEmpty(),
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(34.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_undo),
                             contentDescription = "Geri Al",
                             tint = if (undoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
 
@@ -530,111 +598,28 @@ fun NoteDetailScreen(
                     IconButton(
                         onClick = { handleRedo() },
                         enabled = redoStack.isNotEmpty(),
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(34.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_redo),
                             contentDescription = "İleri Al",
                             tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
 
                     // Export / Share Action Button (Feature 1)
                     IconButton(
                         onClick = { showExportSheet = true },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(34.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.share_square),
                             contentDescription = "Dışa Aktar",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    // Notion Status Selection Pill
-                    val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == noteStatus } ?: KANBAN_COLUMNS[0]
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(currentStatusDef.badgeBgColor)
-                            .clickable { showStatusMenu = true }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = currentStatusDef.title,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = currentStatusDef.badgeTextColor
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    // Category Selection Pill
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(SoftOrangeLight)
-                            .clickable { showCategoryMenu = true }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = selectedCategoryName,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = VibrantOrange
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    // Reminder & Alarm Action Button
-                    val hasActiveReminder = reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (hasActiveReminder) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                            .clickable {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    val hasNotifPermission = ContextCompat.checkSelfPermission(
-                                        context,
-                                        android.Manifest.permission.POST_NOTIFICATIONS
-                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                                    if (!hasNotifPermission) {
-                                        notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                }
-                                showReminderSheet = true
-                            }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_alarm_clock),
-                                contentDescription = "Hatırlatıcı",
-                                tint = if (hasActiveReminder) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            if (hasActiveReminder) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(reminderTime),
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = VibrantOrange
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(6.dp))
 
                     // Bitwarden Lock Action Button
                     IconButton(
@@ -650,31 +635,36 @@ fun NoteDetailScreen(
                                 isPassword = false
                                 context.showToastShort("Kilit kaldırıldı")
                             }
-                        }
+                        },
+                        modifier = Modifier.size(34.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = if (isPassword) R.drawable.lock else R.drawable.unlock),
                             contentDescription = "Kilit",
                             tint = if (isPassword) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
-                    // Save Button
-                    Box(
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Save Button (Clean, single-line, never wraps)
+                    Surface(
                         modifier = Modifier
                             .padding(end = 12.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(CharcoalGray)
-                            .clickable { saveNote() }
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
+                            .clickable { saveNote() },
+                        shape = RoundedCornerShape(12.dp),
+                        color = CharcoalGray
                     ) {
                         Text(
                             text = "Kaydet",
                             color = PureWhite,
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                         )
                     }
                 },
@@ -809,7 +799,7 @@ fun NoteDetailScreen(
                     onOpenSlashMenu = { showSlashSheet = true },
                     onLinkNote = { showLinkNotePicker = true },
                     onScanOcr = {
-                        ocrLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        showOcrSourceSheet = true
                     },
                     isRecordingAudio = isRecordingAudio
                 )
@@ -875,6 +865,122 @@ fun NoteDetailScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Notion Mobile Page Properties Row (Durum, Kategori, Hatırlatıcı / Alarm)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Status Chip
+                    val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == noteStatus } ?: KANBAN_COLUMNS[0]
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showStatusMenu = true },
+                        shape = RoundedCornerShape(12.dp),
+                        color = currentStatusDef.badgeBgColor
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(currentStatusDef.dotColor)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = currentStatusDef.title,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = currentStatusDef.badgeTextColor
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "▼",
+                                fontSize = 8.sp,
+                                color = currentStatusDef.badgeTextColor.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+
+                    // Category Chip
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showCategoryMenu = true },
+                        shape = RoundedCornerShape(12.dp),
+                        color = SoftOrangeLight
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "🏷️", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = selectedCategoryName,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "▼",
+                                fontSize = 8.sp,
+                                color = VibrantOrange.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+
+                    // Reminder / Alarm Chip
+                    val hasActiveReminder = reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    val hasNotifPermission = ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.POST_NOTIFICATIONS
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                    if (!hasNotifPermission) {
+                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                }
+                                showReminderSheet = true
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (hasActiveReminder) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = if (hasActiveReminder) androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f)) else null
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_alarm_clock),
+                                contentDescription = "Hatırlatıcı",
+                                tint = if (hasActiveReminder) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = if (hasActiveReminder) SimpleDateFormat("d MMM HH:mm", Locale("tr")).format(reminderTime) else "Hatırlatıcı Ekle",
+                                fontSize = 11.5.sp,
+                                fontWeight = if (hasActiveReminder) FontWeight.Bold else FontWeight.Medium,
+                                color = if (hasActiveReminder) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1685,6 +1791,167 @@ fun NoteDetailScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+
+    // OCR Source Selector Sheet (Kamera veya Galeri)
+    if (showOcrSourceSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showOcrSourceSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "📷", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Metin Tara (Yapay Zeka OCR)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Görseldeki yazıları cihaz içi ML Kit ile ayrıştırın",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { showOcrSourceSheet = false },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.cancel),
+                            contentDescription = "Kapat",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Option 1: Kamerayı Aç & Çek
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable {
+                            showOcrSourceSheet = false
+                            checkCameraAndLaunch()
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    color = SoftOrangeLight,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(VibrantOrange),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_ocr_scan),
+                                contentDescription = null,
+                                tint = PureWhite,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Kamerayı Aç & Fotoğraf Çek",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Kitap, evrak veya tahtayı anında çekip yazıya dönüştürür.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(text = "Çek ↗", color = VibrantOrange, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Option 2: Galeriden Seç
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable {
+                            showOcrSourceSheet = false
+                            ocrLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.picture),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Galeriden Görsel Seç",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Daha önce kaydettiğiniz bir fotoğraf veya ekran görüntüsünü tarar.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(text = "Seç ↗", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                     }
                 }
 
