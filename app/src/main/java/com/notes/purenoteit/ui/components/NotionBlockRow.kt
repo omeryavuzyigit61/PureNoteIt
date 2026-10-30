@@ -80,6 +80,7 @@ fun NotionBlockRow(
     audioRecorder: AudioRecorder,
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
+    onEditDrawing: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var isDraggingBlock by remember { mutableStateOf(false) }
@@ -149,10 +150,10 @@ fun NotionBlockRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            // Notion ⠿ Touch-and-Drag Handle
+            // Notion ⠿ Instant Touch-and-Drag Handle (0ms latency, zero text conflict)
             Box(
                 modifier = Modifier
-                    .size(26.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
                     .pointerInput(block.id) {
                         detectDragGestures(
@@ -171,7 +172,7 @@ fun NotionBlockRow(
                             onDrag = { change, dragAmount ->
                                 change.consume()
                                 dragAccumulator += dragAmount.y
-                                val threshold = 36f
+                                val threshold = 32f
                                 if (dragAccumulator < -threshold && onMoveUp != null) {
                                     onMoveUp()
                                     dragAccumulator = 0f
@@ -186,7 +187,7 @@ fun NotionBlockRow(
             ) {
                 Text(
                     text = "⠿",
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (isDraggingBlock || isDarkContainer) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
@@ -232,41 +233,7 @@ fun NotionBlockRow(
         }
     }
 
-    // Whole-block long press drag modifier (enabled for text, checklist, callout, image, audio, divider)
-    val wholeBlockDragModifier = if (block.type != BlockType.DRAWING) {
-        Modifier.pointerInput(block.id) {
-            detectDragGesturesAfterLongPress(
-                onDragStart = {
-                    isDraggingBlock = true
-                    dragAccumulator = 0f
-                },
-                onDragEnd = {
-                    isDraggingBlock = false
-                    dragAccumulator = 0f
-                },
-                onDragCancel = {
-                    isDraggingBlock = false
-                    dragAccumulator = 0f
-                },
-                onDrag = { change, dragAmount ->
-                    change.consume()
-                    dragAccumulator += dragAmount.y
-                    val threshold = 38f
-                    if (dragAccumulator < -threshold && onMoveUp != null) {
-                        onMoveUp()
-                        dragAccumulator = 0f
-                    } else if (dragAccumulator > threshold && onMoveDown != null) {
-                        onMoveDown()
-                        dragAccumulator = 0f
-                    }
-                }
-            )
-        }
-    } else {
-        Modifier
-    }
-
-    // Root Tombik Container
+    // Root Tombik Container with Spring Physics (Option A: Instant handle drag, zero text conflict)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -287,7 +254,6 @@ fun NotionBlockRow(
                     Modifier
                 }
             )
-            .then(wholeBlockDragModifier)
     ) {
         when (block.type) {
             BlockType.DIVIDER -> {
@@ -472,6 +438,7 @@ fun NotionBlockRow(
             }
 
             BlockType.DRAWING -> {
+                val drawingPath = block.mediaPath
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -481,24 +448,58 @@ fun NotionBlockRow(
                         .background(PureWhite)
                 ) {
                     AsyncImage(
-                        model = File(block.mediaPath ?: ""),
+                        model = File(drawingPath ?: ""),
                         contentDescription = "El Çizimi",
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(220.dp)
                             .clip(RoundedCornerShape(14.dp))
+                            .clickable {
+                                if (onEditDrawing != null && !drawingPath.isNullOrBlank()) {
+                                    onEditDrawing(drawingPath)
+                                }
+                            }
                             .padding(8.dp),
                         contentScale = ContentScale.Fit
                     )
 
-                    // Dedicated Top Bar for Drawing to avoid gesture conflicts
-                    BlockReorderControls(
-                        isDarkContainer = true,
-                        isDrawingBlock = true,
-                        controlModifier = Modifier
+                    // Top Action Bar for Drawing: Edit Button + Reorder Controls
+                    Row(
+                        modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                    )
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (onEditDrawing != null && !drawingPath.isNullOrBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(VibrantOrange)
+                                    .clickable { onEditDrawing(drawingPath) }
+                                    .padding(horizontal = 9.dp, vertical = 5.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(text = "✏️", fontSize = 11.sp)
+                                    Text(
+                                        text = "Düzenle",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PureWhite
+                                    )
+                                }
+                            }
+                        }
+
+                        BlockReorderControls(
+                            isDarkContainer = true,
+                            isDrawingBlock = true
+                        )
+                    }
                 }
             }
 

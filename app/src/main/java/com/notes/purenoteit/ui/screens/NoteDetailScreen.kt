@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,6 +50,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -168,6 +170,8 @@ fun NoteDetailScreen(
     var showEmojiSheet by remember { mutableStateOf(false) }
     var showSlashSheet by remember { mutableStateOf(false) }
     var showDrawingSheet by remember { mutableStateOf(false) }
+    var editingDrawingPath by remember { mutableStateOf<String?>(null) }
+    var editingDrawingBlockIndex by remember { mutableStateOf<Int?>(null) }
     var showCategoryMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
@@ -354,74 +358,39 @@ fun NoteDetailScreen(
                 actions = {
                     // Notion Status Selection Pill
                     val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == noteStatus } ?: KANBAN_COLUMNS[0]
-                    Box {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(currentStatusDef.badgeBgColor)
-                                .clickable { showStatusMenu = true }
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = currentStatusDef.title,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = currentStatusDef.badgeTextColor
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = showStatusMenu,
-                            onDismissRequest = { showStatusMenu = false }
-                        ) {
-                            for (col in KANBAN_COLUMNS) {
-                                DropdownMenuItem(
-                                    text = { Text(col.title) },
-                                    onClick = {
-                                        noteStatus = col.statusKey
-                                        showStatusMenu = false
-                                    }
-                                )
-                            }
-                        }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(currentStatusDef.badgeBgColor)
+                            .clickable { showStatusMenu = true }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = currentStatusDef.title,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = currentStatusDef.badgeTextColor
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))
 
                     // Category Selection Pill
-                    Box {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(SoftOrangeLight)
-                                .clickable { showCategoryMenu = true }
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = selectedCategoryName,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = VibrantOrange
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = showCategoryMenu,
-                            onDismissRequest = { showCategoryMenu = false }
-                        ) {
-                            for (category in categoryList) {
-                                DropdownMenuItem(
-                                    text = { Text(category.name) },
-                                    onClick = {
-                                        selectedCategoryId = category.id
-                                        selectedCategoryName = category.name
-                                        showCategoryMenu = false
-                                    }
-                                )
-                            }
-                        }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SoftOrangeLight)
+                            .clickable { showCategoryMenu = true }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = selectedCategoryName,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VibrantOrange
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))
@@ -586,7 +555,11 @@ fun NoteDetailScreen(
                         pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
                     onRecordAudio = { handleRecordAudio() },
-                    onOpenDrawing = { showDrawingSheet = true },
+                    onOpenDrawing = {
+                        editingDrawingPath = null
+                        editingDrawingBlockIndex = null
+                        showDrawingSheet = true
+                    },
                     onOpenSlashMenu = { showSlashSheet = true },
                     isRecordingAudio = isRecordingAudio
                 )
@@ -686,6 +659,11 @@ fun NoteDetailScreen(
                             blocks.add(index + 1, item)
                         }
                     } else null,
+                    onEditDrawing = { existingPath ->
+                        editingDrawingPath = existingPath
+                        editingDrawingBlockIndex = index
+                        showDrawingSheet = true
+                    },
                     audioRecorder = audioRecorder
                 )
             }
@@ -706,6 +684,8 @@ fun NoteDetailScreen(
             onDismiss = { showSlashSheet = false },
             onSelectBlock = { type ->
                 if (type == BlockType.DRAWING) {
+                    editingDrawingPath = null
+                    editingDrawingBlockIndex = null
                     showDrawingSheet = true
                 } else {
                     blocks.add(NoteBlock(type = type, content = ""))
@@ -714,15 +694,313 @@ fun NoteDetailScreen(
         )
     }
 
-    // Drawing Canvas Sheet
+    // Drawing Canvas Sheet (Supports both creating new and editing existing drawings)
     if (showDrawingSheet) {
         DrawingCanvasSheet(
-            onDismiss = { showDrawingSheet = false },
+            existingImagePath = editingDrawingPath,
+            onDismiss = {
+                showDrawingSheet = false
+                editingDrawingPath = null
+                editingDrawingBlockIndex = null
+            },
             onSaveDrawing = { savedPath ->
-                blocks.add(NoteBlock(type = BlockType.DRAWING, mediaPath = savedPath))
-                context.showToastShort("Çizim nota eklendi")
+                val targetIdx = editingDrawingBlockIndex
+                if (targetIdx != null && targetIdx in blocks.indices) {
+                    blocks[targetIdx] = blocks[targetIdx].copy(mediaPath = savedPath)
+                    context.showToastShort("Çizim güncellendi")
+                } else {
+                    blocks.add(NoteBlock(type = BlockType.DRAWING, mediaPath = savedPath))
+                    context.showToastShort("Çizim nota eklendi")
+                }
+                showDrawingSheet = false
+                editingDrawingPath = null
+                editingDrawingBlockIndex = null
             }
         )
+    }
+
+    // Modern Notion Status Bottom Sheet
+    if (showStatusMenu) {
+        ModalBottomSheet(
+            onDismissRequest = { showStatusMenu = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "🎯", fontSize = 18.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Not Durumu Seçin",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { showStatusMenu = false },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.cancel),
+                            contentDescription = "Kapat",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                for (col in KANBAN_COLUMNS) {
+                    val isSelected = noteStatus == col.statusKey
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (isSelected) col.badgeBgColor
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            )
+                            .border(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) col.dotColor else Color.Transparent,
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            .clickable {
+                                noteStatus = col.statusKey
+                                showStatusMenu = false
+                            }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(col.dotColor)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = col.title,
+                                fontSize = 15.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) col.badgeTextColor else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        if (isSelected) {
+                            Text(
+                                text = "✓",
+                                color = col.dotColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+
+    // Modern Notion Category Bottom Sheet with Inline "+ Yeni Kategori Ekle"
+    if (showCategoryMenu) {
+        var newCategoryText by remember { mutableStateOf("") }
+
+        ModalBottomSheet(
+            onDismissRequest = { showCategoryMenu = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "🏷️", fontSize = 18.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Kategori Seçin veya Ekleyin",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { showCategoryMenu = false },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.cancel),
+                            contentDescription = "Kapat",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Inline New Category Input Row (Add without leaving page)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BasicTextField(
+                        value = newCategoryText,
+                        onValueChange = { newCategoryText = it },
+                        textStyle = TextStyle(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        cursorBrush = SolidColor(VibrantOrange),
+                        decorationBox = { innerTextField ->
+                            if (newCategoryText.isEmpty()) {
+                                Text(
+                                    text = "+ Yeni Kategori Adı...",
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                            innerTextField()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Button(
+                        onClick = {
+                            val trimmed = newCategoryText.trim()
+                            if (trimmed.isNotEmpty()) {
+                                val newCat = CategoryData(name = trimmed, isPassword = false)
+                                categoryViewModel.upsert(newCat)
+                                selectedCategoryName = trimmed
+                                val existing = categoryList.find { it.name.equals(trimmed, ignoreCase = true) }
+                                if (existing != null) {
+                                    selectedCategoryId = existing.id
+                                }
+                                newCategoryText = ""
+                                context.showToastShort("'$trimmed' kategorisi eklendi ve seçildi")
+                                showCategoryMenu = false
+                            } else {
+                                context.showToastShort("Lütfen bir kategori adı yazın")
+                            }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = VibrantOrange,
+                            contentColor = PureWhite
+                        ),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        enabled = newCategoryText.isNotBlank()
+                    ) {
+                        Text(
+                            text = "Ekle",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Mevcut Kategoriler",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Existing Categories List
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                ) {
+                    items(categoryList) { category ->
+                        val isSelected = selectedCategoryId == category.id || selectedCategoryName == category.name
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isSelected) SoftOrangeLight
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                )
+                            .border(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) VibrantOrange else Color.Transparent,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable {
+                                selectedCategoryId = category.id
+                                selectedCategoryName = category.name
+                                showCategoryMenu = false
+                            }
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSelected) VibrantOrange else MaterialTheme.colorScheme.outline)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = category.name,
+                                    fontSize = 14.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            if (isSelected) {
+                                Text(
+                                    text = "✓",
+                                    color = VibrantOrange,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
     }
 
     // Set PIN dialog if not set yet

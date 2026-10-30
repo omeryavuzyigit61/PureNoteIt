@@ -1,6 +1,7 @@
 package com.notes.purenoteit.ui.components
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Paint
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -53,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -124,12 +126,22 @@ private val PALETTE_COLORS = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DrawingCanvasSheet(
+    existingImagePath: String? = null,
     onDismiss: () -> Unit,
     onSaveDrawing: (filePath: String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val baseBitmap = remember(existingImagePath) {
+        existingImagePath?.let { path ->
+            val file = File(path)
+            if (file.exists()) {
+                BitmapFactory.decodeFile(file.absolutePath)
+            } else null
+        }
+    }
 
     val items = remember { mutableStateListOf<CanvasItem>() }
     val currentPoints = remember { mutableStateListOf<Offset>() }
@@ -149,7 +161,7 @@ fun DrawingCanvasSheet(
     var canvasSize by remember { mutableStateOf(IntSize(1080, 1080)) }
 
     fun saveDrawingToPng() {
-        if (items.isEmpty()) {
+        if (items.isEmpty() && baseBitmap == null) {
             context.showToastShort("Çizim boş!")
             return
         }
@@ -161,6 +173,13 @@ fun DrawingCanvasSheet(
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = android.graphics.Canvas(bitmap)
             canvas.drawColor(android.graphics.Color.WHITE)
+
+            // Render existing drawing bitmap as the base canvas layer
+            baseBitmap?.let { bmp ->
+                val srcRect = android.graphics.Rect(0, 0, bmp.width, bmp.height)
+                val dstRect = android.graphics.Rect(0, 0, width, height)
+                canvas.drawBitmap(bmp, srcRect, dstRect, null)
+            }
 
             val paint = Paint().apply {
                 isAntiAlias = true
@@ -275,7 +294,7 @@ fun DrawingCanvasSheet(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Çizim Tuvali",
+                    text = if (existingImagePath != null) "Çizimi Düzenle" else "Çizim Tuvali",
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -328,7 +347,7 @@ fun DrawingCanvasSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Ekle",
+                            text = if (existingImagePath != null) "Güncelle" else "Ekle",
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = PureWhite,
@@ -508,6 +527,14 @@ fun DrawingCanvasSheet(
                             )
                         }
                 ) {
+                    // 0. Render existing base bitmap if editing an existing sketch
+                    baseBitmap?.let { bmp ->
+                        drawImage(
+                            image = bmp.asImageBitmap(),
+                            dstSize = IntSize(size.width.toInt(), size.height.toInt())
+                        )
+                    }
+
                     // 1. Draw all committed canvas items
                     for (item in items) {
                         val drawColor = if (item.isEraser) PureWhite else item.color
