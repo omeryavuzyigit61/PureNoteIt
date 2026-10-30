@@ -21,8 +21,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +53,12 @@ import com.notes.purenoteit.ui.theme.VibrantOrange
 import com.notes.purenoteit.util.AudioRecorder
 import java.io.File
 
+/**
+ * Notion Block Row Component.
+ * Supports rich blocks: Headings, Paragraphs, Checklists, Bullet Lists, Callouts,
+ * Dividers, Spotify Audio Players, Images, and Hand Drawings.
+ * Features 1-click Move Up / Move Down block reordering and deletion.
+ */
 @Composable
 fun NotionBlockRow(
     block: NoteBlock,
@@ -55,8 +66,12 @@ fun NotionBlockRow(
     onCheckedChange: (Boolean) -> Unit,
     onDeleteBlock: () -> Unit,
     audioRecorder: AudioRecorder,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var showBlockMenu by remember { mutableStateOf(false) }
+
     val textStyle = when (block.type) {
         BlockType.HEADING_1 -> TextStyle(
             fontSize = 22.sp,
@@ -86,6 +101,60 @@ fun NotionBlockRow(
         )
     }
 
+    // Mini Reorder Bar (Up / Down / Delete)
+    @Composable
+    fun BlockReorderControls(
+        isDarkContainer: Boolean = false,
+        modifier: Modifier = Modifier
+    ) {
+        Row(
+            modifier = modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (isDarkContainer) CharcoalGray.copy(alpha = 0.85f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                .padding(horizontal = 2.dp, vertical = 1.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            if (onMoveUp != null) {
+                IconButton(
+                    onClick = onMoveUp,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Text(
+                        text = "▲",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDarkContainer) PureWhite else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            if (onMoveDown != null) {
+                IconButton(
+                    onClick = onMoveDown,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Text(
+                        text = "▼",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDarkContainer) PureWhite else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            IconButton(
+                onClick = onDeleteBlock,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.cancel),
+                    contentDescription = "Sil",
+                    tint = if (isDarkContainer) PureWhite.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.size(11.dp)
+                )
+            }
+        }
+    }
+
     when (block.type) {
         BlockType.DIVIDER -> {
             Row(
@@ -99,17 +168,7 @@ fun NotionBlockRow(
                     thickness = 1.dp,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                 )
-                IconButton(
-                    onClick = onDeleteBlock,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.cancel),
-                        contentDescription = "Sil",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
+                BlockReorderControls(modifier = Modifier.padding(start = 6.dp))
             }
         }
 
@@ -120,26 +179,25 @@ fun NotionBlockRow(
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Interactive Checkbox
                 Box(
                     modifier = Modifier
-                        .size(22.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .size(20.dp)
+                        .clip(RoundedCornerShape(5.dp))
                         .border(
                             width = 1.5.dp,
-                            color = if (block.isChecked) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(6.dp)
+                            color = if (block.isChecked) VibrantOrange else MaterialTheme.colorScheme.outline,
+                            shape = RoundedCornerShape(5.dp)
                         )
                         .background(if (block.isChecked) VibrantOrange else Color.Transparent)
                         .clickable { onCheckedChange(!block.isChecked) },
                     contentAlignment = Alignment.Center
                 ) {
                     if (block.isChecked) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.confirm_button_background),
-                            contentDescription = null,
-                            tint = PureWhite,
-                            modifier = Modifier.size(10.dp)
+                        Text(
+                            text = "✓",
+                            color = PureWhite,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -165,19 +223,7 @@ fun NotionBlockRow(
                     modifier = Modifier.weight(1f)
                 )
 
-                if (block.content.isBlank()) {
-                    IconButton(
-                        onClick = onDeleteBlock,
-                        modifier = Modifier.size(20.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.cancel),
-                            contentDescription = "Sil",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                }
+                BlockReorderControls(modifier = Modifier.padding(start = 4.dp))
             }
         }
 
@@ -186,14 +232,14 @@ fun NotionBlockRow(
                 modifier = modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .padding(top = 8.dp, start = 4.dp, end = 10.dp)
+                        .padding(start = 6.dp, end = 12.dp)
                         .size(6.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onBackground)
+                        .background(VibrantOrange)
                 )
 
                 BasicTextField(
@@ -204,7 +250,7 @@ fun NotionBlockRow(
                     decorationBox = { innerTextField ->
                         if (block.content.isEmpty()) {
                             Text(
-                                text = "Madde...",
+                                text = "Liste maddesi...",
                                 style = textStyle.copy(
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
                                 )
@@ -215,36 +261,29 @@ fun NotionBlockRow(
                     modifier = Modifier.weight(1f)
                 )
 
-                if (block.content.isBlank()) {
-                    IconButton(
-                        onClick = onDeleteBlock,
-                        modifier = Modifier.size(20.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.cancel),
-                            contentDescription = "Sil",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                }
+                BlockReorderControls(modifier = Modifier.padding(start = 4.dp))
             }
         }
 
         BlockType.CALLOUT -> {
-            Box(
+            Surface(
                 modifier = modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(SoftOrangeLight.copy(alpha = 0.5f))
-                    .border(1.dp, VibrantOrange.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
-                    .padding(12.dp)
+                    .padding(vertical = 6.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = SoftYellowLight,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFE082))
             ) {
-                Row(verticalAlignment = Alignment.Top) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = block.calloutIcon,
-                        fontSize = 20.sp,
-                        modifier = Modifier.padding(end = 8.dp)
+                        fontSize = 18.sp,
+                        modifier = Modifier.padding(end = 10.dp)
                     )
 
                     BasicTextField(
@@ -266,17 +305,7 @@ fun NotionBlockRow(
                         modifier = Modifier.weight(1f)
                     )
 
-                    IconButton(
-                        onClick = onDeleteBlock,
-                        modifier = Modifier.size(20.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.cancel),
-                            contentDescription = "Sil",
-                            tint = CharcoalGray.copy(alpha = 0.5f),
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
+                    BlockReorderControls(modifier = Modifier.padding(start = 4.dp))
                 }
             }
         }
@@ -299,32 +328,66 @@ fun NotionBlockRow(
                     contentScale = ContentScale.Crop
                 )
 
-                IconButton(
-                    onClick = onDeleteBlock,
+                BlockReorderControls(
+                    isDarkContainer = true,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(CharcoalGray.copy(alpha = 0.7f))
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.cancel),
-                        contentDescription = "Sil",
-                        tint = PureWhite,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
+                        .padding(8.dp)
+                )
+            }
+        }
+
+        BlockType.DRAWING -> {
+            Box(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(1.5.dp, BorderLight.copy(alpha = 0.8f), RoundedCornerShape(14.dp))
+                    .background(PureWhite)
+            ) {
+                AsyncImage(
+                    model = File(block.mediaPath ?: ""),
+                    contentDescription = "El Çizimi",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .padding(8.dp),
+                    contentScale = ContentScale.Fit
+                )
+
+                BlockReorderControls(
+                    isDarkContainer = true,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                )
             }
         }
 
         BlockType.AUDIO -> {
-            SpotifyAudioPlayer(
-                filePath = block.mediaPath ?: "",
-                audioRecorder = audioRecorder,
-                onDelete = onDeleteBlock,
+            Column(
                 modifier = modifier
-            )
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    BlockReorderControls()
+                }
+
+                SpotifyAudioPlayer(
+                    filePath = block.mediaPath ?: "",
+                    audioRecorder = audioRecorder,
+                    onDelete = onDeleteBlock,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         else -> { // PARAGRAPH, HEADING_1, HEADING_2
@@ -360,19 +423,7 @@ fun NotionBlockRow(
                     modifier = Modifier.weight(1f)
                 )
 
-                if (block.content.isBlank()) {
-                    IconButton(
-                        onClick = onDeleteBlock,
-                        modifier = Modifier.size(20.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.cancel),
-                            contentDescription = "Sil",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                }
+                BlockReorderControls(modifier = Modifier.padding(start = 4.dp))
             }
         }
     }

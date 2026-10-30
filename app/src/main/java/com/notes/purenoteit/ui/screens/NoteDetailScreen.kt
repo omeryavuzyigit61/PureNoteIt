@@ -84,6 +84,7 @@ import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
+import com.notes.purenoteit.ui.components.DrawingCanvasSheet
 import com.notes.purenoteit.ui.components.EmojiPickerSheet
 import com.notes.purenoteit.ui.components.KANBAN_COLUMNS
 import com.notes.purenoteit.ui.components.NotionBlockRow
@@ -166,6 +167,7 @@ fun NoteDetailScreen(
     // Dialog sheets
     var showEmojiSheet by remember { mutableStateOf(false) }
     var showSlashSheet by remember { mutableStateOf(false) }
+    var showDrawingSheet by remember { mutableStateOf(false) }
     var showCategoryMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
@@ -584,6 +586,7 @@ fun NoteDetailScreen(
                         pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
                     onRecordAudio = { handleRecordAudio() },
+                    onOpenDrawing = { showDrawingSheet = true },
                     onOpenSlashMenu = { showSlashSheet = true },
                     isRecordingAudio = isRecordingAudio
                 )
@@ -671,6 +674,18 @@ fun NoteDetailScreen(
                             blocks[0] = NoteBlock()
                         }
                     },
+                    onMoveUp = if (index > 0) {
+                        {
+                            val item = blocks.removeAt(index)
+                            blocks.add(index - 1, item)
+                        }
+                    } else null,
+                    onMoveDown = if (index < blocks.lastIndex) {
+                        {
+                            val item = blocks.removeAt(index)
+                            blocks.add(index + 1, item)
+                        }
+                    } else null,
                     audioRecorder = audioRecorder
                 )
             }
@@ -690,7 +705,22 @@ fun NoteDetailScreen(
         NotionSlashDialog(
             onDismiss = { showSlashSheet = false },
             onSelectBlock = { type ->
-                blocks.add(NoteBlock(type = type, content = ""))
+                if (type == BlockType.DRAWING) {
+                    showDrawingSheet = true
+                } else {
+                    blocks.add(NoteBlock(type = type, content = ""))
+                }
+            }
+        )
+    }
+
+    // Drawing Canvas Sheet
+    if (showDrawingSheet) {
+        DrawingCanvasSheet(
+            onDismiss = { showDrawingSheet = false },
+            onSaveDrawing = { savedPath ->
+                blocks.add(NoteBlock(type = BlockType.DRAWING, mediaPath = savedPath))
+                context.showToastShort("Çizim nota eklendi")
             }
         )
     }

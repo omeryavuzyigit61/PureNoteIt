@@ -13,7 +13,8 @@ enum class BlockType {
     CALLOUT,
     DIVIDER,
     AUDIO,
-    IMAGE
+    IMAGE,
+    DRAWING
 }
 
 data class NoteBlock(

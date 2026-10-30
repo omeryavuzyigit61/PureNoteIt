@@ -50,6 +50,7 @@ fun NotionSlashDialog(
         SlashItem(BlockType.TODO, "Yapılacaklar Listesi", "Tamamlanabilir görev kutucuğu", R.drawable.ic_checklist),
         SlashItem(BlockType.BULLET_LIST, "Madde İmleri", "Basit bir liste oluşturun", R.drawable.ic_format_bullet),
         SlashItem(BlockType.CALLOUT, "Callout (Vurgu Kutusu)", "Önemli fikir ve notları kutu içine alın", R.drawable.ic_format_quote),
+        SlashItem(BlockType.DRAWING, "El Çizimi (Tuval)", "Parmakla serbest çizim veya şema çizin", R.drawable.ic_brush),
         SlashItem(BlockType.DIVIDER, "Ayırıcı Çizgi", "Blokları birbirinden ayıran yatay çizgi", R.drawable.cancel)
     )
 

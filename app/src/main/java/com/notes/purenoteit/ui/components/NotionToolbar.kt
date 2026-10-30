@@ -43,6 +43,7 @@ fun NotionToolbar(
     onAddBlock: (BlockType) -> Unit,
     onPickImage: () -> Unit,
     onRecordAudio: () -> Unit,
+    onOpenDrawing: () -> Unit,
     onOpenSlashMenu: () -> Unit,
     isRecordingAudio: Boolean = false,
     modifier: Modifier = Modifier
@@ -120,6 +121,13 @@ fun NotionToolbar(
                 iconRes = R.drawable.picture,
                 label = "Fotoğraf",
                 onClick = onPickImage
+            )
+
+            // El Çizimi Ekleme (Drawing Canvas)
+            ToolbarItem(
+                iconRes = R.drawable.ic_brush,
+                label = "Çizim",
+                onClick = onOpenDrawing
             )
 
             // Ses Kaydı (changes visual style when recording)
