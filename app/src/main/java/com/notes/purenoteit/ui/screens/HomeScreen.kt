@@ -388,6 +388,32 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Menu Item: 2D Knowledge Graph (Paket 1)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.ic_network_graph,
+                        title = "Bilgi Ağı (2D Graph)",
+                        subtitle = "Notlar arası bağlantı haritası",
+                        onClick = {
+                            currentViewMode = NotionViewMode.GRAPH
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Menu Item: Thought Stream (Paket 4)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.ic_stream_timeline,
+                        title = "Fikir Akışı (Inbox)",
+                        subtitle = "Hızlı anlık düşünce timeline'ı",
+                        onClick = {
+                            currentViewMode = NotionViewMode.STREAM
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Menu Item: Dark Mode Switch
                     Surface(
                         modifier = Modifier

@@ -109,6 +109,22 @@ fun NotionToolbar(
                 onClick = { onAddBlock(BlockType.BULLET_LIST) }
             )
 
+            // Açılır Liste (Toggle)
+            ToolbarItem(
+                iconRes = R.drawable.category,
+                label = "Açılır Liste",
+                onClick = { onAddBlock(BlockType.TOGGLE) },
+                iconTint = VibrantOrange
+            )
+
+            // Dinamik Tablo (Table)
+            ToolbarItem(
+                iconRes = R.drawable.ic_table,
+                label = "Tablo",
+                onClick = { onAddBlock(BlockType.TABLE) },
+                iconTint = VibrantOrange
+            )
+
             // Vurgu / Alıntı Kutusu (Callout / Quote)
             ToolbarItem(
                 iconRes = R.drawable.ic_format_quote,
