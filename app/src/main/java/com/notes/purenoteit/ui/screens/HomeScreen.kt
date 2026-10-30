@@ -3,6 +3,7 @@ package com.notes.purenoteit.ui.screens
 import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
@@ -14,22 +15,28 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -41,6 +48,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -80,10 +88,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -143,6 +155,15 @@ fun HomeScreen(
     var selectedCategory by remember { mutableStateOf("Tümü") }
     var searchQuery by remember { mutableStateOf("") }
     var currentViewMode by remember { mutableStateOf(NotionViewMode.GRID) }
+    var isSearchFocused by remember { mutableStateOf(false) }
+
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    BackHandler(enabled = isSearchFocused) {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+    }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -204,6 +225,8 @@ fun HomeScreen(
     val regularNotes = remember(filteredNotes) { filteredNotes.filter { !it.isPinned } }
 
     val handleNoteClick: (NoteData) -> Unit = { note ->
+        focusManager.clearFocus()
+        keyboardController?.hide()
         if (note.isPassword == true && !SecurityUtil.isVaultUnlocked) {
             pendingUnlockNoteId = note.id
             // Try biometrics first, fallback to PIN dialog
@@ -396,122 +419,120 @@ fun HomeScreen(
             }
         }
     ) {
-        Scaffold(
-            topBar = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.background)
-                        .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Left: Drawer menu button
-                        IconButton(
-                            onClick = { scope.launch { drawerState.open() } },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.menu),
-                                contentDescription = "Menü",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Center: App Title
-                        Text(
-                            text = "PureNoteIt",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                        )
-
-                        // Right: Spacer for visual balance
-                        Spacer(modifier = Modifier.size(42.dp))
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Notion Multi-View Switcher Tabs
-                    Row(
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Scaffold(
+                topBar = {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .background(MaterialTheme.colorScheme.background)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
-                        for (mode in NotionViewMode.values()) {
-                            ViewModeTab(
-                                mode = mode,
-                                isSelected = currentViewMode == mode,
-                                onClick = { currentViewMode = mode }
-                            )
-                        }
-                    }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Left: Drawer menu button
+                            IconButton(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    scope.launch { drawerState.open() }
+                                },
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.menu),
+                                    contentDescription = "Menü",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
 
-                    // Horizontal Category Chips (Visible in Grid, List & Board views)
-                    if (currentViewMode != NotionViewMode.CALENDAR) {
+                            // Center: App Title
+                            Text(
+                                text = "PureNoteIt",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            )
+
+                            // Right: Spacer for visual balance
+                            Spacer(modifier = Modifier.size(42.dp))
+                        }
+
                         Spacer(modifier = Modifier.height(10.dp))
 
+                        // Notion Multi-View Switcher Tabs
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            CategoryChip(
-                                label = "Tümü",
-                                isSelected = selectedCategory == "Tümü",
-                                onClick = { selectedCategory = "Tümü" }
-                            )
-
-                            categoryList.forEach { category ->
-                                CategoryChip(
-                                    label = category.name,
-                                    isSelected = selectedCategory == category.name,
-                                    isLocked = category.isPassword == true,
-                                    onClick = { selectedCategory = category.name }
+                            for (mode in NotionViewMode.values()) {
+                                ViewModeTab(
+                                    mode = mode,
+                                    isSelected = currentViewMode == mode,
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        currentViewMode = mode
+                                    }
                                 )
                             }
                         }
-                    }
-                }
-            },
-            floatingActionButton = {
-                NotionMobileBottomDock(
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { searchQuery = it },
-                    onVoiceClick = {
-                        try {
-                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Notlarda ara...")
+
+                        // Horizontal Category Chips (Visible in Grid, List & Board views)
+                        if (currentViewMode != NotionViewMode.CALENDAR) {
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CategoryChip(
+                                    label = "Tümü",
+                                    isSelected = selectedCategory == "Tümü",
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        selectedCategory = "Tümü"
+                                    }
+                                )
+
+                                categoryList.forEach { category ->
+                                    CategoryChip(
+                                        label = category.name,
+                                        isSelected = selectedCategory == category.name,
+                                        isLocked = category.isPassword == true,
+                                        onClick = {
+                                            focusManager.clearFocus()
+                                            keyboardController?.hide()
+                                            selectedCategory = category.name
+                                        }
+                                    )
+                                }
                             }
-                            speechLauncher.launch(intent)
-                        } catch (e: Exception) {
-                            context.showToastShort("Sesli arama cihazınızda desteklenmiyor")
                         }
-                    },
-                    onAddNoteClick = { onNavigateToAddNote(-1) },
-                    isDark = isDarkTheme,
-                    modifier = Modifier
-                        .navigationBarsPadding()
-                        .imePadding()
-                )
-            },
-            floatingActionButtonPosition = FabPosition.Center,
-            containerColor = MaterialTheme.colorScheme.background
-        ) { paddingValues ->
+                    }
+                },
+                containerColor = Color.Transparent
+            ) { paddingValues ->
             when (currentViewMode) {
                 NotionViewMode.BOARD -> {
                     NotionKanbanBoard(
@@ -568,7 +589,16 @@ fun HomeScreen(
                             paddingValues = paddingValues
                         )
                     } else {
+                        val staggeredGridState = rememberLazyStaggeredGridState()
+                        LaunchedEffect(staggeredGridState.isScrollInProgress) {
+                            if (staggeredGridState.isScrollInProgress) {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
+                        }
+
                         LazyVerticalStaggeredGrid(
+                            state = staggeredGridState,
                             columns = StaggeredGridCells.Fixed(2),
                             modifier = Modifier
                                 .fillMaxSize()
@@ -695,6 +725,55 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+
+        // Full-screen tap catcher when search is focused:
+            // Tapping ANYWHERE outside the bottom dock immediately drops focus and stops the blinking cursor!
+            if (isSearchFocused) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                        }
+                )
+            }
+
+            // Pinned Notion Mobile Bottom Dock:
+            // Anchored cleanly to screen bottom, lifts smoothly by EXACTLY keyboard height (via safeDrawing),
+            // and never jumps into the center of the screen!
+            NotionMobileBottomDock(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                onFocusChanged = { isSearchFocused = it },
+                onVoiceClick = {
+                    try {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Notlarda ara...")
+                        }
+                        speechLauncher.launch(intent)
+                    } catch (e: Exception) {
+                        context.showToastShort("Sesli arama cihazınızda desteklenmiyor")
+                    }
+                },
+                onAddNoteClick = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                    onNavigateToAddNote(-1)
+                },
+                isDark = isDarkTheme,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            )
         }
     }
 
@@ -1114,17 +1193,18 @@ private fun NotionRecentCoverCard(
 private fun NotionMobileBottomDock(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
     onVoiceClick: () -> Unit,
     onAddNoteClick: () -> Unit,
     isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -1132,7 +1212,13 @@ private fun NotionMobileBottomDock(
         Surface(
             modifier = Modifier
                 .weight(1f)
-                .height(48.dp),
+                .height(48.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    focusRequester.requestFocus()
+                },
             shape = RoundedCornerShape(24.dp),
             color = if (isDark) Color(0xFF1E1E22) else PureWhite,
             shadowElevation = 6.dp,
@@ -1173,7 +1259,12 @@ private fun NotionMobileBottomDock(
                     BasicTextField(
                         value = searchQuery,
                         onValueChange = onSearchQueryChange,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester)
+                            .onFocusChanged { focusState ->
+                                onFocusChanged(focusState.isFocused)
+                            },
                         singleLine = true,
                         textStyle = TextStyle(
                             fontSize = 14.sp,
@@ -1181,14 +1272,23 @@ private fun NotionMobileBottomDock(
                         ),
                         cursorBrush = SolidColor(VibrantOrange),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
+                        )
                     )
                 }
 
                 // Clear button [ ✕ ] when query has text
                 if (searchQuery.isNotEmpty()) {
                     IconButton(
-                        onClick = { onSearchQueryChange("") },
+                        onClick = {
+                            onSearchQueryChange("")
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                        },
                         modifier = Modifier.size(30.dp)
                     ) {
                         Icon(
@@ -1201,7 +1301,11 @@ private fun NotionMobileBottomDock(
                 }
 
                 IconButton(
-                    onClick = onVoiceClick,
+                    onClick = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                        onVoiceClick()
+                    },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
@@ -1219,7 +1323,11 @@ private fun NotionMobileBottomDock(
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .clickable { onAddNoteClick() },
+                .clickable {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                    onAddNoteClick()
+                },
             shape = CircleShape,
             color = if (isDark) Color(0xFF222228) else PureWhite,
             shadowElevation = 6.dp,
