@@ -374,7 +374,9 @@ fun HomeScreen(
                             scope.launch {
                                 drawerState.close()
                                 noteViewModel.createDailyAgenda { newNote ->
-                                    onNavigateToAddNote(newNote.id)
+                                    if (newNote.id > 0) {
+                                        onNavigateToAddNote(newNote.id)
+                                    }
                                 }
                             }
                         }

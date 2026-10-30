@@ -14,6 +14,9 @@ interface NoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun upsert(note: NoteData): Completable
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertNote(note: NoteData): Single<Long>
+
     @Delete
     fun delete(note: NoteData): Completable
 

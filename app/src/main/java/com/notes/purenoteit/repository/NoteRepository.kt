@@ -6,6 +6,7 @@ import javax.inject.Inject
 
 class NoteRepository @Inject constructor(private val noteDao: NoteDao) {
     fun upsert(item: NoteData) = noteDao.upsert(item)
+    fun insertNote(item: NoteData) = noteDao.insertNote(item)
     fun delete(item: NoteData) = noteDao.delete(item)
     fun getNotes() = noteDao.getNotes()
     fun searchNote(query: String) = noteDao.searchNote(query)

@@ -276,10 +276,11 @@ class NoteViewModel @Inject constructor(
             icon = "⚡"
         )
 
-        repository.upsert(newNote)
+        repository.insertNote(newNote)
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({
+            .subscribe({ generatedId ->
+                newNote.id = generatedId.toInt()
                 knowledgeRepository.markStreamItemsProcessed(selectedIds, newNote.id)
                     .subscribeOn(Schedulers.io())
                     .subscribe()

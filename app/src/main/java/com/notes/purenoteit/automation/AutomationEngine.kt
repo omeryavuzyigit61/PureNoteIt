@@ -1,11 +1,14 @@
 package com.notes.purenoteit.automation
 
+import android.util.Log
+import com.notes.purenoteit.data.db.CategoryDao
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.repository.KnowledgeRepository
 import com.notes.purenoteit.repository.NoteRepository
+import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -16,7 +19,8 @@ import javax.inject.Singleton
 @Singleton
 class AutomationEngine @Inject constructor(
     private val knowledgeRepository: KnowledgeRepository,
-    private val noteRepository: NoteRepository
+    private val noteRepository: NoteRepository,
+    private val categoryDao: CategoryDao
 ) {
     /**
      * Evaluates note-level triggers when a note is created or updated.
@@ -25,6 +29,7 @@ class AutomationEngine @Inject constructor(
     fun onNoteUpdated(note: NoteData, onStatusUpdated: ((String) -> Unit)? = null) {
         knowledgeRepository.getRulesByTrigger("ALL_TASKS_COMPLETED")
             .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
             .subscribe({ rules ->
                 val activeRule = rules.firstOrNull { it.isEnabled }
                 if (activeRule != null) {
@@ -34,7 +39,9 @@ class AutomationEngine @Inject constructor(
                         onStatusUpdated?.invoke("DONE")
                     }
                 }
-            }, {})
+            }, { error ->
+                Log.e("AutomationEngine", "Error checking rules: ${error.message}")
+            })
     }
 
     /**
@@ -82,21 +89,33 @@ class AutomationEngine @Inject constructor(
             )
         )
 
-        val newNote = NoteData(
-            title = "Ajanda: $todayStr",
-            description = BlockParser.serialize(blocks),
-            date = System.currentTimeMillis(),
-            icon = "📅",
-            categoryId = 2, // Günlük
-            status = "TODO",
-            totalTasks = 3,
-            completedTasks = 0
-        )
-
-        noteRepository.upsert(newNote)
+        categoryDao.getAllCategories()
             .subscribeOn(Schedulers.io())
-            .subscribe({
-                onSuccess(newNote)
-            }, {})
+            .flatMap { categories ->
+                val dailyCat = categories.firstOrNull { it.name.equals("Günlük", ignoreCase = true) }
+                val targetCategoryId = dailyCat?.id ?: categories.firstOrNull()?.id
+
+                val newNote = NoteData(
+                    title = "Ajanda: $todayStr",
+                    description = BlockParser.serialize(blocks),
+                    date = System.currentTimeMillis(),
+                    icon = "📅",
+                    categoryId = targetCategoryId,
+                    status = "TODO",
+                    totalTasks = 3,
+                    completedTasks = 0
+                )
+
+                noteRepository.insertNote(newNote).map { generatedId ->
+                    newNote.id = generatedId.toInt()
+                    newNote
+                }
+            }
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({ savedNote ->
+                onSuccess(savedNote)
+            }, { error ->
+                Log.e("AutomationEngine", "Error creating daily agenda note: ${error.message}", error)
+            })
     }
 }

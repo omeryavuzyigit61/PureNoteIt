@@ -216,7 +216,7 @@ fun NoteDetailScreen(
     // Load existing note data
     LaunchedEffect(noteId) {
         if (noteId != -1) {
-            noteViewModel.getNoteById(noteId).subscribe { note ->
+            noteViewModel.getNoteById(noteId).subscribe({ note ->
                 title = note.title ?: ""
                 selectedIcon = note.icon
                 isPassword = note.isPassword ?: false
@@ -254,7 +254,9 @@ fun NoteDetailScreen(
                 if (blocks.isEmpty()) {
                     blocks.add(NoteBlock())
                 }
-            }
+            }, { error ->
+                android.util.Log.e("NoteDetailScreen", "Error loading note $noteId: ${error.message}")
+            })
         } else {
             blocks.clear()
             blocks.add(NoteBlock())
