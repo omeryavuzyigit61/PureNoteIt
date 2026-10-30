@@ -110,7 +110,9 @@ import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
 import com.notes.purenoteit.ui.theme.VibrantOrange
 import com.notes.purenoteit.util.AudioRecorder
+import com.notes.purenoteit.util.NoteExporter
 import com.notes.purenoteit.util.SecurityUtil
+import com.notes.purenoteit.util.TextRecognitionHelper
 import com.notes.purenoteit.util.showToastShort
 import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
@@ -206,6 +208,8 @@ fun NoteDetailScreen(
     var showEmojiSheet by remember { mutableStateOf(false) }
     var showSlashSheet by remember { mutableStateOf(false) }
     var showDrawingSheet by remember { mutableStateOf(false) }
+    var showExportSheet by remember { mutableStateOf(false) }
+    var isScanningOcr by remember { mutableStateOf(false) }
     var editingDrawingPath by remember { mutableStateOf<String?>(null) }
     var editingDrawingBlockIndex by remember { mutableStateOf<Int?>(null) }
     var showCategoryMenu by remember { mutableStateOf(false) }
@@ -215,6 +219,59 @@ fun NoteDetailScreen(
     var showLinkNotePicker by remember { mutableStateOf(false) }
     var linkSearchQuery by remember { mutableStateOf("") }
     val allNotesForLinking by noteViewModel.noteList.observeAsState(emptyList())
+
+    // Undo / Redo history stacks (Feature 2)
+    val undoStack = remember { mutableStateListOf<List<NoteBlock>>() }
+    val redoStack = remember { mutableStateListOf<List<NoteBlock>>() }
+
+    fun recordUndoState() {
+        if (undoStack.size >= 25) {
+            undoStack.removeAt(0)
+        }
+        undoStack.add(blocks.map { it.copy() })
+        redoStack.clear()
+    }
+
+    fun handleUndo() {
+        if (undoStack.isNotEmpty()) {
+            val lastState = undoStack.removeAt(undoStack.lastIndex)
+            redoStack.add(blocks.map { it.copy() })
+            blocks.clear()
+            blocks.addAll(lastState)
+            context.showToastShort("Geri alındı")
+        }
+    }
+
+    fun handleRedo() {
+        if (redoStack.isNotEmpty()) {
+            val nextState = redoStack.removeAt(redoStack.lastIndex)
+            undoStack.add(blocks.map { it.copy() })
+            blocks.clear()
+            blocks.addAll(nextState)
+            context.showToastShort("İleri alındı")
+        }
+    }
+
+    fun navigateToNoteByTitle(targetTitle: String) {
+        val trimmed = targetTitle.trim()
+        if (trimmed.isNotBlank()) {
+            val found = allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
+            if (found != null) {
+                onNavigateToNote?.invoke(found.id)
+            } else {
+                val newNote = NoteData(
+                    title = trimmed,
+                    description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
+                    date = System.currentTimeMillis(),
+                    categoryId = selectedCategoryId
+                )
+                noteViewModel.saveNote(newNote, contentForLinks = null) { newId ->
+                    context.showToastShort("\"$trimmed\" oluşturuldu ve açıldı")
+                    onNavigateToNote?.invoke(newId)
+                }
+            }
+        }
+    }
 
     val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
 
@@ -291,6 +348,7 @@ fun NoteDetailScreen(
     ) { uri ->
         uri?.let {
             try {
+                recordUndoState()
                 val dir = File(context.filesDir, "shared_images").apply { mkdirs() }
                 val file = File(dir, "note_image_${System.currentTimeMillis()}.jpg")
                 context.contentResolver.openInputStream(uri)?.use { input ->
@@ -300,6 +358,36 @@ fun NoteDetailScreen(
             } catch (e: Exception) {
                 context.showToastShort("Görsel yüklenemedi")
             }
+        }
+    }
+
+    // OCR On-Device Text Scanner (Feature 4 - Google ML Kit)
+    val ocrLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let {
+            isScanningOcr = true
+            recordUndoState()
+            TextRecognitionHelper.recognizeTextFromImage(
+                context = context,
+                imageUri = it,
+                onSuccess = { recognizedLines ->
+                    isScanningOcr = false
+                    val validLines = recognizedLines.filter { it.isNotBlank() }
+                    if (validLines.isNotEmpty()) {
+                        for (line in validLines) {
+                            blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = line))
+                        }
+                        context.showToastShort("Yapay zeka metni çıkardı (${validLines.size} satır)!")
+                    } else {
+                        context.showToastShort("Görselde okunabilir metin bulunamadı")
+                    }
+                },
+                onError = { e ->
+                    isScanningOcr = false
+                    context.showToastShort("Metin tarama hatası: ${e.message}")
+                }
+            )
         }
     }
 
@@ -424,6 +512,49 @@ fun NoteDetailScreen(
                     }
                 },
                 actions = {
+                    // Undo Action Button (Feature 2)
+                    IconButton(
+                        onClick = { handleUndo() },
+                        enabled = undoStack.isNotEmpty(),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_undo),
+                            contentDescription = "Geri Al",
+                            tint = if (undoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    // Redo Action Button (Feature 2)
+                    IconButton(
+                        onClick = { handleRedo() },
+                        enabled = redoStack.isNotEmpty(),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_redo),
+                            contentDescription = "İleri Al",
+                            tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    // Export / Share Action Button (Feature 1)
+                    IconButton(
+                        onClick = { showExportSheet = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.share_square),
+                            contentDescription = "Dışa Aktar",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
                     // Notion Status Selection Pill
                     val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == noteStatus } ?: KANBAN_COLUMNS[0]
                     Box(
@@ -663,6 +794,7 @@ fun NoteDetailScreen(
 
                 NotionToolbar(
                     onAddBlock = { type ->
+                        recordUndoState()
                         blocks.add(NoteBlock(type = type, content = ""))
                     },
                     onPickImage = {
@@ -676,6 +808,9 @@ fun NoteDetailScreen(
                     },
                     onOpenSlashMenu = { showSlashSheet = true },
                     onLinkNote = { showLinkNotePicker = true },
+                    onScanOcr = {
+                        ocrLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
                     isRecordingAudio = isRecordingAudio
                 )
             }
@@ -765,6 +900,7 @@ fun NoteDetailScreen(
                         blocks[index] = block.copy(tableData = newTable)
                     },
                     onDeleteBlock = {
+                        recordUndoState()
                         if (blocks.size > 1) {
                             blocks.removeAt(index)
                         } else {
@@ -773,12 +909,14 @@ fun NoteDetailScreen(
                     },
                     onMoveUp = if (index > 0) {
                         {
+                            recordUndoState()
                             val item = blocks.removeAt(index)
                             blocks.add(index - 1, item)
                         }
                     } else null,
                     onMoveDown = if (index < blocks.lastIndex) {
                         {
+                            recordUndoState()
                             val item = blocks.removeAt(index)
                             blocks.add(index + 1, item)
                         }
@@ -787,6 +925,12 @@ fun NoteDetailScreen(
                         editingDrawingPath = existingPath
                         editingDrawingBlockIndex = index
                         showDrawingSheet = true
+                    },
+                    onOpenLinkedNote = { targetTitle ->
+                        navigateToNoteByTitle(targetTitle)
+                    },
+                    onOpenSubPage = { pageTitle ->
+                        navigateToNoteByTitle(pageTitle)
                     },
                     audioRecorder = audioRecorder
                 )
@@ -864,6 +1008,7 @@ fun NoteDetailScreen(
         NotionSlashDialog(
             onDismiss = { showSlashSheet = false },
             onSelectBlock = { type ->
+                recordUndoState()
                 if (type == BlockType.DRAWING) {
                     editingDrawingPath = null
                     editingDrawingBlockIndex = null
@@ -961,6 +1106,7 @@ fun NoteDetailScreen(
                                     .clip(RoundedCornerShape(14.dp))
                                     .clickable {
                                         val linkText = "[[${targetNote.title ?: "Başlıksız Not"}]] "
+                                        recordUndoState()
                                         if (blocks.isNotEmpty() && blocks.last().content.isBlank() && blocks.last().type == BlockType.PARAGRAPH) {
                                             blocks[blocks.lastIndex] = blocks.last().copy(content = linkText)
                                         } else {
@@ -1393,6 +1539,175 @@ fun NoteDetailScreen(
             onDismiss = {
                 showReminderSheet = false
             }
+        )
+    }
+
+    // Export & Share Sheet (Feature 1: PDF & Markdown)
+    if (showExportSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showExportSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "📤", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Notu Dışa Aktar & Paylaş",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Notunuzu standart formatlarda dışarı aktarın",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { showExportSheet = false },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.cancel),
+                            contentDescription = "Kapat",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Option 1: PDF Export
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable {
+                            showExportSheet = false
+                            val currentTitle = if (title.isBlank()) "Başlıksız Not" else title
+                            NoteExporter.shareAsPdf(context, currentTitle, blocks)
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFFFEBEE)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "📄", fontSize = 22.sp)
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "PDF Olarak Paylaş / Yazdır",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Temiz A4 formatında, tüm bloklar ve başlıklar ile birlikte PDF oluşturur.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Option 2: Markdown Export
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable {
+                            showExportSheet = false
+                            val currentTitle = if (title.isBlank()) "Başlıksız Not" else title
+                            NoteExporter.shareAsMarkdown(context, currentTitle, blocks)
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(SoftOrangeLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "📝", fontSize = 22.sp)
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Markdown (.md) Olarak Paylaş",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Obsidian, Notion ve GitHub uyumlu standart Markdown belgesi oluşturur.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+
+    // OCR Scanning Dialog (Feature 4)
+    if (isScanningOcr) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Text(text = "Metin Taranıyor...", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "📷", fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(text = "Google ML Kit cihazınızda görseldeki metinleri ayrıştırıyor...")
+                }
+            },
+            confirmButton = {}
         )
     }
 }

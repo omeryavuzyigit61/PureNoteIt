@@ -46,6 +46,7 @@ fun NotionToolbar(
     onOpenDrawing: () -> Unit,
     onOpenSlashMenu: () -> Unit,
     onLinkNote: (() -> Unit)? = null,
+    onScanOcr: (() -> Unit)? = null,
     isRecordingAudio: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -146,6 +147,14 @@ fun NotionToolbar(
                 iconRes = R.drawable.picture,
                 label = "Fotoğraf",
                 onClick = onPickImage
+            )
+
+            // OCR Metin Tarama (Scan to Text)
+            ToolbarItem(
+                iconRes = R.drawable.ic_ocr_scan,
+                label = "Metin Tara",
+                onClick = { onScanOcr?.invoke() },
+                iconTint = VibrantOrange
             )
 
             // El Çizimi Ekleme (Drawing Canvas)

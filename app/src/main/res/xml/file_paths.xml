@@ -6,4 +6,10 @@
     <files-path
         name="shared_sounds"
         path="recordings/"/>
+    <files-path
+        name="shared_files"
+        path="."/>
+    <cache-path
+        name="shared_cache"
+        path="."/>
 </paths>

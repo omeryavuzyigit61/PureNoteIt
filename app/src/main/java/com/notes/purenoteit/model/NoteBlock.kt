@@ -16,7 +16,9 @@ enum class BlockType {
     DIVIDER,
     AUDIO,
     IMAGE,
-    DRAWING
+    DRAWING,
+    WEB_BOOKMARK,
+    SUB_PAGE
 }
 
 data class NoteBlock(
@@ -114,6 +116,8 @@ object BlockParser {
                     BlockType.CALLOUT -> "${block.calloutIcon} ${block.content}"
                     BlockType.TOGGLE -> "▶ ${block.content}"
                     BlockType.TABLE -> "📊 Tablo (${if (block.tableData.isNotEmpty()) block.tableData.size - 1 else 0} satır)"
+                    BlockType.WEB_BOOKMARK -> "🌐 ${block.content}"
+                    BlockType.SUB_PAGE -> "📄 ${block.content}"
                     else -> block.content
                 }
             }

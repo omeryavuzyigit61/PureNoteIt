@@ -85,4 +85,7 @@ dependencies {
     // Glide
     implementation(libs.glide)
     ksp(libs.glide.compiler)
+
+    // ML Kit Text Recognition (OCR)
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
 }

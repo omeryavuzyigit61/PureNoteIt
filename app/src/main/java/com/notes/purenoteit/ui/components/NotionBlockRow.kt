@@ -1,5 +1,7 @@
 package com.notes.purenoteit.ui.components
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -90,6 +93,8 @@ fun NotionBlockRow(
     onToggleExpand: (() -> Unit)? = null,
     onToggleBodyChange: ((String) -> Unit)? = null,
     onTableChange: ((List<List<String>>) -> Unit)? = null,
+    onOpenLinkedNote: ((String) -> Unit)? = null,
+    onOpenSubPage: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -850,40 +855,208 @@ fun NotionBlockRow(
                 }
             }
 
-            else -> { // PARAGRAPH, HEADING_1, HEADING_2
-                Row(
+            BlockType.WEB_BOOKMARK -> {
+                val context = LocalContext.current
+                val domain = remember(block.content) {
+                    try {
+                        Uri.parse(block.content).host ?: "Web Bağlantısı"
+                    } catch (e: Exception) {
+                        "Web Bağlantısı"
+                    }
+                }
+
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 ) {
-                    BasicTextField(
-                        value = block.content,
-                        onValueChange = onContentChange,
-                        textStyle = textStyle,
-                        cursorBrush = SolidColor(VibrantOrange),
-                        decorationBox = { innerTextField ->
-                            if (block.content.isEmpty()) {
-                                val placeholderText = when (block.type) {
-                                    BlockType.HEADING_1 -> "Başlık 1 (Büyük Başlık)..."
-                                    BlockType.HEADING_2 -> "Başlık 2 (Alt Başlık)..."
-                                    else -> "Not yazın veya '/' ile komutları açın..."
-                                }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(SoftOrangeLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "🌐", fontSize = 18.sp)
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            BasicTextField(
+                                value = block.content,
+                                onValueChange = onContentChange,
+                                textStyle = textStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                                cursorBrush = SolidColor(VibrantOrange),
+                                decorationBox = { inner ->
+                                    if (block.content.isEmpty()) {
+                                        Text("https://... bağlantı yapıştırın", style = textStyle.copy(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)))
+                                    }
+                                    inner()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (block.content.isNotBlank()) {
                                 Text(
-                                    text = placeholderText,
-                                    style = textStyle.copy(
-                                        color = MaterialTheme.colorScheme.onBackground.copy(
-                                            alpha = if (block.type == BlockType.PARAGRAPH) 0.35f else 0.45f
-                                        )
-                                    )
+                                    text = domain,
+                                    fontSize = 11.sp,
+                                    color = VibrantOrange,
+                                    modifier = Modifier
+                                        .clickable {
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(if (block.content.startsWith("http")) block.content else "https://${block.content}"))
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                // Invalid url
+                                            }
+                                        }
+                                        .padding(top = 2.dp)
                                 )
                             }
-                            innerTextField()
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+                        }
 
-                    BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
+                        BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
+                    }
+                }
+            }
+
+            BlockType.SUB_PAGE -> {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onOpenSubPage?.invoke(block.content) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f)),
+                    shadowElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "📄", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        BasicTextField(
+                            value = block.content,
+                            onValueChange = onContentChange,
+                            textStyle = textStyle.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+                            cursorBrush = SolidColor(VibrantOrange),
+                            decorationBox = { inner ->
+                                if (block.content.isEmpty()) {
+                                    Text("Alt sayfa başlığı...", style = textStyle.copy(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)))
+                                }
+                                inner()
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Text(
+                            text = "Aç ↗",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VibrantOrange,
+                            modifier = Modifier
+                                .clickable { onOpenSubPage?.invoke(block.content) }
+                                .padding(horizontal = 6.dp)
+                        )
+
+                        BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
+                    }
+                }
+            }
+
+            else -> { // PARAGRAPH, HEADING_1, HEADING_2
+                val detectedLinks = remember(block.content) {
+                    Regex("""\[\[(.*?)\]\]""").findAll(block.content)
+                        .map { it.groupValues[1].trim() }
+                        .filter { it.isNotBlank() }
+                        .toList()
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        BasicTextField(
+                            value = block.content,
+                            onValueChange = onContentChange,
+                            textStyle = textStyle,
+                            cursorBrush = SolidColor(VibrantOrange),
+                            decorationBox = { innerTextField ->
+                                if (block.content.isEmpty()) {
+                                    val placeholderText = when (block.type) {
+                                        BlockType.HEADING_1 -> "Başlık 1 (Büyük Başlık)..."
+                                        BlockType.HEADING_2 -> "Başlık 2 (Alt Başlık)..."
+                                        else -> "Not yazın veya '/' ile komutları açın..."
+                                    }
+                                    Text(
+                                        text = placeholderText,
+                                        style = textStyle.copy(
+                                            color = MaterialTheme.colorScheme.onBackground.copy(
+                                                alpha = if (block.type == BlockType.PARAGRAPH) 0.35f else 0.45f
+                                            )
+                                        )
+                                    )
+                                }
+                                innerTextField()
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
+                    }
+
+                    // Clickable pills for [[Links]] inside paragraph
+                    if (detectedLinks.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.padding(top = 4.dp, start = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            for (link in detectedLinks) {
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { onOpenLinkedNote?.invoke(link) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = SoftOrangeLight,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.5f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "🔗", fontSize = 10.sp)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "$link ↗",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = VibrantOrange
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

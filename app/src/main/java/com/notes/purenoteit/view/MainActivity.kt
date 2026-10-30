@@ -131,7 +131,7 @@ class MainActivity : AppCompatActivity() {
                                         navController.popBackStack()
                                     },
                                     onNavigateToNote = { targetId ->
-                                        navController.navigate("noteDetail/$targetId")
+                                        navController.navigate("note_detail/$targetId")
                                     }
                                 )
                             }

@@ -52,6 +52,8 @@ fun NotionSlashDialog(
         SlashItem(BlockType.CALLOUT, "Callout (Vurgu Kutusu)", "Önemli fikir ve notları kutu içine alın", R.drawable.ic_format_quote),
         SlashItem(BlockType.TOGGLE, "Açılır Liste (Toggle)", "Tıklayınca açılan gizlenebilir içerik", R.drawable.arrow_right),
         SlashItem(BlockType.TABLE, "Mini Hesaplama Tablosu", "Satır, sütun ve otomatik toplam alan tablo", R.drawable.ic_table),
+        SlashItem(BlockType.WEB_BOOKMARK, "Web Bağlantısı (Bookmark)", "Akıllı web sitesi önizleme kartı", R.drawable.category),
+        SlashItem(BlockType.SUB_PAGE, "Alt Sayfa (Sub-Page)", "Bu notun içine yeni bir alt not sayfası gömün", R.drawable.file_edit),
         SlashItem(BlockType.DRAWING, "El Çizimi (Tuval)", "Parmakla serbest çizim veya şema çizin", R.drawable.ic_brush),
         SlashItem(BlockType.DIVIDER, "Ayırıcı Çizgi", "Blokları birbirinden ayıran yatay çizgi", R.drawable.cancel)
     )
