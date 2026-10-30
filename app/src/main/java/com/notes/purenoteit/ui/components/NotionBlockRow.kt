@@ -1,10 +1,15 @@
 package com.notes.purenoteit.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.notes.purenoteit.R
 import com.notes.purenoteit.model.BlockType
@@ -59,9 +65,11 @@ import java.io.File
 
 /**
  * Notion Block Row Component.
- * Supports rich blocks: Headings, Paragraphs, Checklists, Bullet Lists, Callouts,
- * Dividers, Spotify Audio Players, Images, and Hand Drawings.
- * Features 1-click Move Up / Move Down block reordering and deletion.
+ * Supports:
+ * - Fluid whole-item finger drag & drop (long press to reorder across the entire block)
+ * - Soft spring expansion ("tombikleşme" scale 1.05x and soft elevation shadow)
+ * - Notion ⠿ handle + 1-click ▲ / ▼ precision buttons
+ * - Drawing block protection (dedicated top-bar reorder to avoid gesture conflict)
  */
 @Composable
 fun NotionBlockRow(
@@ -74,7 +82,24 @@ fun NotionBlockRow(
     onMoveDown: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    var showBlockMenu by remember { mutableStateOf(false) }
+    var isDraggingBlock by remember { mutableStateOf(false) }
+    var dragAccumulator by remember { mutableFloatStateOf(0f) }
+
+    // Tombik Scale & Soft Elevation Shadow with Spring Physics
+    val tombikScale by animateFloatAsState(
+        targetValue = if (isDraggingBlock) 1.05f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "tombikScale"
+    )
+
+    val tombikElevation by animateDpAsState(
+        targetValue = if (isDraggingBlock) 14.dp else 0.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "tombikElevation"
+    )
 
     val textStyle = when (block.type) {
         BlockType.HEADING_1 -> TextStyle(
@@ -105,26 +130,18 @@ fun NotionBlockRow(
         )
     }
 
-    // Reorder Bar with both Direct Finger Drag Handle (⠿) and 1-Click Arrows (▲ / ▼)
+    // Reorder Controls Bar
     @Composable
     fun BlockReorderControls(
         isDarkContainer: Boolean = false,
-        modifier: Modifier = Modifier
+        isDrawingBlock: Boolean = false,
+        controlModifier: Modifier = Modifier
     ) {
-        var dragAccumulator by remember { mutableFloatStateOf(0f) }
-        var isDraggingThisBlock by remember { mutableStateOf(false) }
-
         Row(
-            modifier = modifier
-                .graphicsLayer {
-                    if (isDraggingThisBlock) {
-                        scaleX = 1.08f
-                        scaleY = 1.08f
-                    }
-                }
+            modifier = controlModifier
                 .clip(RoundedCornerShape(8.dp))
                 .background(
-                    if (isDraggingThisBlock) VibrantOrange
+                    if (isDraggingBlock) VibrantOrange
                     else if (isDarkContainer) CharcoalGray.copy(alpha = 0.85f)
                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
                 )
@@ -132,29 +149,29 @@ fun NotionBlockRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            // Notion ⠿ Touch-and-Drag Handle (Finger Reorder)
+            // Notion ⠿ Touch-and-Drag Handle
             Box(
                 modifier = Modifier
                     .size(26.dp)
                     .clip(CircleShape)
-                    .pointerInput(Unit) {
+                    .pointerInput(block.id) {
                         detectDragGestures(
                             onDragStart = {
-                                isDraggingThisBlock = true
+                                isDraggingBlock = true
                                 dragAccumulator = 0f
                             },
                             onDragEnd = {
-                                isDraggingThisBlock = false
+                                isDraggingBlock = false
                                 dragAccumulator = 0f
                             },
                             onDragCancel = {
-                                isDraggingThisBlock = false
+                                isDraggingBlock = false
                                 dragAccumulator = 0f
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
                                 dragAccumulator += dragAmount.y
-                                val threshold = 34f // px threshold for swap
+                                val threshold = 36f
                                 if (dragAccumulator < -threshold && onMoveUp != null) {
                                     onMoveUp()
                                     dragAccumulator = 0f
@@ -171,7 +188,7 @@ fun NotionBlockRow(
                     text = "⠿",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDraggingThisBlock || isDarkContainer) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = if (isDraggingBlock || isDarkContainer) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
             }
 
@@ -184,7 +201,7 @@ fun NotionBlockRow(
                         text = "▲",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDarkContainer || isDraggingThisBlock) PureWhite else MaterialTheme.colorScheme.onSurface
+                        color = if (isDarkContainer || isDraggingBlock) PureWhite else MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -197,7 +214,7 @@ fun NotionBlockRow(
                         text = "▼",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDarkContainer || isDraggingThisBlock) PureWhite else MaterialTheme.colorScheme.onSurface
+                        color = if (isDarkContainer || isDraggingBlock) PureWhite else MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -208,142 +225,155 @@ fun NotionBlockRow(
                 Icon(
                     painter = painterResource(id = R.drawable.cancel),
                     contentDescription = "Sil",
-                    tint = if (isDarkContainer || isDraggingThisBlock) PureWhite.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    tint = if (isDarkContainer || isDraggingBlock) PureWhite.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.size(11.dp)
                 )
             }
         }
     }
 
-    when (block.type) {
-        BlockType.DIVIDER -> {
-            Row(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                )
-                BlockReorderControls(modifier = Modifier.padding(start = 6.dp))
-            }
-        }
-
-        BlockType.TODO -> {
-            Row(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(RoundedCornerShape(5.dp))
-                        .border(
-                            width = 1.5.dp,
-                            color = if (block.isChecked) VibrantOrange else MaterialTheme.colorScheme.outline,
-                            shape = RoundedCornerShape(5.dp)
-                        )
-                        .background(if (block.isChecked) VibrantOrange else Color.Transparent)
-                        .clickable { onCheckedChange(!block.isChecked) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (block.isChecked) {
-                        Text(
-                            text = "✓",
-                            color = PureWhite,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+    // Whole-block long press drag modifier (enabled for text, checklist, callout, image, audio, divider)
+    val wholeBlockDragModifier = if (block.type != BlockType.DRAWING) {
+        Modifier.pointerInput(block.id) {
+            detectDragGesturesAfterLongPress(
+                onDragStart = {
+                    isDraggingBlock = true
+                    dragAccumulator = 0f
+                },
+                onDragEnd = {
+                    isDraggingBlock = false
+                    dragAccumulator = 0f
+                },
+                onDragCancel = {
+                    isDraggingBlock = false
+                    dragAccumulator = 0f
+                },
+                onDrag = { change, dragAmount ->
+                    change.consume()
+                    dragAccumulator += dragAmount.y
+                    val threshold = 38f
+                    if (dragAccumulator < -threshold && onMoveUp != null) {
+                        onMoveUp()
+                        dragAccumulator = 0f
+                    } else if (dragAccumulator > threshold && onMoveDown != null) {
+                        onMoveDown()
+                        dragAccumulator = 0f
                     }
                 }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                BasicTextField(
-                    value = block.content,
-                    onValueChange = onContentChange,
-                    textStyle = textStyle,
-                    cursorBrush = SolidColor(VibrantOrange),
-                    decorationBox = { innerTextField ->
-                        if (block.content.isEmpty()) {
-                            Text(
-                                text = "Yapılacak görev...",
-                                style = textStyle.copy(
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
-                                )
-                            )
-                        }
-                        innerTextField()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-
-                BlockReorderControls(modifier = Modifier.padding(start = 4.dp))
-            }
+            )
         }
+    } else {
+        Modifier
+    }
 
-        BlockType.BULLET_LIST -> {
-            Row(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 6.dp, end = 12.dp)
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(VibrantOrange)
-                )
-
-                BasicTextField(
-                    value = block.content,
-                    onValueChange = onContentChange,
-                    textStyle = textStyle,
-                    cursorBrush = SolidColor(VibrantOrange),
-                    decorationBox = { innerTextField ->
-                        if (block.content.isEmpty()) {
-                            Text(
-                                text = "Liste maddesi...",
-                                style = textStyle.copy(
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
-                                )
-                            )
-                        }
-                        innerTextField()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-
-                BlockReorderControls(modifier = Modifier.padding(start = 4.dp))
+    // Root Tombik Container
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .zIndex(if (isDraggingBlock) 10f else 1f)
+            .graphicsLayer {
+                scaleX = tombikScale
+                scaleY = tombikScale
+                shadowElevation = tombikElevation.toPx()
             }
-        }
-
-        BlockType.CALLOUT -> {
-            Surface(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = SoftYellowLight,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFE082))
-            ) {
+            .then(
+                if (isDraggingBlock) {
+                    Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.5.dp, VibrantOrange.copy(alpha = 0.85f), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                } else {
+                    Modifier
+                }
+            )
+            .then(wholeBlockDragModifier)
+    ) {
+        when (block.type) {
+            BlockType.DIVIDER -> {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .padding(vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = block.calloutIcon,
-                        fontSize = 18.sp,
-                        modifier = Modifier.padding(end = 10.dp)
+                    HorizontalDivider(
+                        modifier = Modifier.weight(1f),
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                    BlockReorderControls(controlModifier = Modifier.padding(start = 6.dp))
+                }
+            }
+
+            BlockType.TODO -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(RoundedCornerShape(5.dp))
+                            .border(
+                                width = 1.5.dp,
+                                color = if (block.isChecked) VibrantOrange else MaterialTheme.colorScheme.outline,
+                                shape = RoundedCornerShape(5.dp)
+                            )
+                            .background(if (block.isChecked) VibrantOrange else Color.Transparent)
+                            .clickable { onCheckedChange(!block.isChecked) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (block.isChecked) {
+                            Text(
+                                text = "✓",
+                                color = PureWhite,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    BasicTextField(
+                        value = block.content,
+                        onValueChange = onContentChange,
+                        textStyle = textStyle,
+                        cursorBrush = SolidColor(VibrantOrange),
+                        decorationBox = { innerTextField ->
+                            if (block.content.isEmpty()) {
+                                Text(
+                                    text = "Yapılacak görev...",
+                                    style = textStyle.copy(
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+                                    )
+                                )
+                            }
+                            innerTextField()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
+                }
+            }
+
+            BlockType.BULLET_LIST -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 6.dp, end = 12.dp)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(VibrantOrange)
                     )
 
                     BasicTextField(
@@ -354,9 +384,9 @@ fun NotionBlockRow(
                         decorationBox = { innerTextField ->
                             if (block.content.isEmpty()) {
                                 Text(
-                                    text = "Vurgulanmış not veya alıntı...",
+                                    text = "Liste maddesi...",
                                     style = textStyle.copy(
-                                        color = CharcoalGray.copy(alpha = 0.45f)
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
                                     )
                                 )
                             }
@@ -365,125 +395,172 @@ fun NotionBlockRow(
                         modifier = Modifier.weight(1f)
                     )
 
-                    BlockReorderControls(modifier = Modifier.padding(start = 4.dp))
+                    BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
                 }
             }
-        }
 
-        BlockType.IMAGE -> {
-            Box(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                AsyncImage(
-                    model = File(block.mediaPath ?: ""),
-                    contentDescription = "Not Görseli",
+            BlockType.CALLOUT -> {
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
-                        .clip(RoundedCornerShape(14.dp)),
-                    contentScale = ContentScale.Crop
-                )
+                        .padding(vertical = 6.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = SoftYellowLight,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFE082))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = block.calloutIcon,
+                            fontSize = 18.sp,
+                            modifier = Modifier.padding(end = 10.dp)
+                        )
 
-                BlockReorderControls(
-                    isDarkContainer = true,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                )
+                        BasicTextField(
+                            value = block.content,
+                            onValueChange = onContentChange,
+                            textStyle = textStyle,
+                            cursorBrush = SolidColor(VibrantOrange),
+                            decorationBox = { innerTextField ->
+                                if (block.content.isEmpty()) {
+                                    Text(
+                                        text = "Vurgulanmış not veya alıntı...",
+                                        style = textStyle.copy(
+                                            color = CharcoalGray.copy(alpha = 0.45f)
+                                        )
+                                    )
+                                }
+                                innerTextField()
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
+                    }
+                }
             }
-        }
 
-        BlockType.DRAWING -> {
-            Box(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .border(1.5.dp, BorderLight.copy(alpha = 0.8f), RoundedCornerShape(14.dp))
-                    .background(PureWhite)
-            ) {
-                AsyncImage(
-                    model = File(block.mediaPath ?: ""),
-                    contentDescription = "El Çizimi",
+            BlockType.IMAGE -> {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(220.dp)
+                        .padding(vertical = 6.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .padding(8.dp),
-                    contentScale = ContentScale.Fit
-                )
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    AsyncImage(
+                        model = File(block.mediaPath ?: ""),
+                        contentDescription = "Not Görseli",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(14.dp)),
+                        contentScale = ContentScale.Crop
+                    )
 
-                BlockReorderControls(
-                    isDarkContainer = true,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                )
+                    BlockReorderControls(
+                        isDarkContainer = true,
+                        controlModifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                    )
+                }
             }
-        }
 
-        BlockType.AUDIO -> {
-            Column(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
+            BlockType.DRAWING -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .border(1.5.dp, BorderLight.copy(alpha = 0.8f), RoundedCornerShape(14.dp))
+                        .background(PureWhite)
+                ) {
+                    AsyncImage(
+                        model = File(block.mediaPath ?: ""),
+                        contentDescription = "El Çizimi",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .padding(8.dp),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    // Dedicated Top Bar for Drawing to avoid gesture conflicts
+                    BlockReorderControls(
+                        isDarkContainer = true,
+                        isDrawingBlock = true,
+                        controlModifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                    )
+                }
+            }
+
+            BlockType.AUDIO -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        BlockReorderControls()
+                    }
+
+                    SpotifyAudioPlayer(
+                        filePath = block.mediaPath ?: "",
+                        audioRecorder = audioRecorder,
+                        onDelete = onDeleteBlock,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            else -> { // PARAGRAPH, HEADING_1, HEADING_2
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.End
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    BlockReorderControls()
-                }
-
-                SpotifyAudioPlayer(
-                    filePath = block.mediaPath ?: "",
-                    audioRecorder = audioRecorder,
-                    onDelete = onDeleteBlock,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-
-        else -> { // PARAGRAPH, HEADING_1, HEADING_2
-            Row(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BasicTextField(
-                    value = block.content,
-                    onValueChange = onContentChange,
-                    textStyle = textStyle,
-                    cursorBrush = SolidColor(VibrantOrange),
-                    decorationBox = { innerTextField ->
-                        if (block.content.isEmpty()) {
-                            val placeholderText = when (block.type) {
-                                BlockType.HEADING_1 -> "Başlık 1 (Büyük Başlık)..."
-                                BlockType.HEADING_2 -> "Başlık 2 (Alt Başlık)..."
-                                else -> "Not yazın veya '/' ile komutları açın..."
-                            }
-                            Text(
-                                text = placeholderText,
-                                style = textStyle.copy(
-                                    color = MaterialTheme.colorScheme.onBackground.copy(
-                                        alpha = if (block.type == BlockType.PARAGRAPH) 0.35f else 0.45f
+                    BasicTextField(
+                        value = block.content,
+                        onValueChange = onContentChange,
+                        textStyle = textStyle,
+                        cursorBrush = SolidColor(VibrantOrange),
+                        decorationBox = { innerTextField ->
+                            if (block.content.isEmpty()) {
+                                val placeholderText = when (block.type) {
+                                    BlockType.HEADING_1 -> "Başlık 1 (Büyük Başlık)..."
+                                    BlockType.HEADING_2 -> "Başlık 2 (Alt Başlık)..."
+                                    else -> "Not yazın veya '/' ile komutları açın..."
+                                }
+                                Text(
+                                    text = placeholderText,
+                                    style = textStyle.copy(
+                                        color = MaterialTheme.colorScheme.onBackground.copy(
+                                            alpha = if (block.type == BlockType.PARAGRAPH) 0.35f else 0.45f
+                                        )
                                     )
                                 )
-                            )
-                        }
-                        innerTextField()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
+                            }
+                            innerTextField()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
 
-                BlockReorderControls(modifier = Modifier.padding(start = 4.dp))
+                    BlockReorderControls(controlModifier = Modifier.padding(start = 4.dp))
+                }
             }
         }
     }

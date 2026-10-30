@@ -275,17 +275,23 @@ fun DrawingCanvasSheet(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Gelişmiş Çizim Stüdyosu",
+                    text = "Çizim Tuvali",
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     // Undo
                     IconButton(
                         onClick = { if (items.isNotEmpty()) items.removeAt(items.lastIndex) },
-                        enabled = items.isNotEmpty()
+                        enabled = items.isNotEmpty(),
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.arrow_left),
@@ -301,7 +307,8 @@ fun DrawingCanvasSheet(
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .clickable { items.clear() }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "Temizle",
@@ -311,49 +318,81 @@ fun DrawingCanvasSheet(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Save Button
+                    // Save Button (Guaranteed single line, no text wrapping)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .background(VibrantOrange)
                             .clickable { saveDrawingToPng() }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "Ekle",
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = PureWhite
+                            color = PureWhite,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Tool Switcher (Serbest Çizim, Düz Çizgi, Kare, Daire, Üçgen, Ok, Yıldız, Silgi)
+            // Tool Switcher: Primary Tools (Kalem & Silgi Yan Yana) + Shape Palette
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ToolChip(title = "Kalem", isSelected = selectedTool == DrawingTool.PEN) { selectedTool = DrawingTool.PEN }
-                ToolChip(title = "Çizgi", isSelected = selectedTool == DrawingTool.LINE) { selectedTool = DrawingTool.LINE }
-                ToolChip(title = "Kare", isSelected = selectedTool == DrawingTool.RECTANGLE) { selectedTool = DrawingTool.RECTANGLE }
-                ToolChip(title = "Daire", isSelected = selectedTool == DrawingTool.CIRCLE) { selectedTool = DrawingTool.CIRCLE }
-                ToolChip(title = "Üçgen", isSelected = selectedTool == DrawingTool.TRIANGLE) { selectedTool = DrawingTool.TRIANGLE }
-                ToolChip(title = "Ok", isSelected = selectedTool == DrawingTool.ARROW) { selectedTool = DrawingTool.ARROW }
-                ToolChip(title = "Yıldız", isSelected = selectedTool == DrawingTool.STAR) { selectedTool = DrawingTool.STAR }
-                ToolChip(
-                    title = "Silgi",
-                    isSelected = selectedTool == DrawingTool.ERASER,
-                    activeColor = Color(0xFFE53935)
+                // Fixed Primary Tools: Kalem + Silgi (Always visible, prominent at front)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    selectedTool = DrawingTool.ERASER
+                    ToolChip(
+                        title = "✏️ Kalem",
+                        isSelected = selectedTool == DrawingTool.PEN
+                    ) {
+                        selectedTool = DrawingTool.PEN
+                    }
+
+                    ToolChip(
+                        title = "🧹 Silgi",
+                        isSelected = selectedTool == DrawingTool.ERASER,
+                        activeColor = Color(0xFFE53935)
+                    ) {
+                        selectedTool = DrawingTool.ERASER
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Vertical Divider
+                Box(
+                    modifier = Modifier
+                        .height(20.dp)
+                        .width(1.dp)
+                        .background(BorderLight)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Scrollable Shapes Palette
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ToolChip(title = "📏 Çizgi", isSelected = selectedTool == DrawingTool.LINE) { selectedTool = DrawingTool.LINE }
+                    ToolChip(title = "⬜ Kare", isSelected = selectedTool == DrawingTool.RECTANGLE) { selectedTool = DrawingTool.RECTANGLE }
+                    ToolChip(title = "⭕ Daire", isSelected = selectedTool == DrawingTool.CIRCLE) { selectedTool = DrawingTool.CIRCLE }
+                    ToolChip(title = "🔺 Üçgen", isSelected = selectedTool == DrawingTool.TRIANGLE) { selectedTool = DrawingTool.TRIANGLE }
+                    ToolChip(title = "➡️ Ok", isSelected = selectedTool == DrawingTool.ARROW) { selectedTool = DrawingTool.ARROW }
+                    ToolChip(title = "⭐ Yıldız", isSelected = selectedTool == DrawingTool.STAR) { selectedTool = DrawingTool.STAR }
                 }
             }
 
