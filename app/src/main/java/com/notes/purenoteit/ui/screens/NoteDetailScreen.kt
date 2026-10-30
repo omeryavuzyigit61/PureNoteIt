@@ -85,6 +85,7 @@ import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.ui.components.EmojiPickerSheet
+import com.notes.purenoteit.ui.components.KANBAN_COLUMNS
 import com.notes.purenoteit.ui.components.NotionBlockRow
 import com.notes.purenoteit.ui.components.NotionSlashDialog
 import com.notes.purenoteit.ui.components.NotionToolbar
@@ -119,6 +120,8 @@ fun NoteDetailScreen(
     var isPinned by remember { mutableStateOf(false) }
     var selectedCategoryId by remember { mutableStateOf(1) }
     var selectedCategoryName by remember { mutableStateOf("Not") }
+    var noteStatus by remember { mutableStateOf("TODO") }
+    var noteDate by remember { mutableStateOf(System.currentTimeMillis()) }
 
     val blocks = remember { mutableStateListOf<NoteBlock>() }
     var isRecordingAudio by remember { mutableStateOf(false) }
@@ -163,6 +166,7 @@ fun NoteDetailScreen(
     var showEmojiSheet by remember { mutableStateOf(false) }
     var showSlashSheet by remember { mutableStateOf(false) }
     var showCategoryMenu by remember { mutableStateOf(false) }
+    var showStatusMenu by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
 
@@ -177,6 +181,8 @@ fun NoteDetailScreen(
                 isPassword = note.isPassword ?: false
                 isPinned = note.isPinned
                 selectedCategoryId = note.categoryId ?: 1
+                noteStatus = note.status ?: "TODO"
+                noteDate = note.date
 
                 val rawDesc = if (note.isEncrypted) {
                     SecurityUtil.decrypt(note.description ?: "")
@@ -291,7 +297,7 @@ fun NoteDetailScreen(
         val note = NoteData(
             title = if (title.isBlank()) "Başlıksız Not" else title.trim(),
             description = finalContent,
-            date = System.currentTimeMillis(),
+            date = if (noteDate > 0) noteDate else System.currentTimeMillis(),
             images = images,
             isPassword = isPassword,
             categoryId = selectedCategoryId,
@@ -300,7 +306,8 @@ fun NoteDetailScreen(
             icon = selectedIcon,
             isEncrypted = isEncrypted,
             totalTasks = total,
-            completedTasks = completed
+            completedTasks = completed,
+            status = noteStatus
         )
 
         if (noteId != -1) {
@@ -325,6 +332,43 @@ fun NoteDetailScreen(
                     }
                 },
                 actions = {
+                    // Notion Status Selection Pill
+                    val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == noteStatus } ?: KANBAN_COLUMNS[0]
+                    Box {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(currentStatusDef.badgeBgColor)
+                                .clickable { showStatusMenu = true }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = currentStatusDef.title,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = currentStatusDef.badgeTextColor
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showStatusMenu,
+                            onDismissRequest = { showStatusMenu = false }
+                        ) {
+                            for (col in KANBAN_COLUMNS) {
+                                DropdownMenuItem(
+                                    text = { Text(col.title) },
+                                    onClick = {
+                                        noteStatus = col.statusKey
+                                        showStatusMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
                     // Category Selection Pill
                     Box {
                         Box(
@@ -463,16 +507,13 @@ fun NoteDetailScreen(
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
-                                // Spotify Dynamic Equalizer Waveform
+                                // Spotify Dynamic Fluid Waveform
                                 SpotifyAudioVisualizer(
                                     isPlayingOrRecording = isRecordingAudio,
                                     currentAmplitude = currentAmplitude,
-                                    barCount = 14,
                                     maxHeight = 24.dp,
-                                    minHeight = 4.dp,
-                                    barWidth = 2.5.dp,
-                                    barSpacing = 2.dp,
-                                    activeColor = Color(0xFFE53935)
+                                    activeColor = Color(0xFFE53935),
+                                    modifier = Modifier.width(75.dp)
                                 )
                             }
 

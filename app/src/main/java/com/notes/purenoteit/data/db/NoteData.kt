@@ -42,6 +42,8 @@ data class NoteData(
     var totalTasks: Int = 0,
     @ColumnInfo(name = "completedTasks", defaultValue = "0")
     var completedTasks: Int = 0,
+    @ColumnInfo(name = "status", defaultValue = "'TODO'")
+    var status: String = "TODO"
 ) : Serializable {
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0

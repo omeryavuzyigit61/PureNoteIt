@@ -82,6 +82,11 @@ class NoteViewModel @Inject constructor(private val repository: NoteRepository) 
             }
     }
 
+    fun updateNoteStatus(note: NoteData, newStatus: String) {
+        note.status = newStatus
+        upsert(note)
+    }
+
     fun getNotesBetweenDates(startDate: Long, endDate: Long) {
         repository.getNotesBetweenDates(startDate, endDate).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({ dateDatas ->

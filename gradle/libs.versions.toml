@@ -1,13 +1,13 @@
 [versions]
 agp = "8.6.0"
 kotlin = "2.0.20"
-coreKtx = "1.13.1"
+coreKtx = "1.15.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 appcompat = "1.7.0"
 material = "1.12.0"
-activity = "1.9.2"
+activity = "1.9.3"
 constraintlayout = "2.1.4"
 navigationFragmentKtx = "2.8.2"
 navigationUiKtx = "2.8.2"
@@ -15,15 +15,12 @@ hilt = "2.52"
 roomRuntime = "2.6.1"
 roomRxjava2 = "2.6.1"
 rxandroid = "2.1.1"
-glide = "5.0.0-rc01"
-compiler = "5.0.0-rc01"
 gson = "2.11.0"
 navigationSafeArgsGradlePluginVersion = "2.8.2"
-touchimageview = "1.4.1"
 biometric = "1.1.0"
-materialsearchbar = "0.8.5"
-composeBom = "2024.09.02"
+composeBom = "2024.10.01"
 coil = "2.7.0"
+glide = "5.0.0-rc01"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -44,12 +41,10 @@ google-dagger-hilt-compiler = { group = "com.google.dagger", name = "hilt-androi
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "roomRuntime" }
 androidx-room-rxjava2 = { group = "androidx.room", name = "room-rxjava2", version.ref = "roomRxjava2" }
 rxandroid = { group = "io.reactivex.rxjava2", name = "rxandroid", version.ref = "rxandroid" }
-glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
-glide-compiler = { group = "com.github.bumptech.glide", name = "compiler", version.ref = "compiler" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
-touchimageview = { group = "com.github.MikeOrtiz", name = "TouchImageView", version.ref = "touchimageview" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
-materialsearchbar = { group = "com.github.mancj", name = "MaterialSearchBar", version.ref = "materialsearchbar" }
+glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
+glide-compiler = { group = "com.github.bumptech.glide", name = "compiler", version.ref = "glide" }
 
 # Compose Material 3
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }

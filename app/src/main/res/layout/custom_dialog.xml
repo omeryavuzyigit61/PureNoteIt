@@ -6,7 +6,7 @@
     android:layout_height="600dp"
     android:background="@drawable/dialogbacground">
 
-    <com.ortiz.touchview.TouchImageView
+    <ImageView
         android:id="@+id/dialogImageView"
         android:layout_width="match_parent"
         android:layout_height="0dp"

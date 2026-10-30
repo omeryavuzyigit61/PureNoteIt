@@ -174,15 +174,12 @@ fun SpotifyAudioPlayer(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        // Spotify Equalizer Waveform
+                        // Spotify Fluid Waveform
                         SpotifyAudioVisualizer(
                             isPlayingOrRecording = isPlaying,
                             currentAmplitude = if (isPlaying) (12000..28000).random() else 0,
-                            barCount = 18,
                             maxHeight = 22.dp,
-                            minHeight = 4.dp,
-                            barWidth = 2.5.dp,
-                            barSpacing = 2.5.dp
+                            modifier = Modifier.width(90.dp)
                         )
                     }
                 }
@@ -222,13 +219,13 @@ fun SpotifyAudioPlayer(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
-            // Spotify Scrubber / Slider
+            // Spotify Wavy Squiggly Scrubber
             val activePos = if (isUserSeeking) seekPositionMs else currentPositionMs.toFloat()
             val safeDuration = durationMs.toFloat().coerceAtLeast(1000f)
 
-            Slider(
+            SquigglySlider(
                 value = activePos.coerceIn(0f, safeDuration),
                 onValueChange = {
                     isUserSeeking = true
@@ -240,14 +237,11 @@ fun SpotifyAudioPlayer(
                     isUserSeeking = false
                 },
                 valueRange = 0f..safeDuration,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(28.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = VibrantOrange,
-                    activeTrackColor = VibrantOrange,
-                    inactiveTrackColor = BorderLight
-                )
+                isPlaying = isPlaying,
+                activeColor = VibrantOrange,
+                inactiveColor = BorderLight,
+                thumbColor = VibrantOrange,
+                modifier = Modifier.fillMaxWidth()
             )
 
             // Current Time & Total Duration

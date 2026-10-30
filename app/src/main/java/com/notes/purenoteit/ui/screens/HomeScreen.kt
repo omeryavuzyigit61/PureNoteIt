@@ -79,6 +79,9 @@ import androidx.fragment.app.FragmentActivity
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
+import com.notes.purenoteit.ui.components.NotionCalendarView
+import com.notes.purenoteit.ui.components.NotionKanbanBoard
+import com.notes.purenoteit.ui.components.NotionListView
 import com.notes.purenoteit.ui.components.NotionNoteCard
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
@@ -90,6 +93,13 @@ import com.notes.purenoteit.util.showToastShort
 import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import kotlinx.coroutines.launch
+
+enum class NotionViewMode(val title: String, val iconRes: Int) {
+    GRID("Kartlar", R.drawable.category),
+    LIST("Liste", R.drawable.ic_checklist),
+    BOARD("Pano", R.drawable.category_alt),
+    CALENDAR("Takvim", R.drawable.calendar)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,7 +122,7 @@ fun HomeScreen(
     var selectedCategory by remember { mutableStateOf("Tümü") }
     var searchQuery by remember { mutableStateOf("") }
     var isSearchExpanded by remember { mutableStateOf(false) }
-    var isGridView by remember { mutableStateOf(true) }
+    var currentViewMode by remember { mutableStateOf(NotionViewMode.GRID) }
 
     // Dialog state for PIN unlock
     var pendingUnlockNoteId by remember { mutableStateOf<Int?>(null) }
@@ -401,70 +411,68 @@ fun HomeScreen(
                             )
                         }
 
-                        // Right: Actions (Search & Layout Toggle)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { isSearchExpanded = !isSearchExpanded },
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surface)
-                                    .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                            ) {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (isSearchExpanded) R.drawable.cancel else R.drawable.search
-                                    ),
-                                    contentDescription = "Ara",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(6.dp))
-
-                            IconButton(
-                                onClick = { isGridView = !isGridView },
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surface)
-                                    .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                            ) {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (isGridView) R.drawable.category_alt else R.drawable.category
-                                    ),
-                                    contentDescription = "Görünüm Değiştir",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                        // Right: Search Toggle
+                        IconButton(
+                            onClick = { isSearchExpanded = !isSearchExpanded },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    id = if (isSearchExpanded) R.drawable.cancel else R.drawable.search
+                                ),
+                                contentDescription = "Ara",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Horizontal Category Chips
+                    // Notion Multi-View Switcher Tabs
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        CategoryChip(
-                            label = "Tümü",
-                            isSelected = selectedCategory == "Tümü",
-                            onClick = { selectedCategory = "Tümü" }
-                        )
-
-                        categoryList.forEach { category ->
-                            CategoryChip(
-                                label = category.name,
-                                isSelected = selectedCategory == category.name,
-                                isLocked = category.isPassword == true,
-                                onClick = { selectedCategory = category.name }
+                        for (mode in NotionViewMode.values()) {
+                            ViewModeTab(
+                                mode = mode,
+                                isSelected = currentViewMode == mode,
+                                onClick = { currentViewMode = mode }
                             )
+                        }
+                    }
+
+                    // Horizontal Category Chips (Visible in Grid, List & Board views)
+                    if (currentViewMode != NotionViewMode.CALENDAR) {
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CategoryChip(
+                                label = "Tümü",
+                                isSelected = selectedCategory == "Tümü",
+                                onClick = { selectedCategory = "Tümü" }
+                            )
+
+                            categoryList.forEach { category ->
+                                CategoryChip(
+                                    label = category.name,
+                                    isSelected = selectedCategory == category.name,
+                                    isLocked = category.isPassword == true,
+                                    onClick = { selectedCategory = category.name }
+                                )
+                            }
                         }
                     }
                 }
@@ -488,115 +496,117 @@ fun HomeScreen(
             },
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
-            if (filteredNotes.isEmpty()) {
-                // Modern, Soft Empty State (No 2000s emoji!)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(88.dp)
-                                .clip(CircleShape)
-                                .background(SoftOrangeLight),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.note),
-                                contentDescription = null,
-                                tint = VibrantOrange,
-                                modifier = Modifier.size(42.dp)
-                            )
-                        }
+            when (currentViewMode) {
+                NotionViewMode.BOARD -> {
+                    NotionKanbanBoard(
+                        notes = filteredNotes,
+                        categories = categoryList,
+                        onNoteClick = handleNoteClick,
+                        onStatusChange = { note, newStatus ->
+                            noteViewModel.updateNoteStatus(note, newStatus)
+                        },
+                        onAddNewNoteWithStatus = { status ->
+                            onNavigateToAddNote(-1)
+                        },
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                }
 
-                        Spacer(modifier = Modifier.height(18.dp))
+                NotionViewMode.CALENDAR -> {
+                    NotionCalendarView(
+                        notes = filteredNotes,
+                        categories = categoryList,
+                        onNoteClick = handleNoteClick,
+                        onAddNoteForDate = { targetDate ->
+                            onNavigateToAddNote(-1)
+                        },
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                }
 
-                        Text(
-                            text = if (searchQuery.isNotBlank()) "Aramanızla eşleşen not bulunamadı" else "Henüz bir not yok",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                NotionViewMode.LIST -> {
+                    if (filteredNotes.isEmpty()) {
+                        EmptyStateContent(
+                            searchQuery = searchQuery,
+                            onNavigateToAddNote = onNavigateToAddNote,
+                            paddingValues = paddingValues
                         )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = if (searchQuery.isNotBlank())
-                                "Farklı bir arama terimi deneyebilir veya kategoriyi değiştirebilirsiniz."
-                            else
-                                "Notion blokları, yapılacaklar listesi veya ses kaydı ile hemen yeni bir not oluşturun.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                textAlign = TextAlign.Center,
-                                lineHeight = 18.sp
-                            )
+                    } else {
+                        NotionListView(
+                            notes = filteredNotes,
+                            categories = categoryList,
+                            onNoteClick = handleNoteClick,
+                            onPinClick = { note -> noteViewModel.togglePinStatus(note.id, note.isPinned) },
+                            onDeleteClick = { note -> noteViewModel.deleteNoteById(note.id) },
+                            onStatusChange = { note, newStatus -> noteViewModel.updateNoteStatus(note, newStatus) },
+                            modifier = Modifier.padding(paddingValues)
                         )
-
-                        if (searchQuery.isBlank()) {
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Button(
-                                onClick = { onNavigateToAddNote(-1) },
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = VibrantOrange,
-                                    contentColor = PureWhite
-                                )
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.plus_small),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = "Yeni Not Oluştur", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                        }
                     }
                 }
-            } else {
-                if (isGridView) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
-                            .padding(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
-                    ) {
-                        if (pinnedNotes.isNotEmpty()) {
-                            item(span = { GridItemSpan(2) }) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.ic_pin),
-                                        contentDescription = null,
-                                        tint = VibrantOrange,
-                                        modifier = Modifier.size(14.dp)
+
+                NotionViewMode.GRID -> {
+                    if (filteredNotes.isEmpty()) {
+                        EmptyStateContent(
+                            searchQuery = searchQuery,
+                            onNavigateToAddNote = onNavigateToAddNote,
+                            paddingValues = paddingValues
+                        )
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(paddingValues)
+                                .padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
+                        ) {
+                            if (pinnedNotes.isNotEmpty()) {
+                                item(span = { GridItemSpan(2) }) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_pin),
+                                            contentDescription = null,
+                                            tint = VibrantOrange,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Sabitlenenler",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                items(pinnedNotes, key = { it.id }) { note ->
+                                    NotionNoteCard(
+                                        note = note,
+                                        onClick = { handleNoteClick(note) },
+                                        onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
+                                        onDeleteClick = { noteViewModel.deleteNoteById(note.id) }
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Sabitlenenler",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                }
+
+                                if (regularNotes.isNotEmpty()) {
+                                    item(span = { GridItemSpan(2) }) {
+                                        Text(
+                                            text = "Tüm Notlar",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp, start = 4.dp)
+                                        )
+                                    }
                                 }
                             }
 
-                            items(pinnedNotes, key = { it.id }) { note ->
+                            items(regularNotes, key = { it.id }) { note ->
                                 NotionNoteCard(
                                     note = note,
                                     onClick = { handleNoteClick(note) },
@@ -604,45 +614,6 @@ fun HomeScreen(
                                     onDeleteClick = { noteViewModel.deleteNoteById(note.id) }
                                 )
                             }
-
-                            if (regularNotes.isNotEmpty()) {
-                                item(span = { GridItemSpan(2) }) {
-                                    Text(
-                                        text = "Tüm Notlar",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 10.dp, bottom = 4.dp, start = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        items(regularNotes, key = { it.id }) { note ->
-                            NotionNoteCard(
-                                note = note,
-                                onClick = { handleNoteClick(note) },
-                                onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
-                                onDeleteClick = { noteViewModel.deleteNoteById(note.id) }
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
-                            .padding(horizontal = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
-                    ) {
-                        items(filteredNotes, key = { it.id }) { note ->
-                            NotionNoteCard(
-                                note = note,
-                                onClick = { handleNoteClick(note) },
-                                onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
-                                onDeleteClick = { noteViewModel.deleteNoteById(note.id) }
-                            )
                         }
                     }
                 }
@@ -804,6 +775,124 @@ private fun CategoryChip(
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface
             )
+        }
+    }
+}
+
+@Composable
+private fun ViewModeTab(
+    mode: NotionViewMode,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isSelected) VibrantOrange else BorderLight.copy(alpha = 0.7f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(id = mode.iconRes),
+                contentDescription = null,
+                tint = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = mode.title,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyStateContent(
+    searchQuery: String,
+    onNavigateToAddNote: (Int) -> Unit,
+    paddingValues: PaddingValues
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(88.dp)
+                    .clip(CircleShape)
+                    .background(SoftOrangeLight),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.note),
+                    contentDescription = null,
+                    tint = VibrantOrange,
+                    modifier = Modifier.size(42.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Text(
+                text = if (searchQuery.isNotBlank()) "Aramanızla eşleşen not bulunamadı" else "Henüz bir not yok",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = if (searchQuery.isNotBlank())
+                    "Farklı bir arama terimi deneyebilir veya kategoriyi değiştirebilirsiniz."
+                else
+                    "Notion blokları, yapılacaklar listesi veya ses kaydı ile hemen yeni bir not oluşturun.",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp
+                )
+            )
+
+            if (searchQuery.isBlank()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = { onNavigateToAddNote(-1) },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VibrantOrange,
+                        contentColor = PureWhite
+                    )
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.plus_small),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Yeni Not Oluştur", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
         }
     }
 }
