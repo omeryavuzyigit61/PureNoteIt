@@ -21,11 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -341,7 +337,8 @@ fun NotionCalendarView(
                 onSelectDay = { selectedCalendar = it },
                 onNoteClick = onNoteClick,
                 onAddNoteForDate = onAddNoteForDate,
-                isDark = isDark
+                isDark = isDark,
+                modifier = Modifier.weight(1f)
             )
         } else {
             NotionMultiColumnWeekView(
@@ -352,7 +349,8 @@ fun NotionCalendarView(
                 selectedCalendar = selectedCalendar,
                 onNoteClick = onNoteClick,
                 onAddNoteForDate = onAddNoteForDate,
-                isDark = isDark
+                isDark = isDark,
+                modifier = Modifier.weight(1f)
             )
         }
     }
@@ -373,7 +371,8 @@ private fun NotionMultiColumnWeekView(
     selectedCalendar: Calendar,
     onNoteClick: (NoteData) -> Unit,
     onAddNoteForDate: (Long) -> Unit,
-    isDark: Boolean
+    isDark: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
 
@@ -389,7 +388,7 @@ private fun NotionMultiColumnWeekView(
     }
 
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(18.dp))
             .border(
@@ -602,8 +601,11 @@ private fun NotionMultiColumnWeekView(
 }
 
 /**
- * Notion Monthly Schedule View.
- * In the month grid, notes appear DIRECTLY INSIDE the calendar day cells as colored chips!
+ * Notion Monthly Schedule View (Package 1: Event Dots + Unified Page Scroll).
+ * - Cells display elegant category event dots (● ● ●) instead of cramped/clipped text blobs.
+ * - The entire monthly view scrolls as a single unified vertical document, eliminating the
+ *   claustrophobic height trap and allowing selected day notes to expand freely across the screen.
+ * - Includes generous 110dp bottom spacing so cards never hide under the floating search dock.
  */
 @Composable
 private fun NotionMonthScheduleView(
@@ -614,114 +616,136 @@ private fun NotionMonthScheduleView(
     onSelectDay: (Calendar) -> Unit,
     onNoteClick: (NoteData) -> Unit,
     onAddNoteForDate: (Long) -> Unit,
-    isDark: Boolean
+    isDark: Boolean,
+    modifier: Modifier = Modifier
 ) {
-    // Weekday Header Row
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceAround
-    ) {
-        for (label in DAY_LABELS) {
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                modifier = Modifier.width(40.dp),
-                textAlign = TextAlign.Center
-            )
-        }
-    }
+    val scrollState = rememberScrollState()
 
-    Spacer(modifier = Modifier.height(4.dp))
-
-    // Monthly Grid with Event Pills INSIDE Cells
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = if (isDark) Color(0xFF161619) else MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (isDark) Color(0xFF2A2A2E) else BorderLight.copy(alpha = 0.6f)
-        )
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
     ) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(7),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(6.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        // Weekday Header Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround
         ) {
-            items(monthDays) { day ->
-                val isSelected = isSameDay(day.calendar, selectedCalendar)
-                val isToday = isSameDay(day.calendar, Calendar.getInstance())
+            for (label in DAY_LABELS) {
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) PureWhite.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.width(40.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
 
-                val dayNotes = notes.filter { note ->
-                    val noteCal = Calendar.getInstance().apply { timeInMillis = note.date }
-                    isSameDay(noteCal, day.calendar)
-                }
+        Spacer(modifier = Modifier.height(4.dp))
 
-                Box(
-                    modifier = Modifier
-                        .height(64.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(
-                            width = if (isSelected) 1.5.dp else 0.5.dp,
-                            color = if (isSelected) VibrantOrange else if (isDark) Color(0xFF2A2A2E) else BorderLight.copy(alpha = 0.4f),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .background(
-                            when {
-                                isToday -> if (isDark) Color(0xFF2E1C12) else SoftOrangeLight.copy(alpha = 0.5f)
-                                isSelected -> if (isDark) Color(0xFF1F1F24) else Color(0xFFF3F4F6)
-                                else -> Color.Transparent
-                            }
-                        )
-                        .clickable { onSelectDay(day.calendar.clone() as Calendar) }
-                        .padding(2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.Start
+        // Monthly Grid with Event Dots INSIDE Cells
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = if (isDark) Color(0xFF161619) else MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isDark) Color(0xFF2A2A2E) else BorderLight.copy(alpha = 0.6f)
+            )
+        ) {
+            val weeks = remember(monthDays) { monthDays.chunked(7) }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                weeks.forEach { week ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Day Number
-                        Text(
-                            text = "${day.dayOfMonth}",
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
-                            color = when {
-                                isToday -> VibrantOrange
-                                !day.isCurrentMonth -> if (isDark) PureWhite.copy(alpha = 0.25f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
-                                else -> if (isDark) PureWhite.copy(alpha = 0.9f) else MaterialTheme.colorScheme.onSurface
-                            },
-                            modifier = Modifier.padding(start = 2.dp, top = 1.dp)
-                        )
+                        week.forEach { day ->
+                            val isSelected = isSameDay(day.calendar, selectedCalendar)
+                            val isToday = isSameDay(day.calendar, Calendar.getInstance())
 
-                        // Colored Event Blocks DIRECTLY INSIDE the Calendar Cell!
-                        if (dayNotes.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(2.dp))
-                            val displayNotes = dayNotes.take(2)
-                            displayNotes.forEach { note ->
-                                val cat = categories.find { it.id == note.categoryId }
-                                val palette = getCategoryPalette(note.categoryId, cat?.name)
+                            val dayNotes = notes.filter { note ->
+                                val noteCal = Calendar.getInstance().apply { timeInMillis = note.date }
+                                isSameDay(noteCal, day.calendar)
+                            }
 
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 1.dp)
-                                        .clip(RoundedCornerShape(3.dp))
-                                        .background(palette.accentBar.copy(alpha = 0.85f))
-                                        .padding(horizontal = 2.dp, vertical = 1.dp)
-                                ) {
-                                    Text(
-                                        text = if (note.title.isNullOrBlank()) "Not" else note.title!!,
-                                        fontSize = 8.sp,
-                                        color = PureWhite,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(54.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        width = if (isSelected) 1.5.dp else 0.5.dp,
+                                        color = if (isSelected) VibrantOrange else if (isDark) Color(0xFF2A2A2E) else BorderLight.copy(alpha = 0.4f),
+                                        shape = RoundedCornerShape(8.dp)
                                     )
+                                    .background(
+                                        when {
+                                            isToday -> if (isDark) Color(0xFF2E1C12) else SoftOrangeLight.copy(alpha = 0.5f)
+                                            isSelected -> if (isDark) Color(0xFF1F1F24) else Color(0xFFF3F4F6)
+                                            else -> Color.Transparent
+                                        }
+                                    )
+                                    .clickable { onSelectDay(day.calendar.clone() as Calendar) }
+                                    .padding(vertical = 4.dp, horizontal = 2.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    // Day Number
+                                    Text(
+                                        text = "${day.dayOfMonth}",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
+                                        color = when {
+                                            isToday -> VibrantOrange
+                                            !day.isCurrentMonth -> if (isDark) PureWhite.copy(alpha = 0.25f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+                                            else -> if (isDark) PureWhite.copy(alpha = 0.9f) else MaterialTheme.colorScheme.onSurface
+                                        }
+                                    )
+
+                                    // Category Event Dots (● ● ●) instead of cramped text blobs!
+                                    if (dayNotes.isNotEmpty()) {
+                                        Row(
+                                            modifier = Modifier.padding(bottom = 2.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            val dotsToShow = dayNotes.take(3)
+                                            dotsToShow.forEach { note ->
+                                                val cat = categories.find { it.id == note.categoryId }
+                                                val palette = getCategoryPalette(note.categoryId, cat?.name)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .padding(horizontal = 1.dp)
+                                                        .size(5.dp)
+                                                        .clip(CircleShape)
+                                                        .background(palette.accentBar)
+                                                )
+                                            }
+                                            if (dayNotes.size > 3) {
+                                                Text(
+                                                    text = "+",
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isDark) PureWhite.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                                    modifier = Modifier.padding(start = 1.dp)
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Spacer(modifier = Modifier.height(5.dp))
+                                    }
                                 }
                             }
                         }
@@ -729,88 +753,90 @@ private fun NotionMonthScheduleView(
                 }
             }
         }
-    }
 
-    Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-    // Selected Date Header + Add Note Button
-    val selectedNotes = notes.filter { note ->
-        val noteCal = Calendar.getInstance().apply { timeInMillis = note.date }
-        isSameDay(noteCal, selectedCalendar)
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val dateLabel = SimpleDateFormat("d MMMM yyyy, EEEE", Locale("tr")).format(selectedCalendar.time)
-        Text(
-            text = dateLabel,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = if (isDark) PureWhite else MaterialTheme.colorScheme.onSurface
-        )
-
-        // Add note for this date
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(VibrantOrange)
-                .clickable { onAddNoteForDate(selectedCalendar.timeInMillis) }
-                .padding(horizontal = 10.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    painter = painterResource(id = R.drawable.plus_small),
-                    contentDescription = null,
-                    tint = PureWhite,
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Not Ekle",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PureWhite
-                )
-            }
+        // Selected Date Header + Add Note Button
+        val selectedNotes = notes.filter { note ->
+            val noteCal = Calendar.getInstance().apply { timeInMillis = note.date }
+            isSameDay(noteCal, selectedCalendar)
         }
-    }
 
-    Spacer(modifier = Modifier.height(6.dp))
-
-    // Detailed Event Cards for the selected day
-    if (selectedNotes.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Bu tarihte kayıtlı bir not yok.",
-                fontSize = 12.sp,
-                color = if (isDark) PureWhite.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-            )
-        }
-    } else {
-        LazyColumn(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(selectedNotes, key = { it.id }) { note ->
-                NotionCalendarEventCard(
-                    note = note,
-                    categories = categories,
-                    onClick = { onNoteClick(note) },
-                    isDark = isDark,
-                    isColumnMode = false
-                )
+            val dateLabel = SimpleDateFormat("d MMMM yyyy, EEEE", Locale("tr")).format(selectedCalendar.time)
+            Text(
+                text = dateLabel,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isDark) PureWhite else MaterialTheme.colorScheme.onSurface
+            )
+
+            // Add note for this date
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(VibrantOrange)
+                    .clickable { onAddNoteForDate(selectedCalendar.timeInMillis) }
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.plus_small),
+                        contentDescription = null,
+                        tint = PureWhite,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Not Ekle",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PureWhite
+                    )
+                }
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Detailed Event Cards for the selected day (Full page flow without height trap!)
+        if (selectedNotes.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Bu tarihte kayıtlı bir not yok.",
+                    fontSize = 12.5.sp,
+                    color = if (isDark) PureWhite.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                selectedNotes.forEach { note ->
+                    NotionCalendarEventCard(
+                        note = note,
+                        categories = categories,
+                        onClick = { onNoteClick(note) },
+                        isDark = isDark,
+                        isColumnMode = false
+                    )
+                }
+            }
+        }
+
+        // Generous bottom spacer so the last note card NEVER goes underneath the floating search dock!
+        Spacer(modifier = Modifier.height(110.dp))
     }
 }
 
