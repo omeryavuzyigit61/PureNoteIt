@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,8 +42,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -83,8 +86,10 @@ fun NotionBlockRow(
     onEditDrawing: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
     var isDraggingBlock by remember { mutableStateOf(false) }
     var dragAccumulator by remember { mutableFloatStateOf(0f) }
+    var lastMoveTimestamp by remember { mutableLongStateOf(0L) }
 
     // Tombik Scale & Soft Elevation Shadow with Spring Physics
     val tombikScale by animateFloatAsState(
@@ -160,6 +165,8 @@ fun NotionBlockRow(
                             onDragStart = {
                                 isDraggingBlock = true
                                 dragAccumulator = 0f
+                                lastMoveTimestamp = System.currentTimeMillis()
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             },
                             onDragEnd = {
                                 isDraggingBlock = false
@@ -171,14 +178,23 @@ fun NotionBlockRow(
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
+                                val now = System.currentTimeMillis()
+                                if (now - lastMoveTimestamp < 320L) {
+                                    dragAccumulator = 0f
+                                    return@detectDragGestures
+                                }
                                 dragAccumulator += dragAmount.y
-                                val threshold = 32f
+                                val threshold = 50f
                                 if (dragAccumulator < -threshold && onMoveUp != null) {
                                     onMoveUp()
+                                    lastMoveTimestamp = now
                                     dragAccumulator = 0f
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 } else if (dragAccumulator > threshold && onMoveDown != null) {
                                     onMoveDown()
+                                    lastMoveTimestamp = now
                                     dragAccumulator = 0f
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 }
                             }
                         )
@@ -233,7 +249,54 @@ fun NotionBlockRow(
         }
     }
 
-    // Root Tombik Container with Spring Physics (Option A: Instant handle drag, zero text conflict)
+    // Whole-block Long-Press Drag Modifier with Anti-Tremble / Anti-Jitter Cooldown
+    val wholeBlockLongPressModifier = if (block.type != BlockType.DRAWING) {
+        Modifier.pointerInput(block.id) {
+            detectDragGesturesAfterLongPress(
+                onDragStart = {
+                    isDraggingBlock = true
+                    dragAccumulator = 0f
+                    lastMoveTimestamp = System.currentTimeMillis()
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                },
+                onDragEnd = {
+                    isDraggingBlock = false
+                    dragAccumulator = 0f
+                },
+                onDragCancel = {
+                    isDraggingBlock = false
+                    dragAccumulator = 0f
+                },
+                onDrag = { change, dragAmount ->
+                    change.consume()
+                    val now = System.currentTimeMillis()
+                    // 320ms anti-tremble cooldown: prevents the infinite oscillation bug when index changes
+                    if (now - lastMoveTimestamp < 320L) {
+                        dragAccumulator = 0f
+                        return@detectDragGesturesAfterLongPress
+                    }
+
+                    dragAccumulator += dragAmount.y
+                    val threshold = 55f
+                    if (dragAccumulator < -threshold && onMoveUp != null) {
+                        onMoveUp()
+                        lastMoveTimestamp = now
+                        dragAccumulator = 0f
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    } else if (dragAccumulator > threshold && onMoveDown != null) {
+                        onMoveDown()
+                        lastMoveTimestamp = now
+                        dragAccumulator = 0f
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                }
+            )
+        }
+    } else {
+        Modifier
+    }
+
+    // Root Tombik Container with Spring Physics (Supports Long Press Anywhere + Handle Drag)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -254,6 +317,7 @@ fun NotionBlockRow(
                     Modifier
                 }
             )
+            .then(wholeBlockLongPressModifier)
     ) {
         when (block.type) {
             BlockType.DIVIDER -> {

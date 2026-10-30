@@ -32,6 +32,10 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -387,7 +391,7 @@ fun HomeScreen(
                                 .size(42.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surface)
-                                .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.menu),
@@ -434,7 +438,7 @@ fun HomeScreen(
                                 .size(42.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surface)
-                                .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
                         ) {
                             Icon(
                                 painter = painterResource(
@@ -568,18 +572,18 @@ fun HomeScreen(
                             paddingValues = paddingValues
                         )
                     } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
+                        LazyVerticalStaggeredGrid(
+                            columns = StaggeredGridCells.Fixed(2),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(paddingValues)
                                 .padding(horizontal = 12.dp),
+                            verticalItemSpacing = 10.dp,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
                             contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
                         ) {
                             if (pinnedNotes.isNotEmpty()) {
-                                item(span = { GridItemSpan(2) }) {
+                                item(span = StaggeredGridItemSpan.FullLine) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
@@ -610,7 +614,7 @@ fun HomeScreen(
                                 }
 
                                 if (regularNotes.isNotEmpty()) {
-                                    item(span = { GridItemSpan(2) }) {
+                                    item(span = StaggeredGridItemSpan.FullLine) {
                                         Text(
                                             text = "Tüm Notlar",
                                             fontSize = 13.sp,
@@ -765,10 +769,10 @@ private fun CategoryChip(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surface)
+            .background(if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
             .border(
                 1.dp,
-                if (isSelected) VibrantOrange else BorderLight.copy(alpha = 0.7f),
+                if (isSelected) VibrantOrange else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                 RoundedCornerShape(14.dp)
             )
             .clickable { onClick() }
@@ -806,10 +810,10 @@ private fun ViewModeTab(
             .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surface,
+        color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (isSelected) VibrantOrange else BorderLight.copy(alpha = 0.7f)
+            if (isSelected) VibrantOrange else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
         )
     ) {
         Row(
@@ -819,7 +823,7 @@ private fun ViewModeTab(
             Icon(
                 painter = painterResource(id = mode.iconRes),
                 contentDescription = null,
-                tint = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                tint = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                 modifier = Modifier.size(15.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))

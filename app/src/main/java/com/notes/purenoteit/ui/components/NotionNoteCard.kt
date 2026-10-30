@@ -1,6 +1,7 @@
 package com.notes.purenoteit.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -65,11 +66,15 @@ fun NotionNoteCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -78,42 +83,41 @@ fun NotionNoteCard(
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
-            // Top Row: Category icon pill, Page Emoji, Pin icon & Menu button
+            // Top Row: Primary Icon/Emoji, Pin indicator & Menu button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Category icon pill in PureNoteIt signature orange
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(VibrantOrange),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val iconRes = when (note.categoryId) {
-                            1 -> R.drawable.note
-                            2 -> R.drawable.diary
-                            3 -> R.drawable.important
-                            else -> R.drawable.other
-                        }
-                        Icon(
-                            painter = painterResource(id = iconRes),
-                            contentDescription = null,
-                            tint = PureWhite,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    // Notion Page Emoji
                     if (!note.icon.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.width(6.dp))
+                        // Prominent Notion Page Emoji
                         Text(
                             text = note.icon ?: "",
-                            fontSize = 18.sp
+                            fontSize = 22.sp
                         )
+                    } else {
+                        // Category icon pill in PureNoteIt signature orange
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(VibrantOrange),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val iconRes = when (note.categoryId) {
+                                1 -> R.drawable.note
+                                2 -> R.drawable.diary
+                                3 -> R.drawable.important
+                                else -> R.drawable.other
+                            }
+                            Icon(
+                                painter = painterResource(id = iconRes),
+                                contentDescription = null,
+                                tint = PureWhite,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
 
@@ -310,12 +314,12 @@ fun NotionNoteCard(
                             .height(4.dp)
                             .clip(CircleShape),
                         color = VibrantOrange,
-                        trackColor = BorderLight
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                     )
                 }
             }
 
-            // Media Indicators (Audio / Images)
+            // Media Indicators (Audio / Images) with Translucent Glass Badges
             val hasImages = !note.images.isNullOrEmpty()
             val hasSounds = !note.sounds.isNullOrEmpty()
             if (!isProtected && (hasImages || hasSounds)) {
@@ -324,9 +328,14 @@ fun NotionNoteCard(
                     if (hasSounds) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(SoftOrangeLight)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(VibrantOrange.copy(alpha = 0.15f))
+                                .border(
+                                    0.5.dp,
+                                    VibrantOrange.copy(alpha = 0.35f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
@@ -335,12 +344,12 @@ fun NotionNoteCard(
                                     tint = VibrantOrange,
                                     modifier = Modifier.size(11.dp)
                                 )
-                                Spacer(modifier = Modifier.width(3.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "${note.sounds?.size} Ses",
-                                    fontSize = 10.sp,
+                                    fontSize = 10.5.sp,
                                     color = VibrantOrange,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
@@ -349,23 +358,28 @@ fun NotionNoteCard(
                     if (hasImages) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(BorderLight)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF3B82F6).copy(alpha = 0.15f))
+                                .border(
+                                    0.5.dp,
+                                    Color(0xFF3B82F6).copy(alpha = 0.35f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.picture),
                                     contentDescription = null,
-                                    tint = CharcoalGray,
+                                    tint = Color(0xFF60A5FA),
                                     modifier = Modifier.size(11.dp)
                                 )
-                                Spacer(modifier = Modifier.width(3.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "${note.images?.size} Görsel",
-                                    fontSize = 10.sp,
-                                    color = CharcoalGray,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontSize = 10.5.sp,
+                                    color = Color(0xFF60A5FA),
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
