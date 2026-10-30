@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
@@ -748,9 +749,11 @@ fun HomeScreen(
 
             // Pinned Notion Mobile Bottom Dock:
             // Sits at the bottom above navigation bar when keyboard is closed.
-            // When keyboard is open, Android adjusts the window and the dock sits cleanly 6dp above the keyboard!
+            // When keyboard is open, lifts by EXACTLY the keyboard height (via maxOf), sitting 6dp above the keyboard!
             val density = LocalDensity.current
-            val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
+            val imeBottom = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+            val navBottom = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
+            val bottomDockInset = maxOf(imeBottom, navBottom)
 
             NotionMobileBottomDock(
                 searchQuery = searchQuery,
@@ -775,10 +778,8 @@ fun HomeScreen(
                 isDark = isDarkTheme,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .then(
-                        if (!isKeyboardOpen) Modifier.navigationBarsPadding() else Modifier
-                    )
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .padding(bottom = bottomDockInset + 6.dp)
+                    .padding(horizontal = 16.dp)
             )
         }
     }
