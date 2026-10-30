@@ -43,7 +43,15 @@ data class NoteData(
     @ColumnInfo(name = "completedTasks", defaultValue = "0")
     var completedTasks: Int = 0,
     @ColumnInfo(name = "status", defaultValue = "'TODO'")
-    var status: String = "TODO"
+    var status: String = "TODO",
+    @ColumnInfo(name = "reminderTime")
+    var reminderTime: Long? = null,
+    @ColumnInfo(name = "reminderType")
+    var reminderType: String? = null,
+    @ColumnInfo(name = "reminderSound")
+    var reminderSound: String? = null,
+    @ColumnInfo(name = "isReminderDone", defaultValue = "0")
+    var isReminderDone: Boolean = false
 ) : Serializable {
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0

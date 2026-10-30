@@ -71,4 +71,13 @@ interface NoteDao {
 
     @Query("UPDATE notes SET isPinned = :isPinned WHERE id = :id")
     fun updatePinStatus(id: Int, isPinned: Boolean): Completable
+
+    @Query("SELECT * FROM notes WHERE reminderTime IS NOT NULL AND reminderTime > :now AND isReminderDone = 0")
+    fun getActiveReminders(now: Long): Single<List<NoteData>>
+
+    @Query("UPDATE notes SET isReminderDone = :isDone WHERE id = :id")
+    fun updateReminderDone(id: Int, isDone: Boolean): Completable
+
+    @Query("UPDATE notes SET reminderTime = :reminderTime, isReminderDone = 0 WHERE id = :id")
+    fun updateReminderTime(id: Int, reminderTime: Long): Completable
 }

@@ -955,6 +955,32 @@ fun NotionCalendarEventCard(
                         }
                     }
 
+                    // Active Reminder / Alarm Badge
+                    if (note.reminderTime != null && note.reminderTime!! > System.currentTimeMillis() && !note.isReminderDone) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(VibrantOrange.copy(alpha = 0.2f))
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_alarm_clock),
+                                    contentDescription = null,
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(9.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(note.reminderTime),
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            }
+                        }
+                    }
+
                     // Task Checklist Counter (e.g. ✓ 2/5)
                     if (note.totalTasks > 0) {
                         Box(

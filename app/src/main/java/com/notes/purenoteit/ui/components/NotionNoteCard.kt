@@ -389,15 +389,49 @@ fun NotionNoteCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Formatted Date
+            // Formatted Date and Active Reminder Badge
             val dateStr = remember(note.date) {
                 SimpleDateFormat("dd MMM yyyy", Locale("tr")).format(Date(note.date))
             }
-            Text(
-                text = dateStr,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
+            val hasActiveReminder = note.reminderTime != null && note.reminderTime!! > System.currentTimeMillis() && !note.isReminderDone
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = dateStr,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+
+                if (hasActiveReminder) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(VibrantOrange.copy(alpha = 0.15f))
+                            .border(0.5.dp, VibrantOrange.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_alarm_clock),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(10.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(note.reminderTime),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

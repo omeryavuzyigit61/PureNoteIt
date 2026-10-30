@@ -1,13 +1,15 @@
 package com.notes.purenoteit.view
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.Crossfade
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.animation.Crossfade
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
@@ -15,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.notes.purenoteit.reminder.AlarmSoundPlayer
 import com.notes.purenoteit.ui.screens.AnimatedSplashScreen
 import com.notes.purenoteit.ui.screens.CategoryManagementScreen
 import com.notes.purenoteit.ui.screens.HomeScreen
@@ -32,6 +35,15 @@ class MainActivity : AppCompatActivity() {
 
     private val noteViewModel: NoteViewModel by viewModels()
     private val categoryViewModel: CategoryViewModel by viewModels()
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val openNoteId = intent.getIntExtra("OPEN_NOTE_ID", -1)
+        if (openNoteId != -1) {
+            AlarmSoundPlayer.stop()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +69,14 @@ class MainActivity : AppCompatActivity() {
                         AnimatedSplashScreen(onAnimationFinish = { showSplash = false })
                     } else {
                         val navController = rememberNavController()
+
+                        val openNoteId = intent?.getIntExtra("OPEN_NOTE_ID", -1) ?: -1
+                        LaunchedEffect(openNoteId) {
+                            if (openNoteId != -1) {
+                                AlarmSoundPlayer.stop()
+                                navController.navigate("note_detail/$openNoteId")
+                            }
+                        }
 
                         NavHost(
                             navController = navController,

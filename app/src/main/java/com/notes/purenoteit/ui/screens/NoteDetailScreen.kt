@@ -80,18 +80,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import android.os.Build
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
+import com.notes.purenoteit.reminder.ReminderManager
 import com.notes.purenoteit.ui.components.DrawingCanvasSheet
 import com.notes.purenoteit.ui.components.EmojiPickerSheet
 import com.notes.purenoteit.ui.components.KANBAN_COLUMNS
 import com.notes.purenoteit.ui.components.NotionBlockRow
 import com.notes.purenoteit.ui.components.NotionSlashDialog
 import com.notes.purenoteit.ui.components.NotionToolbar
+import com.notes.purenoteit.ui.components.ReminderBottomSheet
 import com.notes.purenoteit.ui.components.SpotifyAudioVisualizer
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
@@ -105,6 +108,9 @@ import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import kotlinx.coroutines.delay
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,6 +132,20 @@ fun NoteDetailScreen(
     var selectedCategoryName by remember { mutableStateOf("Not") }
     var noteStatus by remember { mutableStateOf("TODO") }
     var noteDate by remember { mutableStateOf(if (initialDate > 0) initialDate else System.currentTimeMillis()) }
+
+    var reminderTime by remember { mutableStateOf<Long?>(null) }
+    var reminderType by remember { mutableStateOf("ALARM") }
+    var reminderSound by remember { mutableStateOf("default") }
+    var isReminderDone by remember { mutableStateOf(false) }
+    var showReminderSheet by remember { mutableStateOf(false) }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            context.showToastShort("Hatırlatıcılar için bildirim izni gereklidir")
+        }
+    }
 
     val blocks = remember { mutableStateListOf<NoteBlock>() }
     var isRecordingAudio by remember { mutableStateOf(false) }
@@ -190,6 +210,10 @@ fun NoteDetailScreen(
                 selectedCategoryId = note.categoryId ?: 1
                 noteStatus = note.status ?: "TODO"
                 noteDate = note.date
+                reminderTime = note.reminderTime
+                reminderType = note.reminderType ?: "ALARM"
+                reminderSound = note.reminderSound ?: "default"
+                isReminderDone = note.isReminderDone
 
                 val rawDesc = if (note.isEncrypted) {
                     SecurityUtil.decrypt(note.description ?: "")
@@ -331,13 +355,35 @@ fun NoteDetailScreen(
             isEncrypted = isEncrypted,
             totalTasks = total,
             completedTasks = completed,
-            status = noteStatus
+            status = noteStatus,
+            reminderTime = reminderTime,
+            reminderType = reminderType,
+            reminderSound = reminderSound,
+            isReminderDone = isReminderDone
         )
 
         if (noteId != -1) {
             note.id = noteId
         }
         noteViewModel.upsert(note)
+
+        // Schedule or cancel alarm with ReminderManager
+        val targetId = if (noteId != -1) noteId else note.hashCode()
+        if (reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone) {
+            val noteDescPreview = blocks.firstOrNull { it.content.isNotBlank() }?.content ?: ""
+            ReminderManager.scheduleReminder(
+                context = context,
+                noteId = targetId,
+                noteTitle = note.title ?: "Başlıksız Not",
+                noteDesc = noteDescPreview,
+                reminderTimeMs = reminderTime!!,
+                reminderType = reminderType,
+                soundType = reminderSound
+            )
+        } else if (reminderTime == null && targetId != 0) {
+            ReminderManager.cancelReminder(context, targetId)
+        }
+
         onNavigateBack()
     }
 
@@ -391,6 +437,48 @@ fun NoteDetailScreen(
                             fontWeight = FontWeight.Bold,
                             color = VibrantOrange
                         )
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Reminder & Alarm Action Button
+                    val hasActiveReminder = reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (hasActiveReminder) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                            .clickable {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    val hasNotifPermission = ContextCompat.checkSelfPermission(
+                                        context,
+                                        android.Manifest.permission.POST_NOTIFICATIONS
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                    if (!hasNotifPermission) {
+                                        notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                }
+                                showReminderSheet = true
+                            }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_alarm_clock),
+                                contentDescription = "Hatırlatıcı",
+                                tint = if (hasActiveReminder) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            if (hasActiveReminder) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(reminderTime),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))
@@ -1047,6 +1135,35 @@ fun NoteDetailScreen(
                 TextButton(onClick = { showPasswordDialog = false; pinInput = "" }) {
                     Text("İptal")
                 }
+            }
+        )
+    }
+
+    // Reminder & Alarm BottomSheet
+    if (showReminderSheet) {
+        ReminderBottomSheet(
+            initialTimeMs = reminderTime,
+            initialType = reminderType,
+            initialSound = reminderSound,
+            onSaveReminder = { timeMs, type, sound ->
+                reminderTime = timeMs
+                reminderType = type
+                reminderSound = sound
+                isReminderDone = false
+                showReminderSheet = false
+                context.showToastShort("Hatırlatıcı ayarlandı: " + SimpleDateFormat("d MMM HH:mm", Locale("tr")).format(timeMs))
+            },
+            onRemoveReminder = {
+                reminderTime = null
+                isReminderDone = false
+                showReminderSheet = false
+                if (noteId != -1) {
+                    ReminderManager.cancelReminder(context, noteId)
+                }
+                context.showToastShort("Hatırlatıcı kaldırıldı")
+            },
+            onDismiss = {
+                showReminderSheet = false
             }
         )
     }

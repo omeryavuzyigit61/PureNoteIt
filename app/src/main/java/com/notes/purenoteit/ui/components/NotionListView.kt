@@ -163,6 +163,15 @@ private fun NotionListRow(
                             modifier = Modifier.size(12.dp)
                         )
                     }
+                    if (note.reminderTime != null && note.reminderTime!! > System.currentTimeMillis() && !note.isReminderDone) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_alarm_clock),
+                            contentDescription = "Hatırlatıcı",
+                            tint = VibrantOrange,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
                 }
 
                 if (note.totalTasks > 0) {
