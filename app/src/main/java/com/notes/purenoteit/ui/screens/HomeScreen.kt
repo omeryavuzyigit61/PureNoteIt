@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -43,6 +44,9 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -77,9 +81,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -134,7 +142,6 @@ fun HomeScreen(
 
     var selectedCategory by remember { mutableStateOf("Tümü") }
     var searchQuery by remember { mutableStateOf("") }
-    var isSearchExpanded by remember { mutableStateOf(false) }
     var currentViewMode by remember { mutableStateOf(NotionViewMode.GRID) }
 
     val speechLauncher = rememberLauncherForActivityResult(
@@ -144,7 +151,6 @@ fun HomeScreen(
             val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             if (!matches.isNullOrEmpty()) {
                 searchQuery = matches[0]
-                isSearchExpanded = true
             }
         }
     }
@@ -421,54 +427,18 @@ fun HomeScreen(
                             )
                         }
 
-                        // Center: Search bar or App Title
-                        if (isSearchExpanded) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = { Text("Notlarda ara...", fontSize = 13.sp) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(horizontal = 8.dp)
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(14.dp),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = VibrantOrange,
-                                    unfocusedBorderColor = BorderLight,
-                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                                )
+                        // Center: App Title
+                        Text(
+                            text = "PureNoteIt",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = MaterialTheme.colorScheme.onBackground
                             )
-                        } else {
-                            Text(
-                                text = "PureNoteIt",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                            )
-                        }
+                        )
 
-                        // Right: Search Toggle
-                        IconButton(
-                            onClick = { isSearchExpanded = !isSearchExpanded },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                        ) {
-                            Icon(
-                                painter = painterResource(
-                                    id = if (isSearchExpanded) R.drawable.cancel else R.drawable.search
-                                ),
-                                contentDescription = "Ara",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        // Right: Spacer for visual balance
+                        Spacer(modifier = Modifier.size(42.dp))
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -520,7 +490,7 @@ fun HomeScreen(
             floatingActionButton = {
                 NotionMobileBottomDock(
                     searchQuery = searchQuery,
-                    onSearchClick = { isSearchExpanded = true },
+                    onSearchQueryChange = { searchQuery = it },
                     onVoiceClick = {
                         try {
                             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -534,7 +504,9 @@ fun HomeScreen(
                     },
                     onAddNoteClick = { onNavigateToAddNote(-1) },
                     isDark = isDarkTheme,
-                    modifier = Modifier.navigationBarsPadding()
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .imePadding()
                 )
             },
             floatingActionButtonPosition = FabPosition.Center,
@@ -1141,12 +1113,14 @@ private fun NotionRecentCoverCard(
 @Composable
 private fun NotionMobileBottomDock(
     searchQuery: String,
-    onSearchClick: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
     onVoiceClick: () -> Unit,
     onAddNoteClick: () -> Unit,
     isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val focusManager = LocalFocusManager.current
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -1154,13 +1128,11 @@ private fun NotionMobileBottomDock(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Notion Search / Ask AI Pill
+        // Notion Search / Ask AI Pill with inline interactive BasicTextField
         Surface(
             modifier = Modifier
                 .weight(1f)
-                .height(48.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .clickable { onSearchClick() },
+                .height(48.dp),
             shape = RoundedCornerShape(24.dp),
             color = if (isDark) Color(0xFF1E1E22) else PureWhite,
             shadowElevation = 6.dp,
@@ -1172,28 +1144,60 @@ private fun NotionMobileBottomDock(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(start = 14.dp, end = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                Icon(
+                    painter = painterResource(id = R.drawable.search),
+                    contentDescription = "Ara",
+                    tint = if (isDark) PureWhite.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterStart
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.search),
-                        contentDescription = "Ara",
-                        tint = if (isDark) PureWhite.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.size(16.dp)
+                    if (searchQuery.isEmpty()) {
+                        Text(
+                            text = "Notlarda ara veya sor...",
+                            fontSize = 13.sp,
+                            color = if (isDark) PureWhite.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            fontSize = 14.sp,
+                            color = if (isDark) PureWhite else MaterialTheme.colorScheme.onBackground
+                        ),
+                        cursorBrush = SolidColor(VibrantOrange),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (searchQuery.isNotBlank()) searchQuery else "Notlarda ara veya sor...",
-                        fontSize = 13.sp,
-                        color = if (isDark) PureWhite.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                }
+
+                // Clear button [ ✕ ] when query has text
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onSearchQueryChange("") },
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.cancel),
+                            contentDescription = "Temizle",
+                            tint = if (isDark) PureWhite.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
 
                 IconButton(
