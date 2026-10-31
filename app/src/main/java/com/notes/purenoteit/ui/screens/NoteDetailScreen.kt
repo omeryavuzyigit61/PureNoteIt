@@ -104,6 +104,7 @@ import com.notes.purenoteit.ui.components.KANBAN_COLUMNS
 import com.notes.purenoteit.ui.components.NotionBlockRow
 import com.notes.purenoteit.ui.components.NotionSlashDialog
 import com.notes.purenoteit.ui.components.NotionToolbar
+import com.notes.purenoteit.ui.components.PdfExportStudioSheet
 import com.notes.purenoteit.ui.components.ReminderBottomSheet
 import com.notes.purenoteit.ui.components.SpotifyAudioVisualizer
 import com.notes.purenoteit.ui.theme.BorderLight
@@ -2047,155 +2048,29 @@ fun NoteDetailScreen(
         )
     }
 
-    // Export & Share Sheet (Feature 1: PDF & Markdown)
+    // Export & Share Sheet (Gelişmiş Filtreli & Canlı Önizlemeli PDF Stüdyosu)
     if (showExportSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showExportSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "📤", fontSize = 20.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Notu Dışa Aktar & Paylaş",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Notunuzu standart formatlarda dışarı aktarın",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    IconButton(
-                        onClick = { showExportSheet = false },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.cancel),
-                            contentDescription = "Kapat",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Option 1: PDF Export
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable {
-                            showExportSheet = false
-                            val currentTitle = if (title.isBlank()) "Başlıksız Not" else title
-                            NoteExporter.shareAsPdf(context, currentTitle, blocks)
-                        },
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.5f))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFFFEBEE)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = "📄", fontSize = 22.sp)
-                        }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "PDF Olarak Paylaş / Yazdır",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Temiz A4 formatında, tüm bloklar ve başlıklar ile birlikte PDF oluşturur.",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Option 2: Markdown Export
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable {
-                            showExportSheet = false
-                            val currentTitle = if (title.isBlank()) "Başlıksız Not" else title
-                            NoteExporter.shareAsMarkdown(context, currentTitle, blocks)
-                        },
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.5f))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(SoftOrangeLight),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = "📝", fontSize = 22.sp)
-                        }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Markdown (.md) Olarak Paylaş",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Obsidian, Notion ve GitHub uyumlu standart Markdown belgesi oluşturur.",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
+        val currentTitle = if (title.isBlank()) "Başlıksız Not" else title
+        PdfExportStudioSheet(
+            title = currentTitle,
+            categoryName = selectedCategoryName,
+            blocks = blocks,
+            onDismiss = { showExportSheet = false },
+            onExportPdf = { config ->
+                showExportSheet = false
+                NoteExporter.shareAsPdf(
+                    context = context,
+                    title = currentTitle,
+                    blocks = blocks,
+                    categoryName = selectedCategoryName,
+                    config = config
+                )
+            },
+            onExportMarkdown = {
+                showExportSheet = false
+                NoteExporter.shareAsMarkdown(context, currentTitle, blocks)
             }
-        }
+        )
     }
 
     // OCR Source Selector Sheet (Kamera veya Galeri)

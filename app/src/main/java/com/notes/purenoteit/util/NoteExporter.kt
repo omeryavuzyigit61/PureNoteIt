@@ -2,8 +2,11 @@ package com.notes.purenoteit.util
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
 import com.notes.purenoteit.model.BlockType
@@ -13,6 +16,15 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+data class PdfExportConfig(
+    val includeText: Boolean = true,
+    val includeImages: Boolean = true,
+    val includeDrawings: Boolean = true,
+    val includeTasks: Boolean = true,
+    val includeAudioBadge: Boolean = true,
+    val includeHeader: Boolean = true
+)
 
 object NoteExporter {
 
@@ -49,6 +61,15 @@ object NoteExporter {
                         sb.append("\n")
                     }
                 }
+                BlockType.IMAGE -> {
+                    sb.append("![Görsel](${block.mediaPath ?: ""})\n\n")
+                }
+                BlockType.DRAWING -> {
+                    sb.append("![Çizim](${block.mediaPath ?: ""})\n\n")
+                }
+                BlockType.AUDIO -> {
+                    sb.append("🎙️ [Ses Kaydı Eki: ${block.mediaPath?.substringAfterLast("/") ?: "ses.mp4"}]\n\n")
+                }
                 BlockType.DIVIDER -> sb.append("\n---\n\n")
                 else -> {
                     if (block.content.isNotBlank()) {
@@ -67,129 +88,370 @@ object NoteExporter {
     }
 
     /**
-     * Generates a sleek, formatted PDF document from note blocks and triggers the Android Share Sheet.
+     * Safely decodes a bitmap from disk with appropriate sampling to prevent OOM.
      */
-    fun shareAsPdf(context: Context, title: String, blocks: List<NoteBlock>) {
+    private fun decodeSampledBitmap(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
+        return try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(path, options)
+            if (options.outWidth <= 0 || options.outHeight <= 0) return null
+
+            var inSampleSize = 1
+            val halfHeight = options.outHeight / 2
+            val halfWidth = options.outWidth / 2
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            BitmapFactory.decodeFile(path, decodeOptions)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Generates a multi-page, publication-quality A4 PDF with real images, drawings, audio badges,
+     * tables and checklists, filtered according to the user's PdfExportConfig.
+     */
+    fun shareAsPdf(
+        context: Context,
+        title: String,
+        blocks: List<NoteBlock>,
+        categoryName: String = "",
+        config: PdfExportConfig = PdfExportConfig()
+    ) {
         val safeTitle = if (title.isBlank()) "PureNoteIt_Not" else title.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         val exportDir = File(context.cacheDir, "exports").apply { mkdirs() }
         val pdfFile = File(exportDir, "${safeTitle}.pdf")
 
         val pdfDocument = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // Standard A4 (72 dpi)
-        val page = pdfDocument.startPage(pageInfo)
-        val canvas = page.canvas
+        val pageWidth = 595
+        val pageHeight = 842
+        val marginX = 40f
+        val contentWidth = 515f
+        val maxPageY = 780f
 
-        val titlePaint = Paint().apply {
+        var pageNumber = 1
+        var pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+        var page = pdfDocument.startPage(pageInfo)
+        var canvas = page.canvas
+
+        // Paints
+        val brandPaint = Paint().apply {
             color = Color.parseColor("#E65100") // PureNoteIt VibrantOrange
-            textSize = 20f
+            textSize = 21f
             isFakeBoldText = true
             isAntiAlias = true
         }
 
         val datePaint = Paint().apply {
-            color = Color.DKGRAY
+            color = Color.parseColor("#757575")
             textSize = 10f
             isAntiAlias = true
         }
 
+        val categoryTagPaint = Paint().apply {
+            color = Color.parseColor("#E65100")
+            textSize = 9.5f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+
+        val categoryTagBgPaint = Paint().apply {
+            color = Color.parseColor("#FFF3E0")
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
         val bodyPaint = Paint().apply {
-            color = Color.BLACK
+            color = Color.parseColor("#212121")
             textSize = 12f
             isAntiAlias = true
         }
 
+        val todoDonePaint = Paint().apply {
+            color = Color.parseColor("#9E9E9E")
+            textSize = 12f
+            isStrikeThruText = true
+            isAntiAlias = true
+        }
+
+        val h1Paint = Paint().apply {
+            color = Color.parseColor("#1C1C1E")
+            textSize = 18f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+
         val h2Paint = Paint().apply {
-            color = Color.parseColor("#212121")
+            color = Color.parseColor("#2C2C2E")
             textSize = 15f
             isFakeBoldText = true
             isAntiAlias = true
         }
 
         val calloutPaint = Paint().apply {
-            color = Color.parseColor("#E65100")
+            color = Color.parseColor("#BF360C")
             textSize = 11.5f
             isAntiAlias = true
         }
 
         val dividerPaint = Paint().apply {
-            color = Color.LTGRAY
+            color = Color.parseColor("#E0E0E0")
             strokeWidth = 1f
         }
 
+        val pageNumberPaint = Paint().apply {
+            color = Color.parseColor("#9E9E9E")
+            textSize = 9.5f
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
+
+        val audioBgPaint = Paint().apply {
+            color = Color.parseColor("#FFF8E1")
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val audioBorderPaint = Paint().apply {
+            color = Color.parseColor("#FFE082")
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+            isAntiAlias = true
+        }
+
+        val audioTitlePaint = Paint().apply {
+            color = Color.parseColor("#F57F17")
+            textSize = 11.5f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+
+        val audioSubPaint = Paint().apply {
+            color = Color.parseColor("#795548")
+            textSize = 9.5f
+            isAntiAlias = true
+        }
+
+        val imageBorderPaint = Paint().apply {
+            color = Color.parseColor("#E0E0E0")
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+            isAntiAlias = true
+        }
+
         var y = 50f
-        val marginX = 40f
-        val maxPageY = 780f
 
-        // Document Title & Date Header
-        canvas.drawText("PureNoteIt • $title", marginX, y, titlePaint)
-        y += 20f
-        val todayStr = SimpleDateFormat("d MMMM yyyy, HH:mm", Locale("tr")).format(Date())
-        canvas.drawText("Oluşturulma Tarihi: $todayStr", marginX, y, datePaint)
-        y += 12f
-        canvas.drawLine(marginX, y, 555f, y, dividerPaint)
-        y += 24f
+        fun ensurePageSpace(neededHeight: Float) {
+            if (y + neededHeight > maxPageY) {
+                // Finish current page
+                canvas.drawText("Sayfa $pageNumber", pageWidth / 2f, 815f, pageNumberPaint)
+                pdfDocument.finishPage(page)
 
+                // Start next page
+                pageNumber++
+                pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+                page = pdfDocument.startPage(pageInfo)
+                canvas = page.canvas
+                y = 45f
+
+                // Small running header
+                canvas.drawText("PureNoteIt • $title", marginX, y, datePaint)
+                y += 8f
+                canvas.drawLine(marginX, y, marginX + contentWidth, y, dividerPaint)
+                y += 22f
+            }
+        }
+
+        // 1. Document Header (if enabled)
+        if (config.includeHeader) {
+            val displayTitle = if (title.isBlank()) "Başlıksız Not" else title
+            canvas.drawText(displayTitle, marginX, y, brandPaint)
+            y += 18f
+
+            val todayStr = SimpleDateFormat("d MMMM yyyy, HH:mm", Locale("tr")).format(Date())
+            canvas.drawText("Oluşturulma: $todayStr", marginX, y, datePaint)
+
+            if (categoryName.isNotBlank() && categoryName != "Tümü") {
+                val tagText = " $categoryName "
+                val tagWidth = categoryTagPaint.measureText(tagText) + 8f
+                val tagRect = RectF(marginX + 200f, y - 10f, marginX + 200f + tagWidth, y + 3f)
+                canvas.drawRoundRect(tagRect, 4f, 4f, categoryTagBgPaint)
+                canvas.drawText(tagText, marginX + 204f, y - 1f, categoryTagPaint)
+            }
+
+            y += 12f
+            canvas.drawLine(marginX, y, marginX + contentWidth, y, dividerPaint)
+            y += 24f
+        }
+
+        // 2. Iterate and draw filtered blocks
         for (block in blocks) {
-            if (y > maxPageY) break
-
             when (block.type) {
                 BlockType.HEADING_1 -> {
-                    y += 10f
-                    canvas.drawText(block.content, marginX, y, titlePaint)
-                    y += 24f
+                    if (config.includeText && block.content.isNotBlank()) {
+                        ensurePageSpace(32f)
+                        y += 6f
+                        canvas.drawText(block.content, marginX, y, h1Paint)
+                        y += 24f
+                    }
                 }
+
                 BlockType.HEADING_2 -> {
-                    y += 8f
-                    canvas.drawText(block.content, marginX, y, h2Paint)
-                    y += 20f
+                    if (config.includeText && block.content.isNotBlank()) {
+                        ensurePageSpace(28f)
+                        y += 4f
+                        canvas.drawText(block.content, marginX, y, h2Paint)
+                        y += 20f
+                    }
                 }
+
                 BlockType.TODO -> {
-                    val mark = if (block.isChecked) "[✓]" else "[ ]"
-                    canvas.drawText("$mark ${block.content}", marginX, y, bodyPaint)
-                    y += 18f
-                }
-                BlockType.BULLET_LIST -> {
-                    canvas.drawText("•  ${block.content}", marginX + 6f, y, bodyPaint)
-                    y += 18f
-                }
-                BlockType.CALLOUT -> {
-                    canvas.drawText("${block.calloutIcon}  ${block.content}", marginX, y, calloutPaint)
-                    y += 20f
-                }
-                BlockType.TOGGLE -> {
-                    canvas.drawText("▶ ${block.content}", marginX, y, h2Paint)
-                    y += 18f
-                    if (block.toggleBody.isNotBlank()) {
-                        canvas.drawText("    ${block.toggleBody}", marginX, y, bodyPaint)
+                    if (config.includeTasks && block.content.isNotBlank()) {
+                        ensurePageSpace(22f)
+                        val mark = if (block.isChecked) "[✓]" else "[  ]"
+                        val paint = if (block.isChecked) todoDonePaint else bodyPaint
+                        canvas.drawText("$mark  ${block.content}", marginX, y, paint)
                         y += 18f
                     }
                 }
+
+                BlockType.BULLET_LIST -> {
+                    if (config.includeText && block.content.isNotBlank()) {
+                        ensurePageSpace(20f)
+                        canvas.drawText("•   ${block.content}", marginX + 6f, y, bodyPaint)
+                        y += 18f
+                    }
+                }
+
+                BlockType.CALLOUT -> {
+                    if (config.includeText && block.content.isNotBlank()) {
+                        ensurePageSpace(26f)
+                        canvas.drawText("${block.calloutIcon}   ${block.content}", marginX, y, calloutPaint)
+                        y += 20f
+                    }
+                }
+
+                BlockType.TOGGLE -> {
+                    if (config.includeText && block.content.isNotBlank()) {
+                        ensurePageSpace(24f)
+                        canvas.drawText("▸  ${block.content}", marginX, y, h2Paint)
+                        y += 18f
+                        if (block.toggleBody.isNotBlank()) {
+                            ensurePageSpace(20f)
+                            canvas.drawText("    ${block.toggleBody}", marginX, y, bodyPaint)
+                            y += 18f
+                        }
+                    }
+                }
+
+                BlockType.IMAGE -> {
+                    val imgPath = block.mediaPath
+                    if (config.includeImages && !imgPath.isNullOrBlank()) {
+                        val bitmap = decodeSampledBitmap(imgPath, 515, 260)
+                        if (bitmap != null) {
+                            val aspect = bitmap.height.toFloat() / bitmap.width.toFloat()
+                            val drawWidth = contentWidth.coerceAtMost(bitmap.width.toFloat())
+                            val drawHeight = (drawWidth * aspect).coerceIn(40f, 250f)
+
+                            ensurePageSpace(drawHeight + 18f)
+
+                            val dstRect = RectF(marginX, y, marginX + drawWidth, y + drawHeight)
+                            canvas.drawRoundRect(dstRect, 8f, 8f, imageBorderPaint)
+                            canvas.drawBitmap(bitmap, null, dstRect, null)
+                            y += drawHeight + 16f
+                        }
+                    }
+                }
+
+                BlockType.DRAWING -> {
+                    val drawingPath = block.mediaPath
+                    if (config.includeDrawings && !drawingPath.isNullOrBlank()) {
+                        val bitmap = decodeSampledBitmap(drawingPath, 515, 240)
+                        if (bitmap != null) {
+                            val aspect = bitmap.height.toFloat() / bitmap.width.toFloat()
+                            val drawWidth = contentWidth.coerceAtMost(bitmap.width.toFloat())
+                            val drawHeight = (drawWidth * aspect).coerceIn(40f, 220f)
+
+                            ensurePageSpace(drawHeight + 18f)
+
+                            val dstRect = RectF(marginX, y, marginX + drawWidth, y + drawHeight)
+                            canvas.drawRoundRect(dstRect, 8f, 8f, imageBorderPaint)
+                            canvas.drawBitmap(bitmap, null, dstRect, null)
+                            y += drawHeight + 16f
+                        }
+                    }
+                }
+
+                BlockType.AUDIO -> {
+                    if (config.includeAudioBadge) {
+                        val badgeHeight = 44f
+                        ensurePageSpace(badgeHeight + 14f)
+
+                        val badgeRect = RectF(marginX, y, marginX + contentWidth, y + badgeHeight)
+                        canvas.drawRoundRect(badgeRect, 8f, 8f, audioBgPaint)
+                        canvas.drawRoundRect(badgeRect, 8f, 8f, audioBorderPaint)
+
+                        canvas.drawText("🎙️  Ses Kaydı Eki (Audio Attachment)", marginX + 14f, y + 18f, audioTitlePaint)
+                        val fileName = block.mediaPath?.substringAfterLast("/") ?: "Ses_Kaydi.mp4"
+                        canvas.drawText("Dosya: $fileName  •  PureNoteIt Yerleşik Ses Dosyası", marginX + 14f, y + 33f, audioSubPaint)
+                        y += badgeHeight + 14f
+                    }
+                }
+
                 BlockType.TABLE -> {
-                    if (block.tableData.isNotEmpty()) {
-                        y += 6f
+                    if (config.includeText && block.tableData.isNotEmpty()) {
+                        val tableHeight = block.tableData.size * 18f + 10f
+                        ensurePageSpace(tableHeight)
                         block.tableData.forEachIndexed { rIdx, row ->
                             val rowText = row.joinToString("   |   ")
                             val paint = if (rIdx == 0) h2Paint else bodyPaint
                             canvas.drawText(rowText, marginX, y, paint)
-                            y += 16f
+                            y += 17f
                         }
                         y += 8f
                     }
                 }
+
                 BlockType.DIVIDER -> {
-                    y += 6f
-                    canvas.drawLine(marginX, y, 555f, y, dividerPaint)
-                    y += 16f
+                    ensurePageSpace(14f)
+                    canvas.drawLine(marginX, y, marginX + contentWidth, y, dividerPaint)
+                    y += 14f
                 }
+
                 else -> {
-                    if (block.content.isNotBlank()) {
-                        canvas.drawText(block.content, marginX, y, bodyPaint)
-                        y += 18f
+                    if (config.includeText && block.content.isNotBlank()) {
+                        // Word-wrap long paragraphs if needed
+                        val words = block.content.split(" ")
+                        var currentLine = ""
+                        for (word in words) {
+                            val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+                            if (bodyPaint.measureText(testLine) > contentWidth) {
+                                ensurePageSpace(18f)
+                                canvas.drawText(currentLine, marginX, y, bodyPaint)
+                                y += 17f
+                                currentLine = word
+                            } else {
+                                currentLine = testLine
+                            }
+                        }
+                        if (currentLine.isNotEmpty()) {
+                            ensurePageSpace(18f)
+                            canvas.drawText(currentLine, marginX, y, bodyPaint)
+                            y += 18f
+                        }
                     }
                 }
             }
         }
 
+        // Draw last page footer
+        canvas.drawText("Sayfa $pageNumber", pageWidth / 2f, 815f, pageNumberPaint)
         pdfDocument.finishPage(page)
 
         try {
@@ -207,6 +469,7 @@ object NoteExporter {
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/pdf"
                 putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, title)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(Intent.createChooser(shareIntent, "PDF Olarak Paylaş"))
