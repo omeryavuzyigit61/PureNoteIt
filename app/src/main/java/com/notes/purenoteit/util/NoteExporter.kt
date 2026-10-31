@@ -5,9 +5,11 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
+import android.media.ExifInterface
 import androidx.core.content.FileProvider
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
@@ -88,7 +90,36 @@ object NoteExporter {
     }
 
     /**
-     * Safely decodes a bitmap from disk with appropriate sampling to prevent OOM.
+     * Inspects EXIF orientation metadata and rotates the bitmap so it is upright.
+     */
+    private fun rotateBitmapIfRequired(bitmap: Bitmap, path: String): Bitmap {
+        return try {
+            val exif = ExifInterface(path)
+            val orientation = exif.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+            val matrix = Matrix()
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+                ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+                ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+                ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.preScale(-1f, 1f)
+                ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.preScale(1f, -1f)
+                else -> return bitmap
+            }
+            val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            if (rotated != bitmap) {
+                bitmap.recycle()
+            }
+            rotated
+        } catch (e: Exception) {
+            bitmap
+        }
+    }
+
+    /**
+     * Safely decodes a bitmap from disk with appropriate sampling and EXIF rotation to prevent OOM and orientation bugs.
      */
     private fun decodeSampledBitmap(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
         return try {
@@ -96,9 +127,19 @@ object NoteExporter {
             BitmapFactory.decodeFile(path, options)
             if (options.outWidth <= 0 || options.outHeight <= 0) return null
 
+            var isSwapped = false
+            try {
+                val exif = ExifInterface(path)
+                val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+                isSwapped = (orientation == ExifInterface.ORIENTATION_ROTATE_90 || orientation == ExifInterface.ORIENTATION_ROTATE_270)
+            } catch (ignored: Exception) {}
+
+            val rawWidth = if (isSwapped) options.outHeight else options.outWidth
+            val rawHeight = if (isSwapped) options.outWidth else options.outHeight
+
             var inSampleSize = 1
-            val halfHeight = options.outHeight / 2
-            val halfWidth = options.outWidth / 2
+            val halfHeight = rawHeight / 2
+            val halfWidth = rawWidth / 2
             while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
                 inSampleSize *= 2
             }
@@ -107,7 +148,8 @@ object NoteExporter {
                 this.inSampleSize = inSampleSize
                 inPreferredConfig = Bitmap.Config.RGB_565
             }
-            BitmapFactory.decodeFile(path, decodeOptions)
+            val decoded = BitmapFactory.decodeFile(path, decodeOptions) ?: return null
+            rotateBitmapIfRequired(decoded, path)
         } catch (e: Exception) {
             null
         }
@@ -353,15 +395,34 @@ object NoteExporter {
                 BlockType.IMAGE -> {
                     val imgPath = block.mediaPath
                     if (config.includeImages && !imgPath.isNullOrBlank()) {
-                        val bitmap = decodeSampledBitmap(imgPath, 515, 260)
+                        val bitmap = decodeSampledBitmap(imgPath, 515, 420)
                         if (bitmap != null) {
-                            val aspect = bitmap.height.toFloat() / bitmap.width.toFloat()
-                            val drawWidth = contentWidth.coerceAtMost(bitmap.width.toFloat())
-                            val drawHeight = (drawWidth * aspect).coerceIn(40f, 250f)
+                            val bitmapW = bitmap.width.toFloat()
+                            val bitmapH = bitmap.height.toFloat()
+                            val aspect = bitmapH / bitmapW
+
+                            val maxAllowedW = contentWidth // 515f
+                            val maxAllowedH = 380f // Max height on standard A4 page
+
+                            val (drawWidth, drawHeight) = if (aspect > 1f) {
+                                // Dikey (Portrait): Yükseklik 380'i geçmeyecek, genişlik oranlı küçülecek
+                                val h = maxAllowedH.coerceAtMost(maxAllowedW * aspect)
+                                val w = h / aspect
+                                Pair(w, h)
+                            } else {
+                                // Yatay (Landscape) veya Kare: Genişlik sayfaya sığacak, yükseklik oranlı hesaplanacak
+                                val w = maxAllowedW.coerceAtMost(bitmapW)
+                                val h = w * aspect
+                                val finalH = h.coerceAtMost(maxAllowedH)
+                                val finalW = if (h > maxAllowedH) maxAllowedH / aspect else w
+                                Pair(finalW, finalH)
+                            }
 
                             ensurePageSpace(drawHeight + 18f)
 
-                            val dstRect = RectF(marginX, y, marginX + drawWidth, y + drawHeight)
+                            // Sayfada yatay olarak tam ortala
+                            val drawX = marginX + (contentWidth - drawWidth) / 2f
+                            val dstRect = RectF(drawX, y, drawX + drawWidth, y + drawHeight)
                             canvas.drawRoundRect(dstRect, 8f, 8f, imageBorderPaint)
                             canvas.drawBitmap(bitmap, null, dstRect, null)
                             y += drawHeight + 16f
@@ -372,15 +433,31 @@ object NoteExporter {
                 BlockType.DRAWING -> {
                     val drawingPath = block.mediaPath
                     if (config.includeDrawings && !drawingPath.isNullOrBlank()) {
-                        val bitmap = decodeSampledBitmap(drawingPath, 515, 240)
+                        val bitmap = decodeSampledBitmap(drawingPath, 515, 340)
                         if (bitmap != null) {
-                            val aspect = bitmap.height.toFloat() / bitmap.width.toFloat()
-                            val drawWidth = contentWidth.coerceAtMost(bitmap.width.toFloat())
-                            val drawHeight = (drawWidth * aspect).coerceIn(40f, 220f)
+                            val bitmapW = bitmap.width.toFloat()
+                            val bitmapH = bitmap.height.toFloat()
+                            val aspect = bitmapH / bitmapW
+
+                            val maxAllowedW = contentWidth
+                            val maxAllowedH = 320f
+
+                            val (drawWidth, drawHeight) = if (aspect > 1f) {
+                                val h = maxAllowedH.coerceAtMost(maxAllowedW * aspect)
+                                val w = h / aspect
+                                Pair(w, h)
+                            } else {
+                                val w = maxAllowedW.coerceAtMost(bitmapW)
+                                val h = w * aspect
+                                val finalH = h.coerceAtMost(maxAllowedH)
+                                val finalW = if (h > maxAllowedH) maxAllowedH / aspect else w
+                                Pair(finalW, finalH)
+                            }
 
                             ensurePageSpace(drawHeight + 18f)
 
-                            val dstRect = RectF(marginX, y, marginX + drawWidth, y + drawHeight)
+                            val drawX = marginX + (contentWidth - drawWidth) / 2f
+                            val dstRect = RectF(drawX, y, drawX + drawWidth, y + drawHeight)
                             canvas.drawRoundRect(dstRect, 8f, 8f, imageBorderPaint)
                             canvas.drawBitmap(bitmap, null, dstRect, null)
                             y += drawHeight + 16f

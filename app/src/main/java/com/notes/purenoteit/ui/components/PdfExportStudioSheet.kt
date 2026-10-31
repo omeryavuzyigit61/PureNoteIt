@@ -391,7 +391,7 @@ fun PdfExportStudioSheet(
                                             Surface(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .height(90.dp)
+                                                    .heightIn(min = 60.dp, max = 150.dp)
                                                     .padding(vertical = 4.dp)
                                                     .clip(RoundedCornerShape(6.dp)),
                                                 shape = RoundedCornerShape(6.dp),
@@ -401,7 +401,7 @@ fun PdfExportStudioSheet(
                                                 AsyncImage(
                                                     model = File(block.mediaPath ?: ""),
                                                     contentDescription = "Görsel Önizleme",
-                                                    contentScale = ContentScale.Crop,
+                                                    contentScale = ContentScale.Fit,
                                                     modifier = Modifier.fillMaxWidth()
                                                 )
                                             }
