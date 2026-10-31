@@ -391,4 +391,46 @@
     <string name="clear">Temizle</string>
     <string name="new_note">Yeni Not</string>
     <string name="share">Paylaş</string>
+
+    <!-- App Shortcuts -->
+    <string name="shortcut_new_note_short">Yeni Not</string>
+    <string name="shortcut_new_note_long">Hızlı Yeni Not Oluştur</string>
+    <string name="shortcut_voice_short">Sesli Dikte</string>
+    <string name="shortcut_voice_long">Sesli Not &amp; Canlı Dikte</string>
+    <string name="shortcut_ocr_short">Metin Tara</string>
+    <string name="shortcut_ocr_long">Kamera ile Metin Tara (OCR)</string>
+    <string name="shortcut_agenda_short">Günün Ajandası</string>
+    <string name="shortcut_agenda_long">Bugünün Ajandasını Aç</string>
+
+    <!-- Templates Hub -->
+    <string name="drawer_template_hub">Şablon Galerisi</string>
+    <string name="drawer_template_hub_sub">Toplantı, bütçe, seyahat ve sprint şablonları</string>
+    <string name="template_hub_title">Şablon Galerisi</string>
+    <string name="template_hub_subtitle">Notunuzu tek dokunuşla profesyonel şablonlarla başlatın</string>
+    <string name="template_use_btn">Şablonu Kullan</string>
+    <string name="template_banner_title">✨ Hazır Şablon ile Başla</string>
+    <string name="template_banner_desc">Toplantı, Bütçe, İnceleme veya Seyahat şablonu seçin...</string>
+    <string name="template_applied_toast">\"%1$s\" şablonu uygulandı!</string>
+    <string name="template_meeting_title">Toplantı Notları</string>
+    <string name="template_meeting_desc">Gündem, katılımcılar, kararlar ve görev dağılımı</string>
+    <string name="template_budget_title">Aylık Bütçe Planı</string>
+    <string name="template_budget_desc">Dinamik tablo ve otomatik dip toplamlı harcama planı</string>
+    <string name="template_review_title">Kitap &amp; Medya İncelemesi</string>
+    <string name="template_review_desc">Puanlama, özet, alıntılar ve gizli bölüm notları</string>
+    <string name="template_travel_title">Seyahat &amp; Bavul Listesi</string>
+    <string name="template_travel_desc">Pasaport, bilet kontrolü ve kategorize bavul listesi</string>
+    <string name="template_goals_title">Haftalık Hedefler &amp; Sprint</string>
+    <string name="template_goals_desc">Öncelikli P1/P2 hedefleri ve kişisel alışkanlıklar</string>
+    <string name="slash_template_title">Şablon Ekle</string>
+    <string name="slash_template_desc">Hazır toplantı, bütçe veya seyahat şablonu yükleyin</string>
+
+    <!-- Smart Filter Chips -->
+    <string name="filter_all">Tümü</string>
+    <string name="filter_pinned">Sabitlenenler</string>
+    <string name="filter_locked">Kilitliler</string>
+    <string name="filter_reminders">Alarmlılar</string>
+    <string name="filter_photos">Fotoğraflılar</string>
+    <string name="filter_audio">Ses Kayıtlılar</string>
+    <string name="filter_tasks">Görevler</string>
+    <string name="filter_tables">Tablolular</string>
 </resources>

@@ -33,7 +33,7 @@ import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.VibrantOrange
 
 data class SlashItem(
-    val type: BlockType,
+    val type: BlockType?,
     val title: String,
     val subtitle: String,
     val iconRes: Int
@@ -43,22 +43,26 @@ data class SlashItem(
 @Composable
 fun NotionSlashDialog(
     onDismiss: () -> Unit,
-    onSelectBlock: (BlockType) -> Unit
+    onSelectBlock: (BlockType) -> Unit,
+    onOpenTemplateHub: (() -> Unit)? = null
 ) {
-    val items = listOf(
-        SlashItem(BlockType.PARAGRAPH, stringResource(R.string.slash_text_title), stringResource(R.string.slash_text_desc), R.drawable.file_edit),
-        SlashItem(BlockType.HEADING_1, stringResource(R.string.slash_h1_title), stringResource(R.string.slash_h1_desc), R.drawable.ic_format_h1),
-        SlashItem(BlockType.HEADING_2, stringResource(R.string.slash_h2_title), stringResource(R.string.slash_h2_desc), R.drawable.ic_format_h2),
-        SlashItem(BlockType.TODO, stringResource(R.string.slash_todo_title), stringResource(R.string.slash_todo_desc), R.drawable.ic_checklist),
-        SlashItem(BlockType.BULLET_LIST, stringResource(R.string.slash_bullet_title), stringResource(R.string.slash_bullet_desc), R.drawable.ic_format_bullet),
-        SlashItem(BlockType.CALLOUT, stringResource(R.string.slash_callout_title), stringResource(R.string.slash_callout_desc), R.drawable.ic_format_quote),
-        SlashItem(BlockType.TOGGLE, stringResource(R.string.slash_toggle_title), stringResource(R.string.slash_toggle_desc), R.drawable.arrow_right),
-        SlashItem(BlockType.TABLE, stringResource(R.string.slash_table_title), stringResource(R.string.slash_table_desc), R.drawable.ic_table),
-        SlashItem(BlockType.WEB_BOOKMARK, stringResource(R.string.slash_bookmark_title), stringResource(R.string.slash_bookmark_desc), R.drawable.category),
-        SlashItem(BlockType.SUB_PAGE, stringResource(R.string.slash_subpage_title), stringResource(R.string.slash_subpage_desc), R.drawable.ic_subpage),
-        SlashItem(BlockType.DRAWING, stringResource(R.string.slash_drawing_title), stringResource(R.string.slash_drawing_desc), R.drawable.ic_brush),
-        SlashItem(BlockType.DIVIDER, stringResource(R.string.slash_divider_title), stringResource(R.string.slash_divider_desc), R.drawable.cancel)
-    )
+    val items = buildList {
+        add(SlashItem(BlockType.PARAGRAPH, stringResource(R.string.slash_text_title), stringResource(R.string.slash_text_desc), R.drawable.file_edit))
+        if (onOpenTemplateHub != null) {
+            add(SlashItem(null, stringResource(R.string.slash_template_title), stringResource(R.string.slash_template_desc), R.drawable.calendar))
+        }
+        add(SlashItem(BlockType.HEADING_1, stringResource(R.string.slash_h1_title), stringResource(R.string.slash_h1_desc), R.drawable.ic_format_h1))
+        add(SlashItem(BlockType.HEADING_2, stringResource(R.string.slash_h2_title), stringResource(R.string.slash_h2_desc), R.drawable.ic_format_h2))
+        add(SlashItem(BlockType.TODO, stringResource(R.string.slash_todo_title), stringResource(R.string.slash_todo_desc), R.drawable.ic_checklist))
+        add(SlashItem(BlockType.BULLET_LIST, stringResource(R.string.slash_bullet_title), stringResource(R.string.slash_bullet_desc), R.drawable.ic_format_bullet))
+        add(SlashItem(BlockType.CALLOUT, stringResource(R.string.slash_callout_title), stringResource(R.string.slash_callout_desc), R.drawable.ic_format_quote))
+        add(SlashItem(BlockType.TOGGLE, stringResource(R.string.slash_toggle_title), stringResource(R.string.slash_toggle_desc), R.drawable.arrow_right))
+        add(SlashItem(BlockType.TABLE, stringResource(R.string.slash_table_title), stringResource(R.string.slash_table_desc), R.drawable.ic_table))
+        add(SlashItem(BlockType.WEB_BOOKMARK, stringResource(R.string.slash_bookmark_title), stringResource(R.string.slash_bookmark_desc), R.drawable.category))
+        add(SlashItem(BlockType.SUB_PAGE, stringResource(R.string.slash_subpage_title), stringResource(R.string.slash_subpage_desc), R.drawable.ic_subpage))
+        add(SlashItem(BlockType.DRAWING, stringResource(R.string.slash_drawing_title), stringResource(R.string.slash_drawing_desc), R.drawable.ic_brush))
+        add(SlashItem(BlockType.DIVIDER, stringResource(R.string.slash_divider_title), stringResource(R.string.slash_divider_desc), R.drawable.cancel))
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -88,8 +92,12 @@ fun NotionSlashDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                onSelectBlock(item.type)
                                 onDismiss()
+                                if (item.type != null) {
+                                    onSelectBlock(item.type)
+                                } else {
+                                    onOpenTemplateHub?.invoke()
+                                }
                             }
                             .padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically

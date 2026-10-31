@@ -41,6 +41,8 @@ class MainActivity : AppCompatActivity() {
     private val noteViewModel: NoteViewModel by viewModels()
     private val categoryViewModel: CategoryViewModel by viewModels()
 
+    private var activeIntent by mutableStateOf<Intent?>(null)
+
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LanguageManager.wrapContext(newBase))
     }
@@ -48,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        activeIntent = intent
         val openNoteId = intent.getIntExtra("OPEN_NOTE_ID", -1)
         if (openNoteId != -1) {
             AlarmSoundPlayer.stop()
@@ -62,6 +65,8 @@ class MainActivity : AppCompatActivity() {
         }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        activeIntent = intent
 
         // Ensure default categories exist and notes are loaded
         categoryViewModel.seedDefaultCategories()
@@ -84,14 +89,33 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         val navController = rememberNavController()
 
-                        val openNoteId = intent?.getIntExtra("OPEN_NOTE_ID", -1) ?: -1
-                        val widgetAction = intent?.getStringExtra("WIDGET_ACTION")
-                        LaunchedEffect(openNoteId, widgetAction) {
-                            if (openNoteId != -1) {
-                                AlarmSoundPlayer.stop()
-                                navController.navigate("note_detail/$openNoteId")
-                            } else if (widgetAction != null) {
-                                navController.navigate("note_detail/-1")
+                        LaunchedEffect(activeIntent) {
+                            val currentIntent = activeIntent
+                            if (currentIntent != null) {
+                                val openNoteId = currentIntent.getIntExtra("OPEN_NOTE_ID", -1)
+                                val widgetAction = currentIntent.getStringExtra("WIDGET_ACTION")
+                                if (openNoteId != -1) {
+                                    AlarmSoundPlayer.stop()
+                                    navController.navigate("note_detail/$openNoteId")
+                                } else if (widgetAction != null) {
+                                    when (widgetAction) {
+                                        "DAILY_AGENDA" -> {
+                                            noteViewModel.createDailyAgenda { newNote ->
+                                                navController.navigate("note_detail/${newNote.id}")
+                                            }
+                                        }
+                                        "VOICE_NOTE" -> {
+                                            navController.navigate("note_detail/-1?autoVoice=true")
+                                        }
+                                        "OCR_SCAN" -> {
+                                            navController.navigate("note_detail/-1?autoOcr=true")
+                                        }
+                                        else -> {
+                                            navController.navigate("note_detail/-1")
+                                        }
+                                    }
+                                }
+                                activeIntent = null
                             }
                         }
 
@@ -124,7 +148,7 @@ class MainActivity : AppCompatActivity() {
                             }
 
                             composable(
-                                route = "note_detail/{noteId}?initialDate={initialDate}",
+                                route = "note_detail/{noteId}?initialDate={initialDate}&autoVoice={autoVoice}&autoOcr={autoOcr}",
                                 arguments = listOf(
                                     navArgument("noteId") {
                                         type = NavType.IntType
@@ -133,14 +157,27 @@ class MainActivity : AppCompatActivity() {
                                     navArgument("initialDate") {
                                         type = NavType.LongType
                                         defaultValue = -1L
+                                    },
+                                    navArgument("autoVoice") {
+                                        type = NavType.BoolType
+                                        defaultValue = false
+                                    },
+                                    navArgument("autoOcr") {
+                                        type = NavType.BoolType
+                                        defaultValue = false
                                     }
                                 )
                             ) { backStackEntry ->
                                 val noteId = backStackEntry.arguments?.getInt("noteId") ?: -1
                                 val initialDate = backStackEntry.arguments?.getLong("initialDate") ?: -1L
+                                val autoVoice = backStackEntry.arguments?.getBoolean("autoVoice") ?: false
+                                val autoOcr = backStackEntry.arguments?.getBoolean("autoOcr") ?: false
+
                                 NoteDetailScreen(
                                     noteId = noteId,
                                     initialDate = initialDate,
+                                    autoVoice = autoVoice,
+                                    autoOcr = autoOcr,
                                     noteViewModel = noteViewModel,
                                     categoryViewModel = categoryViewModel,
                                     onNavigateBack = {

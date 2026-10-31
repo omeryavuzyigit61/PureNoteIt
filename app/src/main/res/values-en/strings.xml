@@ -391,4 +391,46 @@
     <string name="clear">Clear</string>
     <string name="new_note">New Note</string>
     <string name="share">Share</string>
+
+    <!-- App Shortcuts -->
+    <string name="shortcut_new_note_short">New Note</string>
+    <string name="shortcut_new_note_long">Create Quick Note</string>
+    <string name="shortcut_voice_short">Voice Note</string>
+    <string name="shortcut_voice_long">Voice Note &amp; Live Dictation</string>
+    <string name="shortcut_ocr_short">Scan Text</string>
+    <string name="shortcut_ocr_long">Scan Text with Camera (OCR)</string>
+    <string name="shortcut_agenda_short">Daily Agenda</string>
+    <string name="shortcut_agenda_long">Open Today\'s Agenda</string>
+
+    <!-- Templates Hub -->
+    <string name="drawer_template_hub">Template Gallery</string>
+    <string name="drawer_template_hub_sub">Meeting, budget, travel, and sprint templates</string>
+    <string name="template_hub_title">Template Gallery</string>
+    <string name="template_hub_subtitle">Kickstart your note with professional templates</string>
+    <string name="template_use_btn">Use Template</string>
+    <string name="template_banner_title">✨ Start with a Template</string>
+    <string name="template_banner_desc">Choose Meeting, Budget, Review, or Travel template...</string>
+    <string name="template_applied_toast">\"%1$s\" template applied!</string>
+    <string name="template_meeting_title">Meeting Notes</string>
+    <string name="template_meeting_desc">Agenda, attendees, decisions, and action items</string>
+    <string name="template_budget_title">Monthly Budget Plan</string>
+    <string name="template_budget_desc">Dynamic table with automatic expense totals</string>
+    <string name="template_review_title">Book &amp; Media Review</string>
+    <string name="template_review_desc">Ratings, summary, quotes, and spoiler toggles</string>
+    <string name="template_travel_title">Travel &amp; Packing List</string>
+    <string name="template_travel_desc">Passport, tickets, and categorized packing list</string>
+    <string name="template_goals_title">Weekly Goals &amp; Sprint</string>
+    <string name="template_goals_desc">Prioritized P1/P2 goals and personal habits</string>
+    <string name="slash_template_title">Insert Template</string>
+    <string name="slash_template_desc">Load a ready meeting, budget, or travel template</string>
+
+    <!-- Smart Filter Chips -->
+    <string name="filter_all">All</string>
+    <string name="filter_pinned">Pinned</string>
+    <string name="filter_locked">Locked</string>
+    <string name="filter_reminders">Reminders</string>
+    <string name="filter_photos">Photos</string>
+    <string name="filter_audio">Audio Notes</string>
+    <string name="filter_tasks">Tasks</string>
+    <string name="filter_tables">Tables</string>
 </resources>

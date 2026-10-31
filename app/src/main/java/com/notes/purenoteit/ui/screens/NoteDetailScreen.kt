@@ -74,6 +74,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -120,6 +121,7 @@ import com.notes.purenoteit.ui.components.NotionToolbar
 import com.notes.purenoteit.ui.components.PdfExportStudioSheet
 import com.notes.purenoteit.ui.components.ReminderBottomSheet
 import com.notes.purenoteit.ui.components.SpotifyAudioVisualizer
+import com.notes.purenoteit.ui.components.TemplateHubSheet
 import com.notes.purenoteit.ui.components.ZenReadingModeView
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
@@ -145,6 +147,8 @@ import java.util.Locale
 fun NoteDetailScreen(
     noteId: Int,
     initialDate: Long = -1L,
+    autoVoice: Boolean = false,
+    autoOcr: Boolean = false,
     noteViewModel: NoteViewModel,
     categoryViewModel: CategoryViewModel,
     onNavigateBack: () -> Unit,
@@ -235,6 +239,9 @@ fun NoteDetailScreen(
     // Dialog sheets
     var showEmojiSheet by remember { mutableStateOf(false) }
     var showSlashSheet by remember { mutableStateOf(false) }
+    var showTemplateSheet by remember { mutableStateOf(false) }
+    var autoVoiceHandled by rememberSaveable { mutableStateOf(false) }
+    var autoOcrHandled by rememberSaveable { mutableStateOf(false) }
     var showDrawingSheet by remember { mutableStateOf(false) }
     var showExportSheet by remember { mutableStateOf(false) }
     var showOcrSourceSheet by remember { mutableStateOf(false) }
@@ -683,6 +690,22 @@ fun NoteDetailScreen(
                 isVoiceDictating = false
                 liveVoiceText = ""
             }
+        }
+    }
+
+    LaunchedEffect(autoVoice) {
+        if (autoVoice && !autoVoiceHandled) {
+            autoVoiceHandled = true
+            delay(400)
+            handleToggleVoiceDictation()
+        }
+    }
+
+    LaunchedEffect(autoOcr) {
+        if (autoOcr && !autoOcrHandled) {
+            autoOcrHandled = true
+            delay(400)
+            checkCameraAndLaunch()
         }
     }
 
@@ -1679,6 +1702,69 @@ fun NoteDetailScreen(
                     }
                 }
 
+                // Notion Ready-to-Use Templates Hub Banner (Visible on fresh/empty notes)
+                val isNoteEmpty = noteId == -1 && blocks.all { it.content.isBlank() && it.mediaPath == null }
+                if (isNoteEmpty) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { showTemplateSheet = true },
+                        shape = RoundedCornerShape(16.dp),
+                        color = SoftOrangeLight.copy(alpha = 0.45f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.35f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(PureWhite),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = "✨", fontSize = 20.sp)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.template_banner_title),
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = stringResource(R.string.template_banner_desc),
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 11.5.sp
+                                    )
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = VibrantOrange
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.template_use_btn),
+                                    color = PureWhite,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
@@ -1826,6 +1912,30 @@ fun NoteDetailScreen(
                 } else {
                     blocks.add(NoteBlock(type = type, content = ""))
                 }
+            },
+            onOpenTemplateHub = {
+                showTemplateSheet = true
+            }
+        )
+    }
+
+    // Template Hub BottomSheet
+    if (showTemplateSheet) {
+        TemplateHubSheet(
+            onDismiss = { showTemplateSheet = false },
+            onSelectTemplate = { selectedTemplate ->
+                showTemplateSheet = false
+                recordUndoState()
+                val templateBlocks = selectedTemplate.buildBlocks(context)
+                blocks.clear()
+                blocks.addAll(templateBlocks)
+                if (title.isBlank()) {
+                    title = selectedTemplate.getDefaultTitle(context)
+                }
+                if (selectedIcon == null) {
+                    selectedIcon = selectedTemplate.icon
+                }
+                context.showToastShort(context.getString(R.string.template_applied_toast, context.getString(selectedTemplate.titleRes)))
             }
         )
     }

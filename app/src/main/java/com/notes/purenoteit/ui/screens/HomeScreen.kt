@@ -125,6 +125,7 @@ import com.notes.purenoteit.ui.components.NotionListView
 import com.notes.purenoteit.ui.components.NotionNoteCard
 import com.notes.purenoteit.ui.components.NotionStreamView
 import com.notes.purenoteit.ui.components.NotionWhiteboardView
+import com.notes.purenoteit.ui.components.TemplateHubSheet
 import com.notes.purenoteit.ui.components.TrashBinSheet
 import com.notes.purenoteit.ui.components.VaultBackupRestoreDialog
 import com.notes.purenoteit.ui.theme.BorderLight
@@ -141,6 +142,17 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+enum class SmartFilter(val titleRes: Int, val iconRes: Int) {
+    ALL(R.string.filter_all, R.drawable.category),
+    PINNED(R.string.filter_pinned, R.drawable.ic_pin),
+    LOCKED(R.string.filter_locked, R.drawable.lock),
+    REMINDERS(R.string.filter_reminders, R.drawable.ic_alarm_clock),
+    PHOTOS(R.string.filter_photos, R.drawable.picture),
+    AUDIO(R.string.filter_audio, R.drawable.microphone_lines),
+    TASKS(R.string.filter_tasks, R.drawable.ic_checklist),
+    TABLES(R.string.filter_tables, R.drawable.ic_table)
+}
 
 enum class NotionViewMode(val titleRes: Int, val iconRes: Int) {
     GRID(R.string.tab_cards, R.drawable.category),
@@ -211,6 +223,12 @@ fun HomeScreen(
     // Language Selection Sheet state (Feature 3: Çoklu Dil)
     var showLanguageSheet by remember { mutableStateOf(false) }
 
+    // Template Hub Sheet state (Zirve Özellik 2: Şablon Galerisi)
+    var showTemplateSheet by remember { mutableStateOf(false) }
+
+    // Smart Filter state (Zirve Özellik 3: Hızlı Filtreleme Çipleri)
+    var selectedSmartFilter by remember { mutableStateOf(SmartFilter.ALL) }
+
     // Smart Hashtag filter state (Feature 3)
     var selectedHashtag by remember { mutableStateOf<String?>(null) }
 
@@ -277,7 +295,7 @@ fun HomeScreen(
     }
 
     // Filter notes
-    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles) {
+    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles, selectedSmartFilter) {
         activeNotes.filter { note ->
             val matchesCategory = if (selectedCategory == null) {
                 true
@@ -302,7 +320,26 @@ fun HomeScreen(
             val isSubpage = note.title?.trim()?.lowercase() in subpageTitles
             val matchesSubpageHierarchy = if (searchQuery.isBlank()) !isSubpage else true
 
-            matchesCategory && matchesQuery && matchesHashtag && matchesSubpageHierarchy
+            val matchesSmartFilter = when (selectedSmartFilter) {
+                SmartFilter.ALL -> true
+                SmartFilter.PINNED -> note.isPinned
+                SmartFilter.LOCKED -> (note.isPassword == true || note.isEncrypted)
+                SmartFilter.REMINDERS -> (note.reminderTime != null && note.reminderTime!! > 0L)
+                SmartFilter.PHOTOS -> (!note.images.isNullOrEmpty()) ||
+                        (note.description ?: "").contains("\"type\":\"IMAGE\"") ||
+                        (note.richBlocksJson ?: "").contains("\"type\":\"IMAGE\"") ||
+                        (note.description ?: "").contains("\"type\":\"DRAWING\"")
+                SmartFilter.AUDIO -> (!note.sounds.isNullOrEmpty()) ||
+                        (note.description ?: "").contains("\"type\":\"AUDIO\"") ||
+                        (note.richBlocksJson ?: "").contains("\"type\":\"AUDIO\"")
+                SmartFilter.TASKS -> note.totalTasks > 0 ||
+                        (note.description ?: "").contains("\"type\":\"TODO\"") ||
+                        (note.richBlocksJson ?: "").contains("\"type\":\"TODO\"")
+                SmartFilter.TABLES -> (note.description ?: "").contains("\"type\":\"TABLE\"") ||
+                        (note.richBlocksJson ?: "").contains("\"type\":\"TABLE\"")
+            }
+
+            matchesCategory && matchesQuery && matchesHashtag && matchesSubpageHierarchy && matchesSmartFilter
         }
     }
 
@@ -454,6 +491,21 @@ fun HomeScreen(
                                 drawerState.close()
                                 showAgendaConfirmDialog = true
                             }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Menu Item: Templates Hub (Şablon Galerisi)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.category,
+                        title = stringResource(R.string.drawer_template_hub),
+                        subtitle = stringResource(R.string.drawer_template_hub_sub),
+                        badge = "PRO",
+                        badgeColor = VibrantOrange,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            showTemplateSheet = true
                         }
                     )
 
@@ -714,6 +766,51 @@ fun HomeScreen(
                                             selectedCategory = category.name
                                         }
                                     )
+                                }
+                            }
+
+                            // Horizontal Smart Filter Chips (Zirve Özellik 3: Hızlı Filtreleme Çipleri)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SmartFilter.values().forEach { filter ->
+                                    val isFilterSelected = selectedSmartFilter == filter
+                                    Surface(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                focusManager.clearFocus()
+                                                keyboardController?.hide()
+                                                selectedSmartFilter = filter
+                                            },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isFilterSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        border = if (!isFilterSelected) androidx.compose.foundation.BorderStroke(0.6.dp, BorderLight.copy(alpha = 0.6f)) else null
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(id = filter.iconRes),
+                                                contentDescription = null,
+                                                tint = if (isFilterSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(5.dp))
+                                            Text(
+                                                text = stringResource(filter.titleRes),
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isFilterSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isFilterSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -1226,6 +1323,25 @@ fun HomeScreen(
             onDismiss = { showLanguageSheet = false }
         )
     }
+
+    // Template Hub Sheet (Zirve Özellik 2: Şablon Galerisi)
+    if (showTemplateSheet) {
+        TemplateHubSheet(
+            onDismiss = { showTemplateSheet = false },
+            onSelectTemplate = { selectedTemplate ->
+                showTemplateSheet = false
+                val newNote = NoteData(
+                    title = selectedTemplate.getDefaultTitle(context),
+                    description = BlockParser.serialize(selectedTemplate.buildBlocks(context)),
+                    date = System.currentTimeMillis(),
+                    icon = selectedTemplate.icon
+                )
+                noteViewModel.saveNote(newNote, contentForLinks = null) { generatedId ->
+                    onNavigateToAddNote(generatedId)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1233,6 +1349,8 @@ private fun DrawerMenuTile(
     iconRes: Int,
     title: String,
     subtitle: String,
+    badge: String? = null,
+    badgeColor: Color = VibrantOrange,
     onClick: () -> Unit
 ) {
     Surface(
@@ -1282,6 +1400,21 @@ private fun DrawerMenuTile(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+            if (badge != null) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = badgeColor
+                ) {
+                    Text(
+                        text = badge,
+                        color = PureWhite,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
         }
     }

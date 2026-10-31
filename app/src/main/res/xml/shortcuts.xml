@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="shortcut_new_note"
+        android:enabled="true"
+        android:icon="@drawable/file_edit"
+        android:shortcutShortLabel="@string/shortcut_new_note_short"
+        android:shortcutLongLabel="@string/shortcut_new_note_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.notes.purenoteit"
+            android:targetClass="com.notes.purenoteit.view.MainActivity">
+            <extra android:name="WIDGET_ACTION" android:value="NEW_NOTE" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="shortcut_voice_note"
+        android:enabled="true"
+        android:icon="@drawable/microphone_lines"
+        android:shortcutShortLabel="@string/shortcut_voice_short"
+        android:shortcutLongLabel="@string/shortcut_voice_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.notes.purenoteit"
+            android:targetClass="com.notes.purenoteit.view.MainActivity">
+            <extra android:name="WIDGET_ACTION" android:value="VOICE_NOTE" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="shortcut_ocr_scan"
+        android:enabled="true"
+        android:icon="@drawable/ic_ocr_scan"
+        android:shortcutShortLabel="@string/shortcut_ocr_short"
+        android:shortcutLongLabel="@string/shortcut_ocr_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.notes.purenoteit"
+            android:targetClass="com.notes.purenoteit.view.MainActivity">
+            <extra android:name="WIDGET_ACTION" android:value="OCR_SCAN" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="shortcut_daily_agenda"
+        android:enabled="true"
+        android:icon="@drawable/calendar"
+        android:shortcutShortLabel="@string/shortcut_agenda_short"
+        android:shortcutLongLabel="@string/shortcut_agenda_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.notes.purenoteit"
+            android:targetClass="com.notes.purenoteit.view.MainActivity">
+            <extra android:name="WIDGET_ACTION" android:value="DAILY_AGENDA" />
+        </intent>
+    </shortcut>
+</shortcuts>
