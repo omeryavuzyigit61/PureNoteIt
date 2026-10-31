@@ -82,13 +82,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import android.os.Build
 import com.notes.purenoteit.R
@@ -233,6 +245,30 @@ fun NoteDetailScreen(
     var showStatusMenu by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
+
+    // Gatekeeper & Vault Security states
+    var loadedNoteRef by remember { mutableStateOf<NoteData?>(null) }
+    var isAccessGranted by remember(noteId) { mutableStateOf(noteId == -1 || SecurityUtil.isVaultUnlocked) }
+    var showGatekeeperPinDialog by remember { mutableStateOf(false) }
+    var gatekeeperPinInput by remember { mutableStateOf("") }
+    var gatekeeperSuccessAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, isPassword) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (isPassword && !SecurityUtil.isVaultUnlocked) {
+                    isAccessGranted = false
+                    blocks.clear()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     var showLinkNotePicker by remember { mutableStateOf(false) }
     var linkSearchQuery by remember { mutableStateOf("") }
     val allNotesForLinking by noteViewModel.noteList.observeAsState(emptyList())
@@ -301,17 +337,98 @@ fun NoteDetailScreen(
         }
     }
 
+    fun populateNoteBlocks(note: NoteData) {
+        val rawDesc = if (note.isEncrypted) {
+            SecurityUtil.decrypt(note.description ?: "")
+        } else {
+            note.description ?: ""
+        }
+        blocks.clear()
+        val parsed = BlockParser.parse(rawDesc)
+        blocks.addAll(parsed)
+
+        // Add existing images and sounds as blocks if not already included
+        note.images?.forEach { imgPath ->
+            if (blocks.none { it.mediaPath == imgPath }) {
+                blocks.add(NoteBlock(type = BlockType.IMAGE, mediaPath = imgPath))
+            }
+        }
+        note.sounds?.forEach { soundPath ->
+            if (blocks.none { it.mediaPath == soundPath }) {
+                blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = soundPath))
+            }
+        }
+
+        if (blocks.isEmpty()) {
+            blocks.add(NoteBlock())
+        }
+    }
+
+    fun requestGatekeeperUnlock(onSuccess: (() -> Unit)? = null) {
+        if (SecurityUtil.isVaultUnlocked) {
+            isAccessGranted = true
+            onSuccess?.invoke()
+            return
+        }
+        val activity = context as? FragmentActivity
+        if (activity != null) {
+            val biometricManager = BiometricManager.from(context)
+            val canAuth = biometricManager.canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            if (canAuth == BiometricManager.BIOMETRIC_SUCCESS) {
+                val prompt = BiometricPrompt(
+                    activity,
+                    ContextCompat.getMainExecutor(context),
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                            SecurityUtil.unlockVault()
+                            isAccessGranted = true
+                            onSuccess?.invoke() ?: run {
+                                loadedNoteRef?.let { populateNoteBlocks(it) }
+                            }
+                        }
+                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                            gatekeeperSuccessAction = onSuccess
+                            showGatekeeperPinDialog = true
+                        }
+                    }
+                )
+                prompt.authenticate(
+                    BiometricPrompt.PromptInfo.Builder()
+                        .setTitle("Korumalı Not")
+                        .setSubtitle("Devam etmek için parmak izinizi okutun")
+                        .setNegativeButtonText("PIN Girin")
+                        .build()
+                )
+            } else {
+                gatekeeperSuccessAction = onSuccess
+                showGatekeeperPinDialog = true
+            }
+        } else {
+            gatekeeperSuccessAction = onSuccess
+            showGatekeeperPinDialog = true
+        }
+    }
+
     fun navigateToNoteByTitle(targetTitle: String) {
         val trimmed = if (targetTitle.isBlank()) "Yeni Alt Sayfa" else targetTitle.trim()
         val found = allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
         if (found != null) {
-            onNavigateToNote?.invoke(found.id)
+            if (found.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+                requestGatekeeperUnlock {
+                    onNavigateToNote?.invoke(found.id)
+                }
+            } else {
+                onNavigateToNote?.invoke(found.id)
+            }
         } else {
             val newNote = NoteData(
                 title = trimmed,
                 description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
                 date = System.currentTimeMillis(),
-                categoryId = selectedCategoryId
+                categoryId = selectedCategoryId,
+                icon = "📄"
             )
             noteViewModel.saveNote(newNote, contentForLinks = null) { newId ->
                 context.showToastShort("\"$trimmed\" oluşturuldu ve açıldı")
@@ -326,6 +443,7 @@ fun NoteDetailScreen(
     LaunchedEffect(noteId) {
         if (noteId != -1) {
             noteViewModel.getNoteById(noteId).subscribe({ note ->
+                loadedNoteRef = note
                 title = note.title ?: ""
                 selectedIcon = note.icon
                 isPassword = note.isPassword ?: false
@@ -338,35 +456,21 @@ fun NoteDetailScreen(
                 reminderSound = note.reminderSound ?: "default"
                 isReminderDone = note.isReminderDone
 
-                val rawDesc = if (note.isEncrypted) {
-                    SecurityUtil.decrypt(note.description ?: "")
+                if (note.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+                    isAccessGranted = false
+                    blocks.clear()
+                    requestGatekeeperUnlock {
+                        populateNoteBlocks(note)
+                    }
                 } else {
-                    note.description ?: ""
-                }
-
-                blocks.clear()
-                val parsed = BlockParser.parse(rawDesc)
-                blocks.addAll(parsed)
-
-                // Add existing images and sounds as blocks if not already included
-                note.images?.forEach { imgPath ->
-                    if (blocks.none { it.mediaPath == imgPath }) {
-                        blocks.add(NoteBlock(type = BlockType.IMAGE, mediaPath = imgPath))
-                    }
-                }
-                note.sounds?.forEach { soundPath ->
-                    if (blocks.none { it.mediaPath == soundPath }) {
-                        blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = soundPath))
-                    }
-                }
-
-                if (blocks.isEmpty()) {
-                    blocks.add(NoteBlock())
+                    isAccessGranted = true
+                    populateNoteBlocks(note)
                 }
             }, { error ->
                 android.util.Log.e("NoteDetailScreen", "Error loading note $noteId: ${error.message}")
             })
         } else {
+            isAccessGranted = true
             blocks.clear()
             blocks.add(NoteBlock())
         }
@@ -582,6 +686,7 @@ fun NoteDetailScreen(
     }
 
     fun saveNote() {
+        if (isPassword && !isAccessGranted) return
         val jsonContent = BlockParser.serialize(blocks)
 
         // Calculate tasks count
@@ -655,7 +760,102 @@ fun NoteDetailScreen(
         onNavigateBack()
     }
 
-    if (isZenMode) {
+    if (!isAccessGranted && isPassword) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    modifier = Modifier.statusBarsPadding(),
+                    title = {},
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.arrow_left),
+                                contentDescription = "Geri",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    }
+                )
+            }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = VibrantOrange.copy(alpha = 0.12f),
+                            modifier = Modifier.size(72.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(text = "🔒", fontSize = 36.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(
+                            text = "Korumalı Not (AES-256)",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Bu not şifrelenmiştir. Görüntülemek için kasanızın kilidini açın.",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = {
+                                requestGatekeeperUnlock {
+                                    loadedNoteRef?.let { populateNoteBlocks(it) }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = VibrantOrange)
+                        ) {
+                            Text(
+                                text = "Kasanın Kilidini Aç",
+                                fontWeight = FontWeight.Bold,
+                                color = PureWhite
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Geri Dön",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    } else if (isZenMode) {
         ZenReadingModeView(
             title = title,
             icon = selectedIcon,
@@ -1569,7 +1769,15 @@ fun NoteDetailScreen(
                                 Surface(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
-                                        .clickable { onNavigateToNote?.invoke(bNote.id) },
+                                        .clickable {
+                                            if (bNote.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+                                                requestGatekeeperUnlock {
+                                                    onNavigateToNote?.invoke(bNote.id)
+                                                }
+                                            } else {
+                                                onNavigateToNote?.invoke(bNote.id)
+                                            }
+                                        },
                                     shape = RoundedCornerShape(12.dp),
                                     color = MaterialTheme.colorScheme.surface,
                                     border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
@@ -2410,5 +2618,72 @@ fun NoteDetailScreen(
             }
         )
     }
+    }
+
+    // Gatekeeper PIN fallback dialog (Bitwarden Security)
+    if (showGatekeeperPinDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showGatekeeperPinDialog = false
+                gatekeeperPinInput = ""
+                gatekeeperSuccessAction = null
+            },
+            title = {
+                Text(text = "PIN Girin", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Korumalı notu açmak için 6 haneli PIN kodunuzu girin.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = gatekeeperPinInput,
+                        onValueChange = { if (it.length <= 10) gatekeeperPinInput = it },
+                        label = { Text("PIN Kodu") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (SecurityUtil.verifyPassword(context, gatekeeperPinInput)) {
+                            SecurityUtil.unlockVault()
+                            isAccessGranted = true
+                            showGatekeeperPinDialog = false
+                            val pendingAction = gatekeeperSuccessAction
+                            gatekeeperSuccessAction = null
+                            gatekeeperPinInput = ""
+                            pendingAction?.invoke() ?: run {
+                                loadedNoteRef?.let { populateNoteBlocks(it) }
+                            }
+                        } else {
+                            context.showToastShort("Hatalı PIN!")
+                            gatekeeperPinInput = ""
+                        }
+                    }
+                ) {
+                    Text("Onayla", fontWeight = FontWeight.Bold, color = VibrantOrange)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showGatekeeperPinDialog = false
+                        gatekeeperPinInput = ""
+                        gatekeeperSuccessAction = null
+                    }
+                ) {
+                    Text("İptal")
+                }
+            }
+        )
     }
 }

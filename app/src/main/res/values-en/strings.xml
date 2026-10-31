@@ -1,4 +1,63 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">PureNoteIt</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="open">Open</string>
+    <string name="close">Close</string>
+    <string name="settings">Settings</string>
+    <string name="tema">Theme</string>
+    <string name="save">Save</string>
+    <string name="category_setting">Category Settings</string>
+    <string name="search_category">Enter Category</string>
+    <string name="current_password">Current Password</string>
+    <string name="new_password">New Password</string>
+    <string name="new_repeat_password">Confirm New Password</string>
+    <string name="you_entered_the_current_password_incorrectly">Current password entered incorrectly</string>
+    <string name="select_date">Select Date</string>
+    <string name="stop_sond">Stop Recording</string>
+    <string name="start_sound">Start Recording</string>
+    <string name="please_enter_category">Please enter a category name</string>
+    <string name="category_added">Category Added</string>
+    <string name="please_confirm_category">Please confirm the category first</string>
+    <string name="titleanddescritionenter">Please fill in title and description</string>
+    <string name="please_talk">Please speak</string>
+    <string name="devicenotsound">Speech recognition not supported on device</string>
+    <string name="saving_sound">Recording audio....</string>
+    <string name="saved_sound">Audio Saved</string>
 
+    <!-- Navigation Drawer -->
+    <string name="drawer_category_mgmt">Category Management</string>
+    <string name="drawer_category_mgmt_sub">Manage and lock categories</string>
+    <string name="drawer_pin_vault">PIN &amp; Vault Lock</string>
+    <string name="drawer_pin_vault_sub">Bitwarden security settings</string>
+    <string name="drawer_daily_agenda">Daily Agenda</string>
+    <string name="drawer_daily_agenda_sub">Generate automated daily agenda template</string>
+    <string name="drawer_graph_view">2D Knowledge Graph</string>
+    <string name="drawer_graph_view_sub">Visual note connection map</string>
+    <string name="drawer_stream_view">Timeline Stream</string>
+    <string name="drawer_stream_view_sub">Quick thought &amp; idea stream</string>
+    <string name="drawer_whiteboard">Infinite Whiteboard</string>
+    <string name="drawer_whiteboard_sub">Draggable cards and visual diagram</string>
+    <string name="drawer_vault_center">Vault Backup &amp; Restore</string>
+    <string name="drawer_vault_center_sub">Backup vault and restore data</string>
+    <string name="drawer_trash_bin">Trash Bin</string>
+    <string name="drawer_language">Language / Dil</string>
+    <string name="drawer_dark_mode">Dark Mode</string>
+
+    <!-- View Mode Tabs -->
+    <string name="tab_cards">Cards</string>
+    <string name="tab_list">List</string>
+    <string name="tab_board">Board</string>
+    <string name="tab_calendar">Calendar</string>
+    <string name="tab_graph">Graph</string>
+    <string name="tab_whiteboard">Canvas</string>
+    <string name="tab_stream">Stream</string>
+
+    <!-- Subpage & Security -->
+    <string name="subpage_badge">Sub-pages</string>
+    <string name="locked_note_title">Protected Note (AES-256)</string>
+    <string name="locked_note_subtitle">This note is encrypted. Scan your fingerprint or enter PIN to view.</string>
+    <string name="unlock_button">Unlock Note</string>
+    <string name="go_back">Go Back</string>
+    <string name="enter_pin">Enter PIN</string>
 </resources>

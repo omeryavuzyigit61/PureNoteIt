@@ -1,29 +1,63 @@
 <resources>
     <string name="app_name">PureNoteIt</string>
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="delete">Sil</string>
     <string name="edit">Düzenle</string>
-    <string name="open">Open</string>
-    <string name="close">Close</string>
+    <string name="open">Aç</string>
+    <string name="close">Kapat</string>
     <string name="settings">Ayarlar</string>
     <string name="tema">Tema</string>
+    <string name="save">Kaydet</string>
     <string name="category_setting">Kategori Ayarları</string>
     <string name="search_category">Kategori Giriniz</string>
     <string name="current_password">Mevcut Şifre</string>
     <string name="new_password">Yeni Şifre</string>
     <string name="new_repeat_password">Yeni Şifre Tekrar</string>
     <string name="you_entered_the_current_password_incorrectly">Mevcut Şifreyi Yanlış Girdiniz</string>
-    <string name="save">Kaydet</string>
     <string name="select_date">Tarih Seçiniz</string>
     <string name="stop_sond">Kaydı Durdur</string>
     <string name="start_sound">Kaydı Başlat</string>
     <string name="please_enter_category">Lütfen bir kategori adı giriniz</string>
     <string name="category_added">Kategori Eklendi</string>
-    <string name="please_confirm_category">Lütfen önce kategoriyi onaylıyınız</string>
+    <string name="please_confirm_category">Lütfen önce kategoriyi onaylayınız</string>
     <string name="titleanddescritionenter">Başlık ve açıklama alanlarını doldurunuz</string>
     <string name="please_talk">Lütfen konuşun</string>
     <string name="devicenotsound">Cihazınızda ses tanıma desteklenmiyor</string>
     <string name="saving_sound">Ses Kaydediliyor....</string>
     <string name="saved_sound">Ses Kaydedildi</string>
+
+    <!-- Navigation Drawer -->
+    <string name="drawer_category_mgmt">Kategori Yönetimi</string>
+    <string name="drawer_category_mgmt_sub">Kategorileri yönet ve kilitle</string>
+    <string name="drawer_pin_vault">PIN &amp; Kasa Kilidi</string>
+    <string name="drawer_pin_vault_sub">Bitwarden güvenlik ayarları</string>
+    <string name="drawer_daily_agenda">Günün Ajandası</string>
+    <string name="drawer_daily_agenda_sub">Otomatik günlük plan şablonu oluştur</string>
+    <string name="drawer_graph_view">2D Bilgi Ağı (Graph View)</string>
+    <string name="drawer_graph_view_sub">Notlar arası bağlantı haritası</string>
+    <string name="drawer_stream_view">Zaman Tüneli (Stream View)</string>
+    <string name="drawer_stream_view_sub">Hızlı düşünce ve fikir akışı</string>
+    <string name="drawer_whiteboard">Sonsuz Tuval (Whiteboard)</string>
+    <string name="drawer_whiteboard_sub">Sürüklenebilir kartlar ve görsel harita</string>
+    <string name="drawer_vault_center">Kasa Yedekleme &amp; Geri Yükleme</string>
+    <string name="drawer_vault_center_sub">Yedek al ve verileri geri yükle</string>
+    <string name="drawer_trash_bin">Çöp Kutusu</string>
+    <string name="drawer_language">Dil Seçimi / Language</string>
+    <string name="drawer_dark_mode">Karanlık Mod</string>
+
+    <!-- View Mode Tabs -->
+    <string name="tab_cards">Kartlar</string>
+    <string name="tab_list">Liste</string>
+    <string name="tab_board">Pano</string>
+    <string name="tab_calendar">Takvim</string>
+    <string name="tab_graph">Ağ</string>
+    <string name="tab_whiteboard">Tuval</string>
+    <string name="tab_stream">Akış</string>
+
+    <!-- Subpage & Security -->
+    <string name="subpage_badge">Alt Sayfa</string>
+    <string name="locked_note_title">Korumalı Not (AES-256)</string>
+    <string name="locked_note_subtitle">Bu not şifrelenmiştir. Görüntülemek için parmak izinizi okutun veya PIN girin.</string>
+    <string name="unlock_button">Kilidi Aç</string>
+    <string name="go_back">Geri Dön</string>
+    <string name="enter_pin">PIN Girin</string>
 </resources>

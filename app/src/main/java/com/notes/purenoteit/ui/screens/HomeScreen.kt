@@ -102,6 +102,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -114,6 +115,9 @@ import androidx.fragment.app.FragmentActivity
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
+import com.notes.purenoteit.model.BlockParser
+import com.notes.purenoteit.model.BlockType
+import com.notes.purenoteit.ui.components.LanguageSelectionSheet
 import com.notes.purenoteit.ui.components.NotionCalendarView
 import com.notes.purenoteit.ui.components.NotionGraphView
 import com.notes.purenoteit.ui.components.NotionKanbanBoard
@@ -128,6 +132,7 @@ import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
 import com.notes.purenoteit.ui.theme.VibrantOrange
+import com.notes.purenoteit.util.LanguageManager
 import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.showToastShort
 import com.notes.purenoteit.viewmodel.CategoryViewModel
@@ -203,6 +208,9 @@ fun HomeScreen(
     // Trash Bin Sheet state (Feature 2)
     var showTrashBinSheet by remember { mutableStateOf(false) }
 
+    // Language Selection Sheet state (Feature 3: Çoklu Dil)
+    var showLanguageSheet by remember { mutableStateOf(false) }
+
     // Smart Hashtag filter state (Feature 3)
     var selectedHashtag by remember { mutableStateOf<String?>(null) }
 
@@ -255,8 +263,21 @@ fun HomeScreen(
         }.distinct()
     }
 
+    // Extract all sub-page titles across active notes (Seçenek A: Notion Tarzı Hiyerarşik Gizleme)
+    val subpageTitles = remember(activeNotes) {
+        activeNotes.flatMap { note ->
+            try {
+                val blocks = BlockParser.parse(note.description ?: "")
+                blocks.filter { it.type == BlockType.SUB_PAGE && it.content.isNotBlank() }
+                    .map { it.content.trim().lowercase() }
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }.toSet()
+    }
+
     // Filter notes
-    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag) {
+    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles) {
         activeNotes.filter { note ->
             val matchesCategory = if (selectedCategory == "Tümü") {
                 true
@@ -277,7 +298,11 @@ fun HomeScreen(
                 val text = (note.title ?: "") + " " + (note.description ?: "")
                 text.contains(selectedHashtag!!, ignoreCase = true)
             }
-            matchesCategory && matchesQuery && matchesHashtag
+            // Notion Hiyerarşik Gizleme: Alt sayfalar ana ekranda gizlenir; arama yapıldığında ise doğrudan bulunur!
+            val isSubpage = note.title?.trim()?.lowercase() in subpageTitles
+            val matchesSubpageHierarchy = if (searchQuery.isBlank()) !isSubpage else true
+
+            matchesCategory && matchesQuery && matchesHashtag && matchesSubpageHierarchy
         }
     }
 
@@ -494,6 +519,19 @@ fun HomeScreen(
                         onClick = {
                             scope.launch { drawerState.close() }
                             showTrashBinSheet = true
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Menu Item: Language Selection (Çoklu Dil)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.category,
+                        title = "Dil Seçimi / Language",
+                        subtitle = LanguageManager.getLanguageLabel(context),
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            showLanguageSheet = true
                         }
                     )
 
@@ -1179,6 +1217,13 @@ fun HomeScreen(
                 context.showToastShort("Çöp kutusu boşaltıldı")
             },
             onDismiss = { showTrashBinSheet = false }
+        )
+    }
+
+    // Language Selection Sheet (Çoklu Dil)
+    if (showLanguageSheet) {
+        LanguageSelectionSheet(
+            onDismiss = { showLanguageSheet = false }
         )
     }
 }

@@ -388,6 +388,18 @@ fun NotionNoteCard(
                 }
             }
 
+            // Subpage count (Seçenek A: Notion Hiyerarşisi Rozeti)
+            val subpageCount = remember(note.description) {
+                if (isProtected) 0 else {
+                    try {
+                        val blocks = BlockParser.parse(note.description ?: "")
+                        blocks.count { it.type == com.notes.purenoteit.model.BlockType.SUB_PAGE && it.content.isNotBlank() }
+                    } catch (e: Exception) {
+                        0
+                    }
+                }
+            }
+
             // Smart Hashtags (Feature 3)
             val hashtags = remember(note.title, note.description) {
                 if (isProtected) emptyList() else {
@@ -401,13 +413,36 @@ fun NotionNoteCard(
                 }
             }
 
-            if (hashtags.isNotEmpty()) {
+            if (subpageCount > 0 || hashtags.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Subpage pill
+                    if (subpageCount > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFFEDE7F6),
+                            border = BorderStroke(0.5.dp, Color(0xFFB39DDB))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "📄", fontSize = 10.sp)
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "$subpageCount Alt Sayfa",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF5E35B1)
+                                )
+                            }
+                        }
+                    }
+
                     for (tag in hashtags) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
