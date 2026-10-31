@@ -53,6 +53,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -341,14 +342,15 @@ fun HomeScreen(
                 modifier = Modifier
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .width(320.dp),
+                    .width(300.dp),
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
                 ) {
                     // Modern App Logo & Brand Header
                     Row(
@@ -551,7 +553,7 @@ fun HomeScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     // Footer
                     Text(
@@ -561,6 +563,8 @@ fun HomeScreen(
                         lineHeight = 16.sp,
                         modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                     )
+
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }
