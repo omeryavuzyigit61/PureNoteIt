@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">PureNoteIt</string>
+    <string name="app_slogan">The purest form of your thoughts</string>
     <string name="delete">Delete</string>
     <string name="edit">Edit</string>
     <string name="open">Open</string>

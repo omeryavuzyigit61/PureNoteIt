@@ -45,10 +45,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.R
+import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
 import com.notes.purenoteit.ui.theme.VibrantOrange
@@ -200,22 +202,14 @@ fun AnimatedSplashScreen(
         modifier = Modifier
             .fillMaxSize()
             .alpha(exitAlpha.value)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.background,
-                        SoftOrangeLight.copy(alpha = 0.35f)
-                    )
-                )
-            ),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Central Logo with Animated Neon Glow Rings & Orbiting Particles
+            // Central Logo with Animated Glow Rings & Orbiting Particles
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(240.dp)
@@ -227,10 +221,10 @@ fun AnimatedSplashScreen(
                         .scale(wave2Scale)
                         .alpha(wave2Alpha)
                         .clip(CircleShape)
-                        .border(1.5.dp, VibrantOrange.copy(alpha = 0.5f), CircleShape)
+                        .border(1.dp, VibrantOrange.copy(alpha = 0.25f), CircleShape)
                         .background(
                             Brush.radialGradient(
-                                colors = listOf(VibrantOrange.copy(alpha = 0.15f), Color.Transparent)
+                                colors = listOf(VibrantOrange.copy(alpha = 0.08f), Color.Transparent)
                             )
                         )
                 )
@@ -242,10 +236,10 @@ fun AnimatedSplashScreen(
                         .scale(wave1Scale)
                         .alpha(wave1Alpha)
                         .clip(CircleShape)
-                        .border(2.dp, Color(0xFFFFB03A), CircleShape)
+                        .border(1.dp, VibrantOrange.copy(alpha = 0.35f), CircleShape)
                         .background(
                             Brush.radialGradient(
-                                colors = listOf(SoftOrangeLight, Color.Transparent)
+                                colors = listOf(VibrantOrange.copy(alpha = 0.12f), Color.Transparent)
                             )
                         )
                 )
@@ -264,14 +258,14 @@ fun AnimatedSplashScreen(
 
                         // Outer particle glow
                         drawCircle(
-                            color = VibrantOrange.copy(alpha = 0.4f),
-                            radius = 6f,
+                            color = VibrantOrange.copy(alpha = 0.35f),
+                            radius = 5f,
                             center = Offset(px, py)
                         )
                         // Inner bright core
                         drawCircle(
                             color = Color(0xFFFFE082),
-                            radius = 2.8f,
+                            radius = 2.4f,
                             center = Offset(px, py)
                         )
                     }
@@ -283,19 +277,13 @@ fun AnimatedSplashScreen(
                         .size(108.dp)
                         .scale(logoScale.value * breathingScale)
                         .alpha(logoAlpha.value),
-                    shape = RoundedCornerShape(30.dp),
-                    color = PureWhite,
-                    shadowElevation = 14.dp,
-                    border = androidx.compose.foundation.BorderStroke(2.dp, VibrantOrange.copy(alpha = 0.6f))
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.6f))
                 ) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(PureWhite, SoftOrangeLight.copy(alpha = 0.5f))
-                                )
-                            ),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
@@ -304,15 +292,15 @@ fun AnimatedSplashScreen(
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .size(76.dp)
-                                .clip(RoundedCornerShape(22.dp))
+                                .clip(RoundedCornerShape(20.dp))
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
-            // Cinematic App Name with Shimmer & Slide
+            // Cinematic App Name with Clean, Seamless Slogan Typography
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -322,39 +310,27 @@ fun AnimatedSplashScreen(
                 Text(
                     text = "PureNoteIt",
                     fontSize = 32.sp,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onBackground,
-                    letterSpacing = 1.sp
+                    letterSpacing = (-0.5).sp
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // Modern Slogan Badge with Soft Glow
-                Surface(
-                    modifier = Modifier.alpha(badgeAlpha.value),
-                    shape = RoundedCornerShape(16.dp),
-                    color = SoftOrangeLight,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.35f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "✨", fontSize = 12.sp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Düşüncelerinizin En Saf Hali",
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = VibrantOrange
-                        )
-                    }
-                }
+                // Seamless, elegant slogan typography (No clunky border, no awkward gray/orange badge)
+                Text(
+                    text = stringResource(id = R.string.app_slogan),
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                    letterSpacing = 0.4.sp,
+                    modifier = Modifier.alpha(badgeAlpha.value)
+                )
             }
 
-            Spacer(modifier = Modifier.height(44.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
-            // Jumping Neon Wave Dots Indicator
+            // Jumping Wave Dots Indicator
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -362,23 +338,23 @@ fun AnimatedSplashScreen(
                 Box(
                     modifier = Modifier
                         .offset(y = dot1Offset.dp)
-                        .size(7.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
                         .background(VibrantOrange)
                 )
                 Box(
                     modifier = Modifier
                         .offset(y = dot2Offset.dp)
-                        .size(7.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFFFB03A))
+                        .background(VibrantOrange.copy(alpha = 0.65f))
                 )
                 Box(
                     modifier = Modifier
                         .offset(y = dot3Offset.dp)
-                        .size(7.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
-                        .background(VibrantOrange)
+                        .background(VibrantOrange.copy(alpha = 0.35f))
                 )
             }
         }
