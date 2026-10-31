@@ -341,7 +341,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .width(300.dp),
+                    .width(320.dp),
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
             ) {
@@ -475,7 +475,7 @@ fun HomeScreen(
                     DrawerMenuTile(
                         iconRes = R.drawable.lock,
                         title = "Kasa Yedekleme & Geri Yükleme",
-                        subtitle = "Yedek al ve yedekten verileri anında geri çek",
+                        subtitle = "Yedek al ve verileri geri yükle",
                         onClick = {
                             scope.launch { drawerState.close() }
                             showVaultRestoreDialog = true
@@ -1220,12 +1220,18 @@ private fun DrawerMenuTile(
                     text = title,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    fontSize = 11.5.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    lineHeight = 15.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
