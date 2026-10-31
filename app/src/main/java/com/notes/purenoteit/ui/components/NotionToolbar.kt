@@ -84,6 +84,46 @@ fun NotionToolbar(
                 )
             }
 
+            // 1. Sesli Dikte (Voice-to-Text Transcription via SpeechRecognizer) - Front & Center
+            ToolbarItem(
+                iconRes = R.drawable.microphone_lines,
+                label = if (isVoiceDictating) "Dinleniyor..." else "Sesli Dikte",
+                onClick = { onVoiceDictation?.invoke() },
+                iconTint = if (isVoiceDictating) Color(0xFF8E24AA) else Color(0xFF6A1B9A),
+                containerColor = if (isVoiceDictating) Color(0xFFEDE7F6) else Color(0xFFF3E5F5)
+            )
+
+            // 2. OCR Metin Tarama (Scan to Text)
+            ToolbarItem(
+                iconRes = R.drawable.ic_ocr_scan,
+                label = "Metin Tara",
+                onClick = { onScanOcr?.invoke() },
+                iconTint = VibrantOrange
+            )
+
+            // 3. El Çizimi Ekleme (Drawing Canvas)
+            ToolbarItem(
+                iconRes = R.drawable.ic_brush,
+                label = "Çizim",
+                onClick = onOpenDrawing
+            )
+
+            // 4. Görev / Checklist (To-Do)
+            ToolbarItem(
+                iconRes = R.drawable.ic_checklist,
+                label = "Görev",
+                onClick = { onAddBlock(BlockType.TODO) },
+                iconTint = VibrantOrange
+            )
+
+            // 5. Not Bağla (Bi-directional Link [[Note]])
+            ToolbarItem(
+                iconRes = R.drawable.ic_network_graph,
+                label = "Not Bağla",
+                onClick = { onLinkNote?.invoke() },
+                iconTint = VibrantOrange
+            )
+
             // H1 Başlık (Heading 1) with clear icon & label
             ToolbarItem(
                 iconRes = R.drawable.ic_format_h1,
@@ -96,14 +136,6 @@ fun NotionToolbar(
                 iconRes = R.drawable.ic_format_h2,
                 label = "Başlık 2",
                 onClick = { onAddBlock(BlockType.HEADING_2) }
-            )
-
-            // Görev / Checklist (To-Do)
-            ToolbarItem(
-                iconRes = R.drawable.ic_checklist,
-                label = "Görev",
-                onClick = { onAddBlock(BlockType.TODO) },
-                iconTint = VibrantOrange
             )
 
             // Madde İmleri (Bullet list)
@@ -129,14 +161,6 @@ fun NotionToolbar(
                 iconTint = VibrantOrange
             )
 
-            // Not Bağla (Bi-directional Link [[Note]])
-            ToolbarItem(
-                iconRes = R.drawable.ic_network_graph,
-                label = "Not Bağla",
-                onClick = { onLinkNote?.invoke() },
-                iconTint = VibrantOrange
-            )
-
             // Alt Sayfa (Nested Sub-Page)
             ToolbarItem(
                 iconRes = R.drawable.ic_subpage,
@@ -159,21 +183,6 @@ fun NotionToolbar(
                 onClick = onPickImage
             )
 
-            // OCR Metin Tarama (Scan to Text)
-            ToolbarItem(
-                iconRes = R.drawable.ic_ocr_scan,
-                label = "Metin Tara",
-                onClick = { onScanOcr?.invoke() },
-                iconTint = VibrantOrange
-            )
-
-            // El Çizimi Ekleme (Drawing Canvas)
-            ToolbarItem(
-                iconRes = R.drawable.ic_brush,
-                label = "Çizim",
-                onClick = onOpenDrawing
-            )
-
             // Ses Kaydı (changes visual style when recording)
             ToolbarItem(
                 iconRes = R.drawable.microphone_lines,
@@ -181,15 +190,6 @@ fun NotionToolbar(
                 onClick = onRecordAudio,
                 iconTint = if (isRecordingAudio) Color(0xFFE53935) else VibrantOrange,
                 containerColor = if (isRecordingAudio) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
-            )
-
-            // Sesli Dikte (Voice-to-Text Transcription via SpeechRecognizer)
-            ToolbarItem(
-                iconRes = R.drawable.microphone_lines,
-                label = if (isVoiceDictating) "Dinleniyor..." else "Sesli Dikte",
-                onClick = { onVoiceDictation?.invoke() },
-                iconTint = if (isVoiceDictating) Color(0xFF6200EE) else Color(0xFF2E7D32),
-                containerColor = if (isVoiceDictating) Color(0xFFEDE7F6) else MaterialTheme.colorScheme.surfaceVariant
             )
 
             // Ayırıcı Çizgi (Divider)

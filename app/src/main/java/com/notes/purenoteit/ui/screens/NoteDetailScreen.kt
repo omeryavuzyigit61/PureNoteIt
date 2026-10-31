@@ -526,6 +526,43 @@ fun NoteDetailScreen(
         }
     }
 
+    fun handleToggleVoiceDictation() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        } else {
+            if (!isVoiceDictating) {
+                isVoiceDictating = true
+                liveVoiceText = ""
+                voiceHelper.startListening(
+                    onPartial = { partial -> liveVoiceText = partial },
+                    onResult = { finalResult ->
+                        if (finalResult.isNotBlank()) {
+                            liveVoiceText = finalResult
+                        }
+                    },
+                    onError = { err ->
+                        isVoiceDictating = false
+                        context.showToastShort(err)
+                    }
+                )
+            } else {
+                if (liveVoiceText.isNotBlank()) {
+                    recordUndoState()
+                    blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = liveVoiceText.trim()))
+                    context.showToastShort("Sesli dikte eklendi")
+                }
+                voiceHelper.stopListening()
+                isVoiceDictating = false
+                liveVoiceText = ""
+            }
+        }
+    }
+
     fun saveNote() {
         val jsonContent = BlockParser.serialize(blocks)
 
@@ -990,6 +1027,158 @@ fun NoteDetailScreen(
                     }
                 }
 
+                // VIP Quick Access Action Dock (Sol Alt ve Sağ Alt Hızlı Erişim)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp, start = 2.dp, end = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Sol Alt: Hızlı Geri Al / İleri Al
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(enabled = undoStack.isNotEmpty()) { handleUndo() },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (undoStack.isNotEmpty()) 0.75f else 0.25f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_undo),
+                                    contentDescription = "Geri Al",
+                                    tint = if (undoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(enabled = redoStack.isNotEmpty()) { handleRedo() },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (redoStack.isNotEmpty()) 0.75f else 0.25f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_redo),
+                                    contentDescription = "İleri Al",
+                                    tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Sağ Alt: VIP Butonlar [📷 Tara] [📤 Paylaş] [🎙️ Sesli Dikte]
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Hızlı Metin Tara (OCR)
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { showOcrSourceSheet = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = SoftOrangeLight,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.35f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_ocr_scan),
+                                    contentDescription = "Metin Tara",
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Tara",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            }
+                        }
+
+                        // Hızlı Paylaş / Dışa Aktar
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { showExportSheet = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.share_square),
+                                    contentDescription = "Paylaş",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Paylaş",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // VIP Hızlı Sesli Dikte (Pulsing Purple Glow)
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { handleToggleVoiceDictation() },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isVoiceDictating) Color(0xFF8E24AA) else Color(0xFFF3E5F5),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.5.dp,
+                                if (isVoiceDictating) Color(0xFFBA68C8) else Color(0xFFCE93D8)
+                            ),
+                            shadowElevation = if (isVoiceDictating) 6.dp else 2.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.microphone_lines),
+                                    contentDescription = "Sesli Dikte",
+                                    tint = if (isVoiceDictating) PureWhite else Color(0xFF6A1B9A),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = if (isVoiceDictating) "Dinleniyor..." else "Sesli Dikte",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (isVoiceDictating) PureWhite else Color(0xFF6A1B9A)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 NotionToolbar(
                     onAddBlock = { type ->
                         recordUndoState()
@@ -1009,41 +1198,7 @@ fun NoteDetailScreen(
                     onScanOcr = {
                         showOcrSourceSheet = true
                     },
-                    onVoiceDictation = {
-                        val hasPermission = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.RECORD_AUDIO
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        if (!hasPermission) {
-                            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                        } else {
-                            if (!isVoiceDictating) {
-                                isVoiceDictating = true
-                                liveVoiceText = ""
-                                voiceHelper.startListening(
-                                    onPartial = { partial -> liveVoiceText = partial },
-                                    onResult = { finalResult ->
-                                        if (finalResult.isNotBlank()) {
-                                            liveVoiceText = finalResult
-                                        }
-                                    },
-                                    onError = { err ->
-                                        isVoiceDictating = false
-                                        context.showToastShort(err)
-                                    }
-                                )
-                            } else {
-                                if (liveVoiceText.isNotBlank()) {
-                                    recordUndoState()
-                                    blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = liveVoiceText.trim()))
-                                }
-                                voiceHelper.stopListening()
-                                isVoiceDictating = false
-                                liveVoiceText = ""
-                            }
-                        }
-                    },
+                    onVoiceDictation = { handleToggleVoiceDictation() },
                     isRecordingAudio = isRecordingAudio,
                     isVoiceDictating = isVoiceDictating
                 )
