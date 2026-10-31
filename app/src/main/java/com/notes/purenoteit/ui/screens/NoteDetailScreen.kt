@@ -543,8 +543,14 @@ fun NoteDetailScreen(
             note.id = noteId
         }
 
-        // Save note and safely sync bi-directional [[Note]] links with real SQLite ID (Paket 1)
-        val allContentText = title + " " + blocks.joinToString(" ") { it.content + " " + it.toggleBody }
+        // Save note and safely sync bi-directional [[Note]] & Sub-Page links with real SQLite ID (Paket 1)
+        val allContentText = title + " " + blocks.joinToString(" ") { block ->
+            if (block.type == BlockType.SUB_PAGE && block.content.isNotBlank()) {
+                "[[${block.content.trim()}]]"
+            } else {
+                block.content + " " + block.toggleBody
+            }
+        }
         noteViewModel.saveNote(note, contentForLinks = allContentText) { actualId ->
             if (reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone) {
                 val noteDescPreview = blocks.firstOrNull { it.content.isNotBlank() }?.content ?: ""
