@@ -72,10 +72,13 @@ class MainActivity : AppCompatActivity() {
                         val navController = rememberNavController()
 
                         val openNoteId = intent?.getIntExtra("OPEN_NOTE_ID", -1) ?: -1
-                        LaunchedEffect(openNoteId) {
+                        val widgetAction = intent?.getStringExtra("WIDGET_ACTION")
+                        LaunchedEffect(openNoteId, widgetAction) {
                             if (openNoteId != -1) {
                                 AlarmSoundPlayer.stop()
                                 navController.navigate("note_detail/$openNoteId")
+                            } else if (widgetAction != null) {
+                                navController.navigate("note_detail/-1")
                             }
                         }
 

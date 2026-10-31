@@ -17,6 +17,9 @@ interface NoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertNote(note: NoteData): Single<Long>
 
+    @Query("SELECT * FROM notes")
+    fun getAllNotes(): Single<List<NoteData>>
+
     @Delete
     fun delete(note: NoteData): Completable
 

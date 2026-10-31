@@ -66,6 +66,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -84,6 +85,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -113,6 +115,7 @@ import com.notes.purenoteit.util.AudioRecorder
 import com.notes.purenoteit.util.NoteExporter
 import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.TextRecognitionHelper
+import com.notes.purenoteit.util.VoiceTranscriptionHelper
 import com.notes.purenoteit.util.showToastShort
 import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
@@ -134,6 +137,16 @@ fun NoteDetailScreen(
 ) {
     val context = LocalContext.current
     val audioRecorder = remember { AudioRecorder(context) }
+    val voiceHelper = remember { VoiceTranscriptionHelper(context) }
+    var isVoiceDictating by remember { mutableStateOf(false) }
+    var liveVoiceText by remember { mutableStateOf("") }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceHelper.stopListening()
+        }
+    }
+
     val backlinks by noteViewModel.backlinks.observeAsState(emptyList())
 
     LaunchedEffect(noteId) {
@@ -221,6 +234,22 @@ fun NoteDetailScreen(
     var showLinkNotePicker by remember { mutableStateOf(false) }
     var linkSearchQuery by remember { mutableStateOf("") }
     val allNotesForLinking by noteViewModel.noteList.observeAsState(emptyList())
+
+    // Smart Link Suggestion (Feature 3)
+    val suggestedLinkTitle = remember(blocks.map { it.content }, allNotesForLinking, noteId) {
+        val allText = blocks.joinToString(" ") { it.content + " " + it.toggleBody }
+        val existingLinks = Regex("""\[\[(.*?)\]\]""").findAll(allText).map { it.groupValues[1].trim().lowercase() }.toSet()
+        val subpageTitles = blocks.filter { it.type == BlockType.SUB_PAGE }.map { it.content.trim().lowercase() }.toSet()
+
+        allNotesForLinking.firstOrNull { noteCandidate ->
+            val candidateTitle = noteCandidate.title?.trim() ?: ""
+            candidateTitle.length >= 3 &&
+            noteCandidate.id != noteId &&
+            !existingLinks.contains(candidateTitle.lowercase()) &&
+            !subpageTitles.contains(candidateTitle.lowercase()) &&
+            allText.contains(candidateTitle, ignoreCase = true)
+        }?.title?.trim()
+    }
 
     // Undo / Redo history stacks (Feature 2)
     val undoStack = remember { mutableStateListOf<List<NoteBlock>>() }
@@ -654,10 +683,10 @@ fun NoteDetailScreen(
 
                     Spacer(modifier = Modifier.width(6.dp))
 
-                    // Save Button (Clean, single-line, never wraps)
+                    // Save Button (Clean, single-line, never wraps or squishes)
                     Surface(
                         modifier = Modifier
-                            .padding(end = 12.dp)
+                            .padding(end = 8.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .clickable { saveNote() },
                         shape = RoundedCornerShape(12.dp),
@@ -788,6 +817,179 @@ fun NoteDetailScreen(
                     }
                 }
 
+                // Smart Link Suggestion Banner (Feature 3)
+                AnimatedVisibility(
+                    visible = suggestedLinkTitle != null,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF64B5F6).copy(alpha = 0.7f)),
+                        shadowElevation = 4.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(text = "💡", fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "\"$suggestedLinkTitle\" notuna referans tespit edildi",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        suggestedLinkTitle?.let { titleToLink ->
+                                            recordUndoState()
+                                            var linked = false
+                                            for (i in blocks.indices) {
+                                                val block = blocks[i]
+                                                if (block.content.contains(titleToLink, ignoreCase = true) && !block.content.contains("[[$titleToLink]]", ignoreCase = true)) {
+                                                    val regex = Regex("(?i)\\b" + Regex.escape(titleToLink) + "\\b")
+                                                    val newContent = if (regex.containsMatchIn(block.content)) {
+                                                        regex.replaceFirst(block.content, "[[$titleToLink]]")
+                                                    } else {
+                                                        block.content.replaceFirst(titleToLink, "[[$titleToLink]]", ignoreCase = true)
+                                                    }
+                                                    blocks[i] = block.copy(content = newContent)
+                                                    linked = true
+                                                    break
+                                                }
+                                            }
+                                            if (!linked) {
+                                                blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = "[[$titleToLink]]"))
+                                            }
+                                            context.showToastShort("\"$titleToLink\" bağlandı!")
+                                        }
+                                    },
+                                shape = RoundedCornerShape(8.dp),
+                                color = VibrantOrange
+                            ) {
+                                Text(
+                                    text = "+ Bağla",
+                                    color = PureWhite,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Live Voice Transcription Banner (Feature 1)
+                AnimatedVisibility(
+                    visible = isVoiceDictating,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFFF3E5F5),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCE93D8)),
+                        shadowElevation = 6.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF8E24AA).copy(alpha = pulseAlpha))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Canlı Sesli Dikte (Türkçe)...",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Color(0xFF6A1B9A)
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(
+                                        onClick = {
+                                            voiceHelper.stopListening()
+                                            isVoiceDictating = false
+                                            liveVoiceText = ""
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("İptal", color = Color(0xFF757575), fontSize = 12.sp)
+                                    }
+
+                                    Surface(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                if (liveVoiceText.isNotBlank()) {
+                                                    recordUndoState()
+                                                    blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = liveVoiceText.trim()))
+                                                    context.showToastShort("Metin eklendi")
+                                                }
+                                                voiceHelper.stopListening()
+                                                isVoiceDictating = false
+                                                liveVoiceText = ""
+                                            },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color(0xFF8E24AA)
+                                    ) {
+                                        Text(
+                                            text = "Not'a Ekle",
+                                            color = PureWhite,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = if (liveVoiceText.isBlank()) "Konuşun, söyledikleriniz anında yazıya dönüşsün..." else liveVoiceText,
+                                fontSize = 13.sp,
+                                color = if (liveVoiceText.isBlank()) Color(0xFF9E9E9E) else Color(0xFF212121),
+                                lineHeight = 18.sp,
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
                 NotionToolbar(
                     onAddBlock = { type ->
                         recordUndoState()
@@ -807,7 +1009,43 @@ fun NoteDetailScreen(
                     onScanOcr = {
                         showOcrSourceSheet = true
                     },
-                    isRecordingAudio = isRecordingAudio
+                    onVoiceDictation = {
+                        val hasPermission = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (!hasPermission) {
+                            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        } else {
+                            if (!isVoiceDictating) {
+                                isVoiceDictating = true
+                                liveVoiceText = ""
+                                voiceHelper.startListening(
+                                    onPartial = { partial -> liveVoiceText = partial },
+                                    onResult = { finalResult ->
+                                        if (finalResult.isNotBlank()) {
+                                            liveVoiceText = finalResult
+                                        }
+                                    },
+                                    onError = { err ->
+                                        isVoiceDictating = false
+                                        context.showToastShort(err)
+                                    }
+                                )
+                            } else {
+                                if (liveVoiceText.isNotBlank()) {
+                                    recordUndoState()
+                                    blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = liveVoiceText.trim()))
+                                }
+                                voiceHelper.stopListening()
+                                isVoiceDictating = false
+                                liveVoiceText = ""
+                            }
+                        }
+                    },
+                    isRecordingAudio = isRecordingAudio,
+                    isVoiceDictating = isVoiceDictating
                 )
             }
         },

@@ -13,6 +13,8 @@ import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.repository.KnowledgeRepository
 import com.notes.purenoteit.repository.NoteRepository
+import com.notes.purenoteit.data.db.NoteDatabase
+import com.notes.purenoteit.util.VaultBackupManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -24,7 +26,8 @@ import javax.inject.Inject
 class NoteViewModel @Inject constructor(
     private val repository: NoteRepository,
     private val knowledgeRepository: KnowledgeRepository,
-    private val automationEngine: AutomationEngine
+    private val automationEngine: AutomationEngine,
+    private val db: NoteDatabase
 ) : ViewModel() {
     private val compositeDisposable = CompositeDisposable()
     private val _noteList = MutableLiveData<List<NoteData>>()
@@ -313,6 +316,34 @@ class NoteViewModel @Inject constructor(
             }, {
                 Log.e("NoteViewModel", "Error converting stream to note: ${it.message}")
             }).let { compositeDisposable.add(it) }
+    }
+
+    // --- Vault Backup & Restore (Feature 5) ---
+    fun backupVault(context: android.content.Context, onSuccess: (java.io.File) -> Unit, onError: (Exception) -> Unit) {
+        VaultBackupManager.createBackup(
+            context = context,
+            noteDao = db.getNoteDao(),
+            categoryDao = db.getCategoryDao(),
+            noteLinkDao = db.getNoteLinkDao(),
+            onSuccess = onSuccess,
+            onError = onError
+        )
+    }
+
+    fun restoreVault(context: android.content.Context, uri: android.net.Uri, onSuccess: (Int, Int) -> Unit, onError: (Exception) -> Unit) {
+        VaultBackupManager.restoreBackup(
+            context = context,
+            backupUri = uri,
+            noteDao = db.getNoteDao(),
+            categoryDao = db.getCategoryDao(),
+            noteLinkDao = db.getNoteLinkDao(),
+            onSuccess = { notesCount, catsCount ->
+                getAllNotes()
+                getAllLinks()
+                onSuccess(notesCount, catsCount)
+            },
+            onError = onError
+        )
     }
 
     // --- Automation Triggers ---

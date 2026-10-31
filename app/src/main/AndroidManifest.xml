@@ -15,6 +15,12 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
         android:name=".view.MyApplication"
         android:allowBackup="false"
@@ -71,6 +77,18 @@
         <service
             android:name=".reminder.AlarmSoundService"
             android:exported="false" />
+
+        <!-- Home Screen App Widget (Feature 2) -->
+        <receiver
+            android:name=".widget.PureNoteWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pure_note_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

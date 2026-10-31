@@ -47,7 +47,9 @@ fun NotionToolbar(
     onOpenSlashMenu: () -> Unit,
     onLinkNote: (() -> Unit)? = null,
     onScanOcr: (() -> Unit)? = null,
+    onVoiceDictation: (() -> Unit)? = null,
     isRecordingAudio: Boolean = false,
+    isVoiceDictating: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -179,6 +181,15 @@ fun NotionToolbar(
                 onClick = onRecordAudio,
                 iconTint = if (isRecordingAudio) Color(0xFFE53935) else VibrantOrange,
                 containerColor = if (isRecordingAudio) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            // Sesli Dikte (Voice-to-Text Transcription via SpeechRecognizer)
+            ToolbarItem(
+                iconRes = R.drawable.microphone_lines,
+                label = if (isVoiceDictating) "Dinleniyor..." else "Sesli Dikte",
+                onClick = { onVoiceDictation?.invoke() },
+                iconTint = if (isVoiceDictating) Color(0xFF6200EE) else Color(0xFF2E7D32),
+                containerColor = if (isVoiceDictating) Color(0xFFEDE7F6) else MaterialTheme.colorScheme.surfaceVariant
             )
 
             // Ayırıcı Çizgi (Divider)

@@ -119,6 +119,7 @@ import com.notes.purenoteit.ui.components.NotionKanbanBoard
 import com.notes.purenoteit.ui.components.NotionListView
 import com.notes.purenoteit.ui.components.NotionNoteCard
 import com.notes.purenoteit.ui.components.NotionStreamView
+import com.notes.purenoteit.ui.components.NotionWhiteboardView
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -139,6 +140,7 @@ enum class NotionViewMode(val title: String, val iconRes: Int) {
     BOARD("Pano", R.drawable.category_alt),
     CALENDAR("Takvim", R.drawable.calendar),
     GRAPH("Ağ", R.drawable.ic_network_graph),
+    WHITEBOARD("Tuval", R.drawable.ic_brush),
     STREAM("Akış", R.drawable.ic_stream_timeline)
 }
 
@@ -191,6 +193,30 @@ fun HomeScreen(
     var pendingUnlockNoteId by remember { mutableStateOf<Int?>(null) }
     var showPinDialog by remember { mutableStateOf(false) }
     var enteredPin by remember { mutableStateOf("") }
+
+    // Vault Backup & Restore state (Feature 5)
+    var isBackingUpVault by remember { mutableStateOf(false) }
+    var isRestoringVault by remember { mutableStateOf(false) }
+
+    val restoreVaultLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            isRestoringVault = true
+            noteViewModel.restoreVault(
+                context = context,
+                uri = it,
+                onSuccess = { notesCount, catsCount ->
+                    isRestoringVault = false
+                    context.showToastShort("Yedek başarıyla yüklendi! ($notesCount not, $catsCount kategori)")
+                },
+                onError = { err ->
+                    isRestoringVault = false
+                    context.showToastShort("Geri yükleme hatası: ${err.message}")
+                }
+            )
+        }
+    }
 
     // Dialog state for Daily Agenda Confirmation
     var showAgendaConfirmDialog by remember { mutableStateOf(false) }
@@ -414,6 +440,57 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Menu Item: Infinite Whiteboard (Feature 4)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.ic_brush,
+                        title = "Sonsuz Tuval (Whiteboard)",
+                        subtitle = "Sürüklenebilir kartlar ve görsel harita",
+                        onClick = {
+                            currentViewMode = NotionViewMode.WHITEBOARD
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Menu Item: Vault Backup (Feature 5)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.lock,
+                        title = if (isBackingUpVault) "Yedekleniyor..." else "Kasayı Yedekle (.purevault)",
+                        subtitle = "Tüm notları, medyaları ve şifreleri dışa aktar",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            isBackingUpVault = true
+                            noteViewModel.backupVault(
+                                context = context,
+                                onSuccess = { file ->
+                                    isBackingUpVault = false
+                                    com.notes.purenoteit.util.VaultBackupManager.shareBackupFile(context, file)
+                                    context.showToastShort("Kasa yedeği hazırlandı!")
+                                },
+                                onError = { e ->
+                                    isBackingUpVault = false
+                                    context.showToastShort("Yedekleme hatası: ${e.message}")
+                                }
+                            )
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Menu Item: Vault Restore (Feature 5)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.category,
+                        title = if (isRestoringVault) "Geri Yükleniyor..." else "Kasayı Geri Yükle",
+                        subtitle = ".purevault dosyasından notları içeri aktar",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            restoreVaultLauncher.launch("*/*")
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Menu Item: Dark Mode Switch
                     Surface(
                         modifier = Modifier
@@ -559,7 +636,7 @@ fun HomeScreen(
                         }
 
                         // Horizontal Category Chips (Visible in Grid, List & Board views)
-                        if (currentViewMode != NotionViewMode.CALENDAR && currentViewMode != NotionViewMode.GRAPH && currentViewMode != NotionViewMode.STREAM) {
+                        if (currentViewMode != NotionViewMode.CALENDAR && currentViewMode != NotionViewMode.GRAPH && currentViewMode != NotionViewMode.STREAM && currentViewMode != NotionViewMode.WHITEBOARD) {
                             Spacer(modifier = Modifier.height(10.dp))
 
                             Row(
@@ -629,6 +706,17 @@ fun HomeScreen(
                         notes = filteredNotes,
                         links = allLinks,
                         onNodeClick = handleNoteClick,
+                        isDark = isDarkTheme,
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                }
+
+                NotionViewMode.WHITEBOARD -> {
+                    NotionWhiteboardView(
+                        notes = filteredNotes,
+                        links = allLinks,
+                        onNoteClick = handleNoteClick,
+                        onAddNote = { onNavigateToAddNote(-1) },
                         isDark = isDarkTheme,
                         modifier = Modifier.padding(paddingValues)
                     )
@@ -839,7 +927,7 @@ fun HomeScreen(
             val navBottom = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
             val bottomDockInset = maxOf(imeBottom, navBottom)
 
-            if (currentViewMode != NotionViewMode.STREAM) {
+            if (currentViewMode != NotionViewMode.STREAM && currentViewMode != NotionViewMode.WHITEBOARD) {
                 NotionMobileBottomDock(
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
