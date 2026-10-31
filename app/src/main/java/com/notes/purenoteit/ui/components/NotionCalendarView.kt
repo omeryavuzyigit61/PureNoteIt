@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,17 +64,23 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-private val DAY_LABELS = listOf("Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz")
-private val MONTH_NAMES = listOf(
-    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
-)
+private fun getLocalizedDayLabels(): List<String> {
+    val cal = Calendar.getInstance().apply {
+        set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+    }
+    val sdf = SimpleDateFormat("EEE", Locale.getDefault())
+    return (0..6).map {
+        val label = sdf.format(cal.time)
+        cal.add(Calendar.DAY_OF_WEEK, 1)
+        label.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+    }
+}
 
-enum class CalendarTabMode(val label: String, val dayCount: Int) {
-    FIVE_DAYS("5 Gün", 5),
-    THREE_DAYS("3 Gün", 3),
-    ONE_DAY("1 Gün", 1),
-    MONTH("Aylık", 30)
+enum class CalendarTabMode(val titleRes: Int, val dayCount: Int) {
+    FIVE_DAYS(R.string.cal_5_days, 5),
+    THREE_DAYS(R.string.cal_3_days, 3),
+    ONE_DAY(R.string.cal_1_day, 1),
+    MONTH(R.string.cal_month, 30)
 }
 
 data class CalendarDay(
@@ -214,7 +221,7 @@ fun NotionCalendarView(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "${MONTH_NAMES[displayedCalendar.get(Calendar.MONTH)]} ${displayedCalendar.get(Calendar.YEAR)}",
+                        text = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(displayedCalendar.time),
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -235,7 +242,7 @@ fun NotionCalendarView(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Bugün",
+                                text = stringResource(R.string.cal_today),
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = VibrantOrange
@@ -260,7 +267,7 @@ fun NotionCalendarView(
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.arrow_left),
-                                contentDescription = "Önceki",
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -282,7 +289,7 @@ fun NotionCalendarView(
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.arrow_right),
-                                contentDescription = "Sonraki",
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -313,7 +320,7 @@ fun NotionCalendarView(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = mode.label,
+                                text = stringResource(mode.titleRes),
                                 fontSize = 11.5.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
@@ -631,7 +638,8 @@ private fun NotionMonthScheduleView(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            for (label in DAY_LABELS) {
+            val dayLabels = remember { getLocalizedDayLabels() }
+            for (label in dayLabels) {
                 Text(
                     text = label,
                     fontSize = 12.sp,

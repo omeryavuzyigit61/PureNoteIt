@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -321,7 +322,7 @@ fun NotionWhiteboardView(
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.curveplus),
-                contentDescription = "Yeni Not Ekle",
+                contentDescription = null,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -345,8 +346,9 @@ private fun WhiteboardCard(
             emptyList()
         }
     }
-    val previewText = remember(parsedBlocks) {
-        parsedBlocks.firstOrNull { it.content.isNotBlank() }?.content ?: "İçerik yok"
+    val emptyContentStr = stringResource(R.string.whiteboard_no_content)
+    val previewText = remember(parsedBlocks, emptyContentStr) {
+        parsedBlocks.firstOrNull { it.content.isNotBlank() }?.content ?: emptyContentStr
     }
 
     Surface(
@@ -385,7 +387,7 @@ private fun WhiteboardCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (note.title.isNullOrBlank()) "Başlıksız Not" else note.title!!,
+                            text = if (note.title.isNullOrBlank()) stringResource(R.string.untitled_note) else note.title!!,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -397,7 +399,7 @@ private fun WhiteboardCard(
                     if (note.isPinned) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_pin),
-                            contentDescription = "Sabitlendi",
+                            contentDescription = stringResource(R.string.pin_to_top),
                             tint = VibrantOrange,
                             modifier = Modifier.size(13.dp)
                         )
@@ -435,7 +437,7 @@ private fun WhiteboardCard(
                 }
 
                 Text(
-                    text = "Açmak için dokunun",
+                    text = stringResource(R.string.open),
                     fontSize = 9.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )

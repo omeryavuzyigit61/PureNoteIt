@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -93,7 +94,7 @@ fun ZenReadingModeView(
 
                 // Zen Title
                 Text(
-                    text = if (title.isBlank()) "Başlıksız Not" else title,
+                    text = if (title.isBlank()) stringResource(R.string.untitled_note) else title,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onBackground,
@@ -108,7 +109,7 @@ fun ZenReadingModeView(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "📖 Zen Kitap Okuma Modu",
+                        text = "📖 " + stringResource(R.string.zen_mode_badge),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = VibrantOrange
@@ -119,7 +120,7 @@ fun ZenReadingModeView(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                     Text(
-                        text = "$wordCount kelime",
+                        text = stringResource(R.string.zen_words, wordCount),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -129,7 +130,7 @@ fun ZenReadingModeView(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                     Text(
-                        text = "~$readingTimeMinutes dk okuma",
+                        text = stringResource(R.string.zen_reading_time, readingTimeMinutes),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -171,7 +172,7 @@ fun ZenReadingModeView(
                     Text(text = "🧘", fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Zen Modu",
+                        text = stringResource(R.string.zen_mode_badge),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -191,7 +192,7 @@ fun ZenReadingModeView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "✕ Düzenlemeye Dön",
+                            text = "✕ " + stringResource(R.string.zen_return_edit),
                             color = PureWhite,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
@@ -349,7 +350,7 @@ private fun ZenBlockContent(
                 if (file.exists()) {
                     AsyncImage(
                         model = file,
-                        contentDescription = "Çizim",
+                        contentDescription = stringResource(R.string.tb_drawing),
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -419,7 +420,7 @@ private fun renderAnnotatedMarkdown(raw: String): AnnotatedString {
         }
 
         // Hashtags #...
-        val tagRegex = Regex("""#([a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]+)""")
+        val tagRegex = Regex("""#([a-zA-Z0-9ığüşöçİĞÜŞÖÇ_-]+)""")
         for (match in tagRegex.findAll(raw)) {
             addStyle(
                 SpanStyle(

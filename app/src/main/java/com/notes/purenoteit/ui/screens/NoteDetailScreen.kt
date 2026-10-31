@@ -189,7 +189,7 @@ fun NoteDetailScreen(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (!isGranted) {
-            context.showToastShort("Hatırlatıcılar için bildirim izni gereklidir")
+            context.showToastShort(context.getString(R.string.reminder_perm_required))
         }
     }
 
@@ -324,7 +324,7 @@ fun NoteDetailScreen(
             redoStack.add(blocks.map { it.copy() })
             blocks.clear()
             blocks.addAll(lastState)
-            context.showToastShort("Geri alındı")
+            context.showToastShort(context.getString(R.string.note_undo_toast))
         }
     }
 
@@ -334,7 +334,7 @@ fun NoteDetailScreen(
             undoStack.add(blocks.map { it.copy() })
             blocks.clear()
             blocks.addAll(nextState)
-            context.showToastShort("İleri alındı")
+            context.showToastShort(context.getString(R.string.note_redo_toast))
         }
     }
 
@@ -432,7 +432,7 @@ fun NoteDetailScreen(
                 icon = "📄"
             )
             noteViewModel.saveNote(newNote, contentForLinks = null) { newId ->
-                context.showToastShort("\"$trimmed\" oluşturuldu ve açıldı")
+                context.showToastShort(context.getString(R.string.subpage_created_toast, trimmed))
                 onNavigateToNote?.invoke(newId)
             }
         }
@@ -508,7 +508,7 @@ fun NoteDetailScreen(
                 }
                 blocks.add(NoteBlock(type = BlockType.IMAGE, mediaPath = file.absolutePath))
             } catch (e: Exception) {
-                context.showToastShort("Görsel yüklenemedi")
+                context.showToastShort(context.getString(R.string.image_load_failed))
             }
         }
     }
@@ -530,14 +530,14 @@ fun NoteDetailScreen(
                         for (line in validLines) {
                             blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = line))
                         }
-                        context.showToastShort("Yapay zeka metni çıkardı (${validLines.size} satır)!")
+                        context.showToastShort(context.getString(R.string.ocr_success_toast, validLines.size))
                     } else {
-                        context.showToastShort("Görselde okunabilir metin bulunamadı")
+                        context.showToastShort(context.getString(R.string.ocr_empty_toast))
                     }
                 },
                 onError = { e ->
                     isScanningOcr = false
-                    context.showToastShort("Metin tarama hatası: ${e.message}")
+                    context.showToastShort(context.getString(R.string.ocr_error_toast, e.message ?: ""))
                 }
             )
         }
@@ -560,14 +560,14 @@ fun NoteDetailScreen(
                         for (line in validLines) {
                             blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = line))
                         }
-                        context.showToastShort("Yapay zeka metni çıkardı (${validLines.size} satır)!")
+                        context.showToastShort(context.getString(R.string.ocr_success_toast, validLines.size))
                     } else {
-                        context.showToastShort("Görselde okunabilir metin bulunamadı")
+                        context.showToastShort(context.getString(R.string.ocr_empty_toast))
                     }
                 },
                 onError = { e ->
                     isScanningOcr = false
-                    context.showToastShort("Metin tarama hatası: ${e.message}")
+                    context.showToastShort(context.getString(R.string.ocr_error_toast, e.message ?: ""))
                 }
             )
         }
@@ -585,7 +585,7 @@ fun NoteDetailScreen(
             tempCameraUri = uri
             takePictureLauncher.launch(uri)
         } catch (e: Exception) {
-            context.showToastShort("Kamera başlatılamadı: ${e.message}")
+            context.showToastShort(context.getString(R.string.camera_init_error, e.message ?: ""))
         }
     }
 
@@ -595,7 +595,7 @@ fun NoteDetailScreen(
         if (isGranted) {
             launchCameraOcr()
         } else {
-            context.showToastShort("Kamera ile metin taramak için kamera izni gereklidir")
+            context.showToastShort(context.getString(R.string.ocr_perm_camera_required))
         }
     }
 
@@ -618,7 +618,7 @@ fun NoteDetailScreen(
         if (isGranted) {
             // Permission granted
         } else {
-            context.showToastShort("Ses kaydı için mikrofon izni gereklidir")
+            context.showToastShort(context.getString(R.string.mic_perm_required))
         }
     }
 
@@ -637,14 +637,14 @@ fun NoteDetailScreen(
             val path = audioRecorder.startRecording()
             if (path != null) {
                 isRecordingAudio = true
-                context.showToastShort("Ses kaydı başladı")
+                context.showToastShort(context.getString(R.string.voice_rec_started))
             }
         } else {
             val path = audioRecorder.stopRecording()
             isRecordingAudio = false
             if (path != null) {
                 blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = path))
-                context.showToastShort("Ses kaydı eklendi")
+                context.showToastShort(context.getString(R.string.voice_rec_added))
             }
         }
     }
@@ -677,7 +677,7 @@ fun NoteDetailScreen(
                 if (liveVoiceText.isNotBlank()) {
                     recordUndoState()
                     blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = liveVoiceText.trim()))
-                    context.showToastShort("Sesli dikte eklendi")
+                    context.showToastShort(context.getString(R.string.voice_dict_added))
                 }
                 voiceHelper.stopListening()
                 isVoiceDictating = false
@@ -917,7 +917,7 @@ fun NoteDetailScreen(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.share_square),
-                            contentDescription = "Dışa Aktar",
+                            contentDescription = stringResource(R.string.export),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(19.dp)
                         )
@@ -929,20 +929,20 @@ fun NoteDetailScreen(
                             if (!isPassword) {
                                 if (SecurityUtil.isPasswordSet(context)) {
                                     isPassword = true
-                                    context.showToastShort("Not AES-256 ile şifrelendi")
+                                    context.showToastShort(context.getString(R.string.note_aes_encrypted_toast))
                                 } else {
                                     showPasswordDialog = true
                                 }
                             } else {
                                 isPassword = false
-                                context.showToastShort("Kilit kaldırıldı")
+                                context.showToastShort(context.getString(R.string.note_lock_removed_toast))
                             }
                         },
                         modifier = Modifier.size(34.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = if (isPassword) R.drawable.lock else R.drawable.unlock),
-                            contentDescription = "Kilit",
+                            contentDescription = stringResource(R.string.lock),
                             tint = if (isPassword) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
@@ -964,7 +964,7 @@ fun NoteDetailScreen(
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.delete),
-                                contentDescription = "Çöp Kutusuna Taşı",
+                                contentDescription = stringResource(R.string.drawer_trash_bin),
                                 tint = Color(0xFFE53935),
                                 modifier = Modifier.size(19.dp)
                             )
@@ -1043,7 +1043,7 @@ fun NoteDetailScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Ses Kaydediliyor...",
+                                        text = stringResource(R.string.saving_sound),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
                                         color = Color(0xFFC62828)
@@ -1072,13 +1072,13 @@ fun NoteDetailScreen(
                                     onClick = {
                                         audioRecorder.cancelRecording()
                                         isRecordingAudio = false
-                                        context.showToastShort("Ses kaydı iptal edildi")
+                                        context.showToastShort(context.getString(R.string.voice_rec_cancelled))
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.cancel),
-                                        contentDescription = "İptal",
+                                        contentDescription = stringResource(R.string.cancel),
                                         tint = Color(0xFFE53935).copy(alpha = 0.7f),
                                         modifier = Modifier.size(16.dp)
                                     )
@@ -1097,7 +1097,7 @@ fun NoteDetailScreen(
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                                 ) {
                                     Text(
-                                        text = "Bitir & Ekle",
+                                        text = stringResource(R.string.voice_dict_finish_btn),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp
                                     )
@@ -1136,7 +1136,7 @@ fun NoteDetailScreen(
                                 Text(text = "💡", fontSize = 14.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "\"$suggestedLinkTitle\" notuna referans tespit edildi",
+                                    text = stringResource(R.string.link_detected_title, suggestedLinkTitle ?: ""),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -1168,14 +1168,14 @@ fun NoteDetailScreen(
                                             if (!linked) {
                                                 blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = "[[$titleToLink]]"))
                                             }
-                                            context.showToastShort("\"$titleToLink\" bağlandı!")
+                                            context.showToastShort(context.getString(R.string.link_connected_toast, titleToLink))
                                         }
                                     },
                                 shape = RoundedCornerShape(8.dp),
                                 color = VibrantOrange
                             ) {
                                 Text(
-                                    text = "+ Bağla",
+                                    text = stringResource(R.string.link_connect_btn),
                                     color = PureWhite,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -1220,7 +1220,7 @@ fun NoteDetailScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Canlı Sesli Dikte (Türkçe)...",
+                                        text = stringResource(R.string.live_voice_listening),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
                                         color = Color(0xFF6A1B9A)
@@ -1236,7 +1236,7 @@ fun NoteDetailScreen(
                                         },
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("İptal", color = Color(0xFF757575), fontSize = 12.sp)
+                                        Text(stringResource(R.string.cancel), color = Color(0xFF757575), fontSize = 12.sp)
                                     }
 
                                     Surface(
@@ -1246,7 +1246,7 @@ fun NoteDetailScreen(
                                                 if (liveVoiceText.isNotBlank()) {
                                                     recordUndoState()
                                                     blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = liveVoiceText.trim()))
-                                                    context.showToastShort("Metin eklendi")
+                                                    context.showToastShort(context.getString(R.string.voice_dict_added))
                                                 }
                                                 voiceHelper.stopListening()
                                                 isVoiceDictating = false
@@ -1256,7 +1256,7 @@ fun NoteDetailScreen(
                                         color = Color(0xFF8E24AA)
                                     ) {
                                         Text(
-                                            text = "Not'a Ekle",
+                                            text = stringResource(R.string.add_to_note),
                                             color = PureWhite,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
@@ -1269,7 +1269,7 @@ fun NoteDetailScreen(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
-                                text = if (liveVoiceText.isBlank()) "Konuşun, söyledikleriniz anında yazıya dönüşsün..." else liveVoiceText,
+                                text = if (liveVoiceText.isBlank()) stringResource(R.string.live_voice_placeholder) else liveVoiceText,
                                 fontSize = 13.sp,
                                 color = if (liveVoiceText.isBlank()) Color(0xFF9E9E9E) else Color(0xFF212121),
                                 lineHeight = 18.sp,
@@ -1306,7 +1306,7 @@ fun NoteDetailScreen(
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_undo),
-                                    contentDescription = "Geri Al",
+                                    contentDescription = stringResource(R.string.undo),
                                     tint = if (undoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                                     modifier = Modifier.size(15.dp)
                                 )
@@ -1326,7 +1326,7 @@ fun NoteDetailScreen(
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_redo),
-                                    contentDescription = "İleri Al",
+                                    contentDescription = stringResource(R.string.redo),
                                     tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                                     modifier = Modifier.size(15.dp)
                                 )
@@ -1354,13 +1354,13 @@ fun NoteDetailScreen(
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_ocr_scan),
-                                    contentDescription = "Metin Tara",
+                                    contentDescription = stringResource(R.string.tb_scan_ocr),
                                     tint = VibrantOrange,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Tara",
+                                    text = stringResource(R.string.tb_scan_ocr),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = VibrantOrange
@@ -1383,13 +1383,13 @@ fun NoteDetailScreen(
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.share_square),
-                                    contentDescription = "Paylaş",
+                                    contentDescription = stringResource(R.string.share),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Paylaş",
+                                    text = stringResource(R.string.share),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1416,13 +1416,13 @@ fun NoteDetailScreen(
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.microphone_lines),
-                                    contentDescription = "Sesli Dikte",
+                                    contentDescription = stringResource(R.string.voice_dict_btn),
                                     tint = if (isVoiceDictating) PureWhite else Color(0xFF6A1B9A),
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = if (isVoiceDictating) "Dinleniyor..." else "Sesli Dikte",
+                                    text = if (isVoiceDictating) stringResource(R.string.listening_dots) else stringResource(R.string.voice_dict_btn),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = if (isVoiceDictating) PureWhite else Color(0xFF6A1B9A)
@@ -1460,7 +1460,7 @@ fun NoteDetailScreen(
                         } else {
                             blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = "==vurgulanan metin=="))
                         }
-                        context.showToastShort("Fosforlu vurgu eklendi")
+                        context.showToastShort(context.getString(R.string.highlighter_added_toast))
                     },
                     onInsertTag = {
                         recordUndoState()
@@ -1470,7 +1470,7 @@ fun NoteDetailScreen(
                         } else {
                             blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = "#etiket"))
                         }
-                        context.showToastShort("#Etiket eklendi")
+                        context.showToastShort(context.getString(R.string.tag_added_toast))
                     },
                     isRecordingAudio = isRecordingAudio,
                     isVoiceDictating = isVoiceDictating
@@ -1505,7 +1505,7 @@ fun NoteDetailScreen(
                         } else {
                             Icon(
                                 painter = painterResource(id = R.drawable.apps_add),
-                                contentDescription = "İkon Seç",
+                                contentDescription = stringResource(R.string.select_icon),
                                 tint = VibrantOrange,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1527,7 +1527,7 @@ fun NoteDetailScreen(
                         decorationBox = { innerTextField ->
                             if (title.isEmpty()) {
                                 Text(
-                                    text = "Not Başlığı...",
+                                    text = stringResource(R.string.note_title_placeholder),
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f)
@@ -1570,7 +1570,7 @@ fun NoteDetailScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = currentStatusDef.title,
+                                text = stringResource(currentStatusDef.titleRes),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = currentStatusDef.badgeTextColor
@@ -1640,13 +1640,13 @@ fun NoteDetailScreen(
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_alarm_clock),
-                                contentDescription = "Hatırlatıcı",
+                                contentDescription = stringResource(R.string.reminder_title),
                                 tint = if (hasActiveReminder) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = if (hasActiveReminder) SimpleDateFormat("d MMM HH:mm", Locale("tr")).format(reminderTime) else "Hatırlatıcı Ekle",
+                                text = if (hasActiveReminder) SimpleDateFormat("d MMM HH:mm", Locale.getDefault()).format(reminderTime) else stringResource(R.string.reminder_title),
                                 fontSize = 11.5.sp,
                                 fontWeight = if (hasActiveReminder) FontWeight.Bold else FontWeight.Medium,
                                 color = if (hasActiveReminder) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant
@@ -1670,7 +1670,7 @@ fun NoteDetailScreen(
                             Text(text = "📊", fontSize = 11.sp)
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "$wordCount kelime • ~$readingTimeMinutes dk",
+                                text = stringResource(R.string.zen_words, wordCount) + " • " + stringResource(R.string.zen_reading_time, readingTimeMinutes),
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1753,7 +1753,7 @@ fun NoteDetailScreen(
                             Text(text = "🔗", fontSize = 14.sp)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Bu Nota Bağlantılar (${backlinks.size})",
+                                text = stringResource(R.string.backlinks_header, backlinks.size),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -1790,7 +1790,7 @@ fun NoteDetailScreen(
                                         Text(text = bNote.icon ?: "📝", fontSize = 13.sp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = bNote.title ?: "Başlıksız Not",
+                                            text = bNote.title ?: stringResource(R.string.untitled_note),
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurface
@@ -1859,13 +1859,13 @@ fun NoteDetailScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "Not Bağla (Bi-directional Link)",
+                            text = stringResource(R.string.link_note_title),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Seçilen not, metne [[Başlık]] formatında eklenecek ve çift yönlü bağlanacaktır.",
+                            text = stringResource(R.string.link_note_subtitle),
                             fontSize = 11.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1877,7 +1877,7 @@ fun NoteDetailScreen(
                 OutlinedTextField(
                     value = linkSearchQuery,
                     onValueChange = { linkSearchQuery = it },
-                    placeholder = { Text("Bağlanacak notu arayın...", fontSize = 13.sp) },
+                    placeholder = { Text(stringResource(R.string.link_search_placeholder), fontSize = 13.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     singleLine = true,
@@ -1897,7 +1897,7 @@ fun NoteDetailScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (linkSearchQuery.isBlank()) "Bağlanabilecek başka not bulunamadı." else "Eşleşen not bulunamadı.",
+                            text = if (linkSearchQuery.isBlank()) stringResource(R.string.link_no_notes) else stringResource(R.string.link_no_matching),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1915,7 +1915,7 @@ fun NoteDetailScreen(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(14.dp))
                                     .clickable {
-                                        val linkText = "[[${targetNote.title ?: "Başlıksız Not"}]] "
+                                        val linkText = "[[" + (targetNote.title ?: context.getString(R.string.untitled_note)) + "]] "
                                         recordUndoState()
                                         if (blocks.isNotEmpty() && blocks.last().content.isBlank() && blocks.last().type == BlockType.PARAGRAPH) {
                                             blocks[blocks.lastIndex] = blocks.last().copy(content = linkText)
@@ -1924,7 +1924,7 @@ fun NoteDetailScreen(
                                         }
                                         showLinkNotePicker = false
                                         linkSearchQuery = ""
-                                        context.showToastShort("\"${targetNote.title}\" nota bağlandı")
+                                        context.showToastShort(context.getString(R.string.link_connected_toast, targetNote.title ?: ""))
                                     },
                                 shape = RoundedCornerShape(14.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -1939,19 +1939,19 @@ fun NoteDetailScreen(
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = targetNote.title ?: "Başlıksız Not",
+                                            text = targetNote.title ?: stringResource(R.string.untitled_note),
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
-                                            text = if (targetNote.totalTasks > 0) "${targetNote.completedTasks}/${targetNote.totalTasks} Görev" else "Not",
+                                            text = if (targetNote.totalTasks > 0) stringResource(R.string.tasks_progress, targetNote.completedTasks, targetNote.totalTasks) else stringResource(R.string.note_fallback),
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                     Text(
-                                        text = "+ Bağla",
+                                        text = stringResource(R.string.link_connect_btn),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = VibrantOrange
@@ -1979,10 +1979,10 @@ fun NoteDetailScreen(
                 val targetIdx = editingDrawingBlockIndex
                 if (targetIdx != null && targetIdx in blocks.indices) {
                     blocks[targetIdx] = blocks[targetIdx].copy(mediaPath = savedPath)
-                    context.showToastShort("Çizim güncellendi")
+                    context.showToastShort(context.getString(R.string.drawing_updated_toast))
                 } else {
                     blocks.add(NoteBlock(type = BlockType.DRAWING, mediaPath = savedPath))
-                    context.showToastShort("Çizim nota eklendi")
+                    context.showToastShort(context.getString(R.string.drawing_added_toast))
                 }
                 showDrawingSheet = false
                 editingDrawingPath = null
@@ -2012,7 +2012,7 @@ fun NoteDetailScreen(
                         Text(text = "🎯", fontSize = 18.sp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Not Durumu Seçin",
+                            text = stringResource(R.string.select_status),
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
                             color = MaterialTheme.colorScheme.onSurface
@@ -2025,7 +2025,7 @@ fun NoteDetailScreen(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.cancel),
-                            contentDescription = "Kapat",
+                            contentDescription = stringResource(R.string.close),
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             modifier = Modifier.size(14.dp)
                         )
@@ -2067,7 +2067,7 @@ fun NoteDetailScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = col.title,
+                                text = stringResource(col.titleRes),
                                 fontSize = 15.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) col.badgeTextColor else MaterialTheme.colorScheme.onSurface
@@ -2113,7 +2113,7 @@ fun NoteDetailScreen(
                         Text(text = "🏷️", fontSize = 18.sp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Kategori Seçin veya Ekleyin",
+                            text = stringResource(R.string.category_sheet_title),
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
                             color = MaterialTheme.colorScheme.onSurface
@@ -2126,7 +2126,7 @@ fun NoteDetailScreen(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.cancel),
-                            contentDescription = "Kapat",
+                            contentDescription = stringResource(R.string.close),
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             modifier = Modifier.size(14.dp)
                         )
@@ -2156,7 +2156,7 @@ fun NoteDetailScreen(
                         decorationBox = { innerTextField ->
                             if (newCategoryText.isEmpty()) {
                                 Text(
-                                    text = "+ Yeni Kategori Adı...",
+                                    text = stringResource(R.string.category_sheet_new_hint),
                                     fontSize = 14.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
@@ -2178,10 +2178,10 @@ fun NoteDetailScreen(
                                     selectedCategoryId = existing.id
                                 }
                                 newCategoryText = ""
-                                context.showToastShort("'$trimmed' kategorisi eklendi ve seçildi")
+                                context.showToastShort(context.getString(R.string.category_sheet_added_toast, trimmed))
                                 showCategoryMenu = false
                             } else {
-                                context.showToastShort("Lütfen bir kategori adı yazın")
+                                context.showToastShort(context.getString(R.string.please_enter_category))
                             }
                         },
                         shape = RoundedCornerShape(10.dp),
@@ -2193,7 +2193,7 @@ fun NoteDetailScreen(
                         enabled = newCategoryText.isNotBlank()
                     ) {
                         Text(
-                            text = "Ekle",
+                            text = stringResource(R.string.cat_add_btn_action),
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -2203,7 +2203,7 @@ fun NoteDetailScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Mevcut Kategoriler",
+                    text = stringResource(R.string.category_sheet_existing),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2283,16 +2283,16 @@ fun NoteDetailScreen(
                 pinInput = ""
             },
             title = {
-                Text(text = "Yeni PIN Belirleyin", fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.cat_set_lock_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 Column {
-                    Text(text = "Korumalı notlarınızı şifrelemek için 6 haneli bir PIN giriniz:")
+                    Text(text = stringResource(R.string.cat_lock_prompt_no_pwd))
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = pinInput,
                         onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) pinInput = it },
-                        placeholder = { Text("6 Haneli PIN") },
+                        placeholder = { Text(stringResource(R.string.pwd_placeholder_pin)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -2306,18 +2306,18 @@ fun NoteDetailScreen(
                             isPassword = true
                             showPasswordDialog = false
                             pinInput = ""
-                            context.showToastShort("PIN kaydedildi ve not kilitlendi")
+                            context.showToastShort(context.getString(R.string.cat_pwd_saved_and_locked_toast))
                         } else {
-                            context.showToastShort("Lütfen 6 haneli bir PIN giriniz")
+                            context.showToastShort(context.getString(R.string.pin_must_be_6_digits))
                         }
                     }
                 ) {
-                    Text("Kaydet", color = VibrantOrange, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.save), color = VibrantOrange, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showPasswordDialog = false; pinInput = "" }) {
-                    Text("İptal")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -2335,7 +2335,7 @@ fun NoteDetailScreen(
                 reminderSound = sound
                 isReminderDone = false
                 showReminderSheet = false
-                context.showToastShort("Hatırlatıcı ayarlandı: " + SimpleDateFormat("d MMM HH:mm", Locale("tr")).format(timeMs))
+                context.showToastShort(context.getString(R.string.reminder_set_toast, SimpleDateFormat("d MMM HH:mm", Locale.getDefault()).format(timeMs)))
             },
             onRemoveReminder = {
                 reminderTime = null
@@ -2344,7 +2344,7 @@ fun NoteDetailScreen(
                 if (noteId != -1) {
                     ReminderManager.cancelReminder(context, noteId)
                 }
-                context.showToastShort("Hatırlatıcı kaldırıldı")
+                context.showToastShort(context.getString(R.string.reminder_removed_toast))
             },
             onDismiss = {
                 showReminderSheet = false
@@ -2354,7 +2354,7 @@ fun NoteDetailScreen(
 
     // Export & Share Sheet (Gelişmiş Filtreli & Canlı Önizlemeli PDF Stüdyosu)
     if (showExportSheet) {
-        val currentTitle = if (title.isBlank()) "Başlıksız Not" else title
+        val currentTitle = if (title.isBlank()) stringResource(R.string.untitled_note) else title
         PdfExportStudioSheet(
             title = currentTitle,
             categoryName = selectedCategoryName,
@@ -2399,13 +2399,13 @@ fun NoteDetailScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Metin Tara (Yapay Zeka OCR)",
+                                text = stringResource(R.string.ocr_scan_title),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 17.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Görseldeki yazıları cihaz içi ML Kit ile ayrıştırın",
+                                text = stringResource(R.string.ocr_scan_desc),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2418,7 +2418,7 @@ fun NoteDetailScreen(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.cancel),
-                            contentDescription = "Kapat",
+                            contentDescription = stringResource(R.string.close),
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             modifier = Modifier.size(14.dp)
                         )
@@ -2463,19 +2463,19 @@ fun NoteDetailScreen(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Kamerayı Aç & Fotoğraf Çek",
+                                text = stringResource(R.string.ocr_camera_title),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Kitap, evrak veya tahtayı anında çekip yazıya dönüştürür.",
+                                text = stringResource(R.string.ocr_camera_desc),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Text(text = "Çek ↗", color = VibrantOrange, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(text = stringResource(R.string.ocr_camera_snap), color = VibrantOrange, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
 
@@ -2517,19 +2517,19 @@ fun NoteDetailScreen(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Galeriden Görsel Seç",
+                                text = stringResource(R.string.ocr_gallery_title),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Daha önce kaydettiğiniz bir fotoğraf veya ekran görüntüsünü tarar.",
+                                text = stringResource(R.string.ocr_gallery_desc),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Text(text = "Seç ↗", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        Text(text = stringResource(R.string.ocr_gallery_pick), color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                     }
                 }
 
@@ -2543,13 +2543,13 @@ fun NoteDetailScreen(
         AlertDialog(
             onDismissRequest = {},
             title = {
-                Text(text = "Metin Taranıyor...", fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.ocr_scanning_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "📷", fontSize = 24.sp)
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = "Google ML Kit cihazınızda görseldeki metinleri ayrıştırıyor...")
+                    Text(text = stringResource(R.string.ocr_scanning_desc))
                 }
             },
             confirmButton = {}
@@ -2561,23 +2561,23 @@ fun NoteDetailScreen(
         AlertDialog(
             onDismissRequest = { showStatsDialog = false },
             icon = { Text(text = "📊", fontSize = 28.sp) },
-            title = { Text(text = "Not İstatistikleri", fontWeight = FontWeight.Bold) },
+            title = { Text(text = stringResource(R.string.note_stats_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(text = "• Kelime Sayısı: $wordCount kelime", fontSize = 13.sp)
-                    Text(text = "• Karakter Sayısı: $charCount karakter", fontSize = 13.sp)
-                    Text(text = "• Tahmini Okuma Süresi: ~$readingTimeMinutes dakika", fontSize = 13.sp)
-                    Text(text = "• Toplam Blok Sayısı: ${blocks.size} blok", fontSize = 13.sp)
+                    Text(text = "• " + stringResource(R.string.note_stat_words, wordCount), fontSize = 13.sp)
+                    Text(text = "• " + stringResource(R.string.note_stat_chars, charCount), fontSize = 13.sp)
+                    Text(text = "• " + stringResource(R.string.note_stat_reading, readingTimeMinutes), fontSize = 13.sp)
+                    Text(text = "• " + stringResource(R.string.note_stat_blocks, blocks.size), fontSize = 13.sp)
                     val totalTasks = blocks.count { it.type == BlockType.TODO }
                     if (totalTasks > 0) {
                         val completedTasks = blocks.count { it.type == BlockType.TODO && it.isChecked }
-                        Text(text = "• Görev İlerlemesi: $completedTasks / $totalTasks tamamlandı", fontSize = 13.sp)
+                        Text(text = "• " + stringResource(R.string.note_stat_tasks, completedTasks, totalTasks), fontSize = 13.sp)
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showStatsDialog = false }) {
-                    Text("Kapat", fontWeight = FontWeight.Bold, color = VibrantOrange)
+                    Text(stringResource(R.string.close), fontWeight = FontWeight.Bold, color = VibrantOrange)
                 }
             }
         )
@@ -2588,10 +2588,10 @@ fun NoteDetailScreen(
         AlertDialog(
             onDismissRequest = { showTrashConfirmDialog = false },
             icon = { Text(text = "🗑️", fontSize = 28.sp) },
-            title = { Text(text = "Çöp Kutusuna Taşı?", fontWeight = FontWeight.Bold) },
+            title = { Text(text = stringResource(R.string.note_trash_confirm_title), fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    text = "Bu not Çöp Kutusu'na taşınacaktır ve 30 gün boyunca dilediğiniz zaman geri yükleyebilirsiniz.",
+                    text = stringResource(R.string.note_trash_confirm_desc),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -2602,19 +2602,19 @@ fun NoteDetailScreen(
                         showTrashConfirmDialog = false
                         noteStatus = "TRASH"
                         saveNote()
-                        context.showToastShort("Not Çöp Kutusu'na taşındı (30 gün saklanır)")
+                        context.showToastShort(context.getString(R.string.note_moved_to_trash_toast))
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFFD32F2F),
                         contentColor = PureWhite
                     )
                 ) {
-                    Text("Çöp Kutusuna Taşı", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.drawer_trash_bin), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showTrashConfirmDialog = false }) {
-                    Text("Vazgeç")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -2666,7 +2666,7 @@ fun NoteDetailScreen(
                                 loadedNoteRef?.let { populateNoteBlocks(it) }
                             }
                         } else {
-                            context.showToastShort("Hatalı PIN!")
+                            context.showToastShort(context.getString(R.string.wrong_pin))
                             gatekeeperPinInput = ""
                         }
                     }

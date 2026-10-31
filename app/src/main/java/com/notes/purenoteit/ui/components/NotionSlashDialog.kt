@@ -19,9 +19,11 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,18 +46,18 @@ fun NotionSlashDialog(
     onSelectBlock: (BlockType) -> Unit
 ) {
     val items = listOf(
-        SlashItem(BlockType.PARAGRAPH, "Düz Metin", "Yazmaya başlamak için basit bir paragraf", R.drawable.file_edit),
-        SlashItem(BlockType.HEADING_1, "Başlık 1 (H1)", "Büyük bölüm başlığı", R.drawable.ic_format_h1),
-        SlashItem(BlockType.HEADING_2, "Başlık 2 (H2)", "Orta boy alt başlık", R.drawable.ic_format_h1),
-        SlashItem(BlockType.TODO, "Yapılacaklar Listesi", "Tamamlanabilir görev kutucuğu", R.drawable.ic_checklist),
-        SlashItem(BlockType.BULLET_LIST, "Madde İmleri", "Basit bir liste oluşturun", R.drawable.ic_format_bullet),
-        SlashItem(BlockType.CALLOUT, "Callout (Vurgu Kutusu)", "Önemli fikir ve notları kutu içine alın", R.drawable.ic_format_quote),
-        SlashItem(BlockType.TOGGLE, "Açılır Liste (Toggle)", "Tıklayınca açılan gizlenebilir içerik", R.drawable.arrow_right),
-        SlashItem(BlockType.TABLE, "Mini Hesaplama Tablosu", "Satır, sütun ve otomatik toplam alan tablo", R.drawable.ic_table),
-        SlashItem(BlockType.WEB_BOOKMARK, "Web Bağlantısı (Bookmark)", "Akıllı web sitesi önizleme kartı", R.drawable.category),
-        SlashItem(BlockType.SUB_PAGE, "Alt Sayfa (Sub-Page)", "Bu notun içine yeni bir alt not sayfası gömün", R.drawable.file_edit),
-        SlashItem(BlockType.DRAWING, "El Çizimi (Tuval)", "Parmakla serbest çizim veya şema çizin", R.drawable.ic_brush),
-        SlashItem(BlockType.DIVIDER, "Ayırıcı Çizgi", "Blokları birbirinden ayıran yatay çizgi", R.drawable.cancel)
+        SlashItem(BlockType.PARAGRAPH, stringResource(R.string.slash_text_title), stringResource(R.string.slash_text_desc), R.drawable.file_edit),
+        SlashItem(BlockType.HEADING_1, stringResource(R.string.slash_h1_title), stringResource(R.string.slash_h1_desc), R.drawable.ic_format_h1),
+        SlashItem(BlockType.HEADING_2, stringResource(R.string.slash_h2_title), stringResource(R.string.slash_h2_desc), R.drawable.ic_format_h2),
+        SlashItem(BlockType.TODO, stringResource(R.string.slash_todo_title), stringResource(R.string.slash_todo_desc), R.drawable.ic_checklist),
+        SlashItem(BlockType.BULLET_LIST, stringResource(R.string.slash_bullet_title), stringResource(R.string.slash_bullet_desc), R.drawable.ic_format_bullet),
+        SlashItem(BlockType.CALLOUT, stringResource(R.string.slash_callout_title), stringResource(R.string.slash_callout_desc), R.drawable.ic_format_quote),
+        SlashItem(BlockType.TOGGLE, stringResource(R.string.slash_toggle_title), stringResource(R.string.slash_toggle_desc), R.drawable.arrow_right),
+        SlashItem(BlockType.TABLE, stringResource(R.string.slash_table_title), stringResource(R.string.slash_table_desc), R.drawable.ic_table),
+        SlashItem(BlockType.WEB_BOOKMARK, stringResource(R.string.slash_bookmark_title), stringResource(R.string.slash_bookmark_desc), R.drawable.category),
+        SlashItem(BlockType.SUB_PAGE, stringResource(R.string.slash_subpage_title), stringResource(R.string.slash_subpage_desc), R.drawable.ic_subpage),
+        SlashItem(BlockType.DRAWING, stringResource(R.string.slash_drawing_title), stringResource(R.string.slash_drawing_desc), R.drawable.ic_brush),
+        SlashItem(BlockType.DIVIDER, stringResource(R.string.slash_divider_title), stringResource(R.string.slash_divider_desc), R.drawable.cancel)
     )
 
     ModalBottomSheet(
@@ -70,7 +72,7 @@ fun NotionSlashDialog(
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
             Text(
-                text = "Temel Bloklar (Notion Tarzı)",
+                text = stringResource(R.string.slash_title),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp

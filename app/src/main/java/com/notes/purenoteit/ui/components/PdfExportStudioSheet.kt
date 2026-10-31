@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,7 +87,7 @@ fun PdfExportStudioSheet(
     val taskCount = remember(blocks) { blocks.count { it.type == BlockType.TODO } }
     val audioCount = remember(blocks) { blocks.count { it.type == BlockType.AUDIO } }
 
-    val todayDateStr = remember { SimpleDateFormat("d MMMM yyyy, HH:mm", Locale("tr")).format(Date()) }
+    val todayDateStr = remember { SimpleDateFormat("d MMMM yyyy, HH:mm", Locale.getDefault()).format(Date()) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -120,13 +121,13 @@ fun PdfExportStudioSheet(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "PDF Dışa Aktarma Stüdyosu",
+                            text = stringResource(R.string.pdf_studio_title),
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Canlı A4 önizlemesi ve içerik filtreleri",
+                            text = stringResource(R.string.pdf_studio_subtitle),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -139,7 +140,7 @@ fun PdfExportStudioSheet(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.cancel),
-                        contentDescription = "Kapat",
+                        contentDescription = stringResource(R.string.close),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.size(16.dp)
                     )
@@ -150,7 +151,7 @@ fun PdfExportStudioSheet(
 
             // Filter Chips Bar (Horizontal Scroll)
             Text(
-                text = "PDF'e Dahil Edilecek Ögeler:",
+                text = stringResource(R.string.pdf_included_elements),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -167,7 +168,7 @@ fun PdfExportStudioSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterToggleChip(
-                    label = "Metinler",
+                    label = stringResource(R.string.pdf_chip_text),
                     icon = "✍️",
                     isSelected = includeText,
                     onClick = { includeText = !includeText }
@@ -175,7 +176,7 @@ fun PdfExportStudioSheet(
 
                 if (imageCount > 0) {
                     FilterToggleChip(
-                        label = "Fotoğraflar ($imageCount)",
+                        label = stringResource(R.string.pdf_chip_images, imageCount),
                         icon = "🖼️",
                         isSelected = includeImages,
                         onClick = { includeImages = !includeImages }
@@ -184,7 +185,7 @@ fun PdfExportStudioSheet(
 
                 if (drawingCount > 0) {
                     FilterToggleChip(
-                        label = "Çizimler ($drawingCount)",
+                        label = stringResource(R.string.pdf_chip_drawings, drawingCount),
                         icon = "🎨",
                         isSelected = includeDrawings,
                         onClick = { includeDrawings = !includeDrawings }
@@ -193,7 +194,7 @@ fun PdfExportStudioSheet(
 
                 if (taskCount > 0) {
                     FilterToggleChip(
-                        label = "Görevler ($taskCount)",
+                        label = stringResource(R.string.pdf_chip_tasks, taskCount),
                         icon = "✅",
                         isSelected = includeTasks,
                         onClick = { includeTasks = !includeTasks }
@@ -202,7 +203,7 @@ fun PdfExportStudioSheet(
 
                 if (audioCount > 0) {
                     FilterToggleChip(
-                        label = "Ses Rozeti ($audioCount)",
+                        label = stringResource(R.string.pdf_chip_audio, audioCount),
                         icon = "🎙️",
                         isSelected = includeAudioBadge,
                         onClick = { includeAudioBadge = !includeAudioBadge }
@@ -210,7 +211,7 @@ fun PdfExportStudioSheet(
                 }
 
                 FilterToggleChip(
-                    label = "Başlık & Tarih",
+                    label = stringResource(R.string.pdf_chip_header),
                     icon = "📅",
                     isSelected = includeHeader,
                     onClick = { includeHeader = !includeHeader }
@@ -545,7 +546,7 @@ fun PdfExportStudioSheet(
                     )
                 ) {
                     Text(
-                        text = "📄 PDF Oluştur & Paylaş",
+                        text = stringResource(R.string.pdf_btn_generate),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -560,7 +561,7 @@ fun PdfExportStudioSheet(
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(
-                        text = "📝 Markdown (.md) Olarak Paylaş",
+                        text = stringResource(R.string.pdf_btn_markdown),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface

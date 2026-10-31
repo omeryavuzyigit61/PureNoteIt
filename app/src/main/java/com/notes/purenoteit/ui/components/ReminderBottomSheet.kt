@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,13 +64,13 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-data class SoundOption(val key: String, val label: String)
+data class SoundOption(val key: String, val labelRes: Int)
 
 val SOUND_OPTIONS = listOf(
-    SoundOption("default", "Varsayılan Alarm"),
-    SoundOption("chime", "Zarif Çan"),
-    SoundOption("digital", "Dijital Bip"),
-    SoundOption("gentle", "Yumuşak Melodi")
+    SoundOption("default", R.string.reminder_sound_default),
+    SoundOption("chime", R.string.reminder_sound_chime),
+    SoundOption("digital", R.string.reminder_sound_digital),
+    SoundOption("gentle", R.string.reminder_sound_gentle)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -155,7 +156,7 @@ fun ReminderBottomSheet(
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
-            // Header: Icon + Title + Notion Subtitle
+            // Header: Icon + Title + Subtitle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -177,13 +178,13 @@ fun ReminderBottomSheet(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "Hatırlatıcı & Alarm Ayarla",
+                        text = stringResource(R.string.reminder_title),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Belirlenen vakitte öten alarm veya bildirim kurun",
+                        text = stringResource(R.string.reminder_subtitle),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                     )
@@ -194,7 +195,7 @@ fun ReminderBottomSheet(
 
             // Quick Presets Row
             Text(
-                text = "Hızlı Zaman Seçimi",
+                text = stringResource(R.string.reminder_title),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -207,36 +208,25 @@ fun ReminderBottomSheet(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Today 18:00
-                QuickPresetChip(label = "Bugün 18:00") {
+                // +1 Hour
+                QuickPresetChip(label = stringResource(R.string.reminder_quick_1h)) {
                     val cal = Calendar.getInstance()
-                    cal.set(Calendar.HOUR_OF_DAY, 18)
-                    cal.set(Calendar.MINUTE, 0)
-                    cal.set(Calendar.SECOND, 0)
+                    cal.add(Calendar.HOUR_OF_DAY, 1)
                     selectedCalendar = cal
                 }
-                // Today 21:00
-                QuickPresetChip(label = "Bugün 21:00") {
+                // Tonight 20:00
+                QuickPresetChip(label = stringResource(R.string.reminder_quick_tonight)) {
                     val cal = Calendar.getInstance()
-                    cal.set(Calendar.HOUR_OF_DAY, 21)
+                    cal.set(Calendar.HOUR_OF_DAY, 20)
                     cal.set(Calendar.MINUTE, 0)
                     cal.set(Calendar.SECOND, 0)
                     selectedCalendar = cal
                 }
                 // Tomorrow 09:00
-                QuickPresetChip(label = "Yarın 09:00") {
+                QuickPresetChip(label = stringResource(R.string.reminder_quick_tomorrow)) {
                     val cal = Calendar.getInstance()
                     cal.add(Calendar.DAY_OF_YEAR, 1)
                     cal.set(Calendar.HOUR_OF_DAY, 9)
-                    cal.set(Calendar.MINUTE, 0)
-                    cal.set(Calendar.SECOND, 0)
-                    selectedCalendar = cal
-                }
-                // Tomorrow 17:00
-                QuickPresetChip(label = "Yarın 17:00") {
-                    val cal = Calendar.getInstance()
-                    cal.add(Calendar.DAY_OF_YEAR, 1)
-                    cal.set(Calendar.HOUR_OF_DAY, 17)
                     cal.set(Calendar.MINUTE, 0)
                     cal.set(Calendar.SECOND, 0)
                     selectedCalendar = cal
@@ -262,14 +252,14 @@ fun ReminderBottomSheet(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "Tarih",
+                            text = stringResource(R.string.select_date),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = SimpleDateFormat("d MMMM yyyy", Locale("tr")).format(selectedCalendar.time),
+                            text = SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(selectedCalendar.time),
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -289,7 +279,7 @@ fun ReminderBottomSheet(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "Saat",
+                            text = "Time",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = VibrantOrange
@@ -307,15 +297,7 @@ fun ReminderBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Notification Mode Selection: [ 🔔 Alarm Gibi Öt ] vs [ 🔕 Sadece Bildirim ]
-            Text(
-                text = "Bildirim Türü",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-
+            // Notification Mode Selection
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -338,14 +320,14 @@ fun ReminderBottomSheet(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "🔔 Alarm Gibi Öt",
+                            text = "🔔 " + stringResource(R.string.reminder_type_alarm),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isAlarm) VibrantOrange else MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Seçilen sesle çalar, erteleme ve durdurma sunar.",
+                            text = stringResource(R.string.reminder_type_alarm_desc),
                             fontSize = 10.5.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             lineHeight = 14.sp
@@ -372,14 +354,14 @@ fun ReminderBottomSheet(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "🔕 Sadece Bildirim",
+                            text = "🔕 " + stringResource(R.string.reminder_type_notif),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isNotif) VibrantOrange else MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Sessizce durum çubuğuna bildirim düşürür.",
+                            text = stringResource(R.string.reminder_type_notif_desc),
                             fontSize = 10.5.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             lineHeight = 14.sp
@@ -388,7 +370,7 @@ fun ReminderBottomSheet(
                 }
             }
 
-            // Sound Selector (Smoothly expands when Alarm mode is active)
+            // Sound Selector
             AnimatedVisibility(
                 visible = selectedType == "ALARM",
                 enter = fadeIn() + expandVertically(),
@@ -396,7 +378,7 @@ fun ReminderBottomSheet(
             ) {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
                     Text(
-                        text = "Alarm Sesi / Melodi",
+                        text = stringResource(R.string.reminder_sound_title),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -450,7 +432,7 @@ fun ReminderBottomSheet(
                                         }
                                         Spacer(modifier = Modifier.width(10.dp))
                                         Text(
-                                            text = soundOption.label,
+                                            text = stringResource(soundOption.labelRes),
                                             fontSize = 13.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSurface
@@ -472,7 +454,7 @@ fun ReminderBottomSheet(
                                     ) {
                                         Icon(
                                             painter = painterResource(id = R.drawable.play_pause),
-                                            contentDescription = "Dinle",
+                                            contentDescription = null,
                                             tint = VibrantOrange,
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -508,7 +490,7 @@ fun ReminderBottomSheet(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Hatırlatıcıyı Kur",
+                    text = stringResource(R.string.reminder_btn_set),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -524,7 +506,7 @@ fun ReminderBottomSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Hatırlatıcıyı Kaldır",
+                        text = stringResource(R.string.reminder_btn_remove),
                         color = Color(0xFFEF4444),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold

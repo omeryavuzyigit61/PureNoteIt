@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -100,7 +101,7 @@ fun TrashBinSheet(
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Çöp Kutusu",
+                                text = stringResource(R.string.trash_title),
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -111,7 +112,7 @@ fun TrashBinSheet(
                                 color = Color(0xFFFFEBEE)
                             ) {
                                 Text(
-                                    text = "${trashedNotes.size} Not",
+                                    text = stringResource(R.string.trash_notes_count, trashedNotes.size),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFFD32F2F),
@@ -120,7 +121,7 @@ fun TrashBinSheet(
                             }
                         }
                         Text(
-                            text = "Silinen notları geri yükleyin veya kalıcı olarak silin",
+                            text = stringResource(R.string.trash_subtitle),
                             fontSize = 11.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -133,7 +134,7 @@ fun TrashBinSheet(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.cancel),
-                        contentDescription = "Kapat",
+                        contentDescription = stringResource(R.string.close),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.size(16.dp)
                     )
@@ -154,14 +155,14 @@ fun TrashBinSheet(
                         Text(text = "✨", fontSize = 44.sp)
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Çöp Kutunuz Tertemiz",
+                            text = stringResource(R.string.trash_empty_title),
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Sildiğiniz notlar burada saklanır ve dilediğiniz an kurtarabilirsiniz.",
+                            text = stringResource(R.string.trash_empty_desc),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                         )
@@ -177,7 +178,7 @@ fun TrashBinSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Silinen Öğeler",
+                        text = stringResource(R.string.trash_title),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -202,7 +203,7 @@ fun TrashBinSheet(
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "Tümünü Temizle",
+                                text = stringResource(R.string.trash_empty_btn),
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFD32F2F)
@@ -237,13 +238,13 @@ fun TrashBinSheet(
             icon = { Text(text = "⚠️", fontSize = 28.sp) },
             title = {
                 Text(
-                    text = "Çöp Kutusunu Boşalt?",
+                    text = stringResource(R.string.trash_empty_confirm_title),
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
-                    text = "Çöp kutusundaki tüm notlar (${trashedNotes.size} adet) kalıcı olarak silinecektir. Bu işlem geri alınamaz.",
+                    text = stringResource(R.string.trash_empty_confirm_desc),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -259,12 +260,12 @@ fun TrashBinSheet(
                         contentColor = PureWhite
                     )
                 ) {
-                    Text("Evet, Boşalt", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.trash_empty_btn), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showEmptyConfirmDialog = false }) {
-                    Text("Vazgeç", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.dismiss), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -310,7 +311,7 @@ private fun TrashNoteItem(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (note.title.isNullOrBlank()) "Başlıksız Not" else note.title!!,
+                        text = if (note.title.isNullOrBlank()) stringResource(R.string.untitled_note) else note.title!!,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -320,7 +321,7 @@ private fun TrashNoteItem(
                 }
 
                 val dateStr = remember(note.date) {
-                    SimpleDateFormat("dd MMM", Locale("tr")).format(Date(note.date))
+                    SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.date))
                 }
                 Text(
                     text = dateStr,
@@ -348,7 +349,7 @@ private fun TrashNoteItem(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Action Row: [Geri Yükle] [Kalıcı Sil]
+            // Action Row: [Restore] [Permanent Delete]
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -370,7 +371,7 @@ private fun TrashNoteItem(
                         Text(text = "♻️", fontSize = 12.sp)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Geri Yükle",
+                            text = stringResource(R.string.trash_restore_btn),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF2E7D32)
@@ -401,7 +402,7 @@ private fun TrashNoteItem(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Kalıcı Sil",
+                            text = stringResource(R.string.trash_perm_delete_btn),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFC62828)
@@ -415,8 +416,8 @@ private fun TrashNoteItem(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Kalıcı Olarak Silinsin mi?", fontWeight = FontWeight.Bold) },
-            text = { Text("\"${note.title ?: "Bu not"}\" tamamen silinecektir. Bu işlem geri alınamaz.") },
+            title = { Text(stringResource(R.string.trash_perm_delete_dialog_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.trash_perm_delete_dialog_desc, note.title ?: stringResource(R.string.untitled_note))) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -424,12 +425,12 @@ private fun TrashNoteItem(
                         onDelete()
                     }
                 ) {
-                    Text("Kalıcı Sil", color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.trash_perm_delete_btn), color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Vazgeç")
+                    Text(stringResource(R.string.dismiss))
                 }
             }
         )

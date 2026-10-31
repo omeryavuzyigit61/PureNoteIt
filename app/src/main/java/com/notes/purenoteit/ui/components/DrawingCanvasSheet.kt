@@ -61,6 +61,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -162,7 +163,7 @@ fun DrawingCanvasSheet(
 
     fun saveDrawingToPng() {
         if (items.isEmpty() && baseBitmap == null) {
-            context.showToastShort("Çizim boş!")
+            context.showToastShort(context.getString(R.string.drawing_empty_toast))
             return
         }
 
@@ -272,7 +273,7 @@ fun DrawingCanvasSheet(
             onSaveDrawing(file.absolutePath)
             onDismiss()
         } catch (e: Exception) {
-            context.showToastShort("Çizim kaydedilemedi: ${e.message}")
+            context.showToastShort(context.getString(R.string.drawing_save_error, e.message ?: ""))
         }
     }
 
@@ -287,14 +288,14 @@ fun DrawingCanvasSheet(
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
-            // Header: Title + Actions (Geri Al, Temizle, Ekle)
+            // Header: Title + Actions (Undo, Clear, Save)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = if (existingImagePath != null) "Çizimi Düzenle" else "Çizim Tuvali",
+                    text = if (existingImagePath != null) stringResource(R.string.drawing_title_edit) else stringResource(R.string.drawing_title_canvas),
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -314,7 +315,7 @@ fun DrawingCanvasSheet(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.arrow_left),
-                            contentDescription = "Geri Al",
+                            contentDescription = stringResource(R.string.undo),
                             tint = if (items.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                             modifier = Modifier.size(18.dp)
                         )
@@ -330,7 +331,7 @@ fun DrawingCanvasSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Temizle",
+                            text = stringResource(R.string.tool_clear),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -347,7 +348,7 @@ fun DrawingCanvasSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (existingImagePath != null) "Güncelle" else "Ekle",
+                            text = if (existingImagePath != null) stringResource(R.string.cat_update_btn) else stringResource(R.string.cat_add_btn_action),
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = PureWhite,
@@ -371,14 +372,14 @@ fun DrawingCanvasSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ToolChip(
-                        title = "✏️ Kalem",
+                        title = stringResource(R.string.tool_pen),
                         isSelected = selectedTool == DrawingTool.PEN
                     ) {
                         selectedTool = DrawingTool.PEN
                     }
 
                     ToolChip(
-                        title = "🧹 Silgi",
+                        title = stringResource(R.string.tool_eraser),
                         isSelected = selectedTool == DrawingTool.ERASER,
                         activeColor = Color(0xFFE53935)
                     ) {
@@ -406,12 +407,12 @@ fun DrawingCanvasSheet(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ToolChip(title = "📏 Çizgi", isSelected = selectedTool == DrawingTool.LINE) { selectedTool = DrawingTool.LINE }
-                    ToolChip(title = "⬜ Kare", isSelected = selectedTool == DrawingTool.RECTANGLE) { selectedTool = DrawingTool.RECTANGLE }
-                    ToolChip(title = "⭕ Daire", isSelected = selectedTool == DrawingTool.CIRCLE) { selectedTool = DrawingTool.CIRCLE }
-                    ToolChip(title = "🔺 Üçgen", isSelected = selectedTool == DrawingTool.TRIANGLE) { selectedTool = DrawingTool.TRIANGLE }
-                    ToolChip(title = "➡️ Ok", isSelected = selectedTool == DrawingTool.ARROW) { selectedTool = DrawingTool.ARROW }
-                    ToolChip(title = "⭐ Yıldız", isSelected = selectedTool == DrawingTool.STAR) { selectedTool = DrawingTool.STAR }
+                    ToolChip(title = stringResource(R.string.tool_line), isSelected = selectedTool == DrawingTool.LINE) { selectedTool = DrawingTool.LINE }
+                    ToolChip(title = stringResource(R.string.tool_rect), isSelected = selectedTool == DrawingTool.RECTANGLE) { selectedTool = DrawingTool.RECTANGLE }
+                    ToolChip(title = stringResource(R.string.tool_circle), isSelected = selectedTool == DrawingTool.CIRCLE) { selectedTool = DrawingTool.CIRCLE }
+                    ToolChip(title = stringResource(R.string.tool_triangle), isSelected = selectedTool == DrawingTool.TRIANGLE) { selectedTool = DrawingTool.TRIANGLE }
+                    ToolChip(title = stringResource(R.string.tool_arrow), isSelected = selectedTool == DrawingTool.ARROW) { selectedTool = DrawingTool.ARROW }
+                    ToolChip(title = stringResource(R.string.tool_star), isSelected = selectedTool == DrawingTool.STAR) { selectedTool = DrawingTool.STAR }
                 }
             }
 

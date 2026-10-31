@@ -50,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -107,7 +108,7 @@ fun CategoryManagementScreen(
                 modifier = Modifier.statusBarsPadding(),
                 title = {
                     Text(
-                        text = "Kategoriler",
+                        text = stringResource(R.string.cat_mgmt_title),
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -117,7 +118,7 @@ fun CategoryManagementScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             painter = painterResource(id = R.drawable.arrow_left),
-                            contentDescription = "Geri",
+                            contentDescription = stringResource(R.string.back),
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -133,7 +134,7 @@ fun CategoryManagementScreen(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.apps_add),
-                            contentDescription = "Kategori Ekle",
+                            contentDescription = stringResource(R.string.cat_add_btn),
                             tint = VibrantOrange,
                             modifier = Modifier.size(24.dp)
                         )
@@ -158,7 +159,7 @@ fun CategoryManagementScreen(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.apps_add),
-                    contentDescription = "Yeni Kategori",
+                    contentDescription = stringResource(R.string.cat_add_btn),
                     modifier = Modifier.size(26.dp)
                 )
             }
@@ -187,7 +188,7 @@ fun CategoryManagementScreen(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.search),
-                        contentDescription = "Ara",
+                        contentDescription = stringResource(R.string.search),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
@@ -197,7 +198,7 @@ fun CategoryManagementScreen(
                         onValueChange = { searchQuery = it },
                         placeholder = {
                             Text(
-                                "Kategori ara...",
+                                text = stringResource(R.string.cat_search_placeholder),
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                                 fontSize = 14.sp
                             )
@@ -223,7 +224,7 @@ fun CategoryManagementScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (searchQuery.isBlank()) "Henüz bir kategori bulunmuyor" else "Sonuç bulunamadı",
+                        text = if (searchQuery.isBlank()) stringResource(R.string.cat_no_categories) else stringResource(R.string.cat_no_results),
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         fontSize = 15.sp
                     )
@@ -287,7 +288,7 @@ fun CategoryManagementScreen(
                                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
-                                                    text = "Varsayılan",
+                                                    text = stringResource(R.string.cat_default_badge),
                                                     fontSize = 11.sp,
                                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                                     fontWeight = FontWeight.Medium
@@ -304,7 +305,7 @@ fun CategoryManagementScreen(
                                             // Unlock category
                                             category.isPassword = false
                                             categoryViewModel.update(category)
-                                            context.showToastShort("Kategori kilidi kaldırıldı")
+                                            context.showToastShort(context.getString(R.string.cat_unlocked_toast))
                                         } else {
                                             // Prompt for PIN to lock
                                             targetCategoryForPin = category
@@ -318,7 +319,7 @@ fun CategoryManagementScreen(
                                         painter = painterResource(
                                             id = if (isLocked) R.drawable.lock else R.drawable.unlock
                                         ),
-                                        contentDescription = if (isLocked) "Kilitli" else "Kilitsiz",
+                                        contentDescription = null,
                                         tint = if (isLocked) VibrantOrange else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -336,7 +337,7 @@ fun CategoryManagementScreen(
                                     ) {
                                         Icon(
                                             painter = painterResource(id = R.drawable.file_edit),
-                                            contentDescription = "Düzenle",
+                                            contentDescription = stringResource(R.string.edit),
                                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                             modifier = Modifier.size(20.dp)
                                         )
@@ -352,7 +353,7 @@ fun CategoryManagementScreen(
                                     ) {
                                         Icon(
                                             painter = painterResource(id = R.drawable.delete),
-                                            contentDescription = "Sil",
+                                            contentDescription = stringResource(R.string.delete),
                                             tint = Color(0xFFE53935).copy(alpha = 0.8f),
                                             modifier = Modifier.size(20.dp)
                                         )
@@ -373,7 +374,7 @@ fun CategoryManagementScreen(
             onDismissRequest = { showAddEditDialog = false },
             title = {
                 Text(
-                    text = if (isEditing) "Kategoriyi Düzenle" else "Yeni Kategori Ekle",
+                    text = if (isEditing) stringResource(R.string.cat_dialog_edit_title) else stringResource(R.string.cat_dialog_add_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
@@ -381,7 +382,7 @@ fun CategoryManagementScreen(
             text = {
                 Column {
                     Text(
-                        text = "Kategori adını girin:",
+                        text = stringResource(R.string.cat_dialog_name_prompt),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -390,7 +391,7 @@ fun CategoryManagementScreen(
                         value = categoryInputName,
                         onValueChange = { categoryInputName = it },
                         singleLine = true,
-                        placeholder = { Text("Örn: Seyahat, Projeler...") },
+                        placeholder = { Text(stringResource(R.string.cat_dialog_name_placeholder)) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -401,24 +402,24 @@ fun CategoryManagementScreen(
                     onClick = {
                         val trimmed = categoryInputName.trim()
                         if (trimmed.isBlank()) {
-                            context.showToastShort("Lütfen kategori giriniz")
+                            context.showToastShort(context.getString(R.string.please_enter_category))
                             return@TextButton
                         }
                         if (isEditing) {
                             editingCategory?.let { cat ->
                                 cat.name = trimmed
                                 categoryViewModel.update(cat)
-                                context.showToastShort("Kategori güncellendi")
+                                context.showToastShort(context.getString(R.string.cat_updated_toast))
                             }
                         } else {
                             categoryViewModel.upsert(CategoryData(name = trimmed, isPassword = false))
-                            context.showToastShort("Kategori eklendi")
+                            context.showToastShort(context.getString(R.string.cat_added_toast))
                         }
                         showAddEditDialog = false
                     }
                 ) {
                     Text(
-                        text = if (isEditing) "Güncelle" else "Ekle",
+                        text = if (isEditing) stringResource(R.string.cat_update_btn) else stringResource(R.string.cat_add_btn_action),
                         color = VibrantOrange,
                         fontWeight = FontWeight.Bold
                     )
@@ -426,7 +427,7 @@ fun CategoryManagementScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showAddEditDialog = false }) {
-                    Text("İptal", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
             },
             shape = RoundedCornerShape(18.dp),
@@ -441,7 +442,7 @@ fun CategoryManagementScreen(
             onDismissRequest = { showPinDialog = false },
             title = {
                 Text(
-                    text = if (isPasswordSet) "Kategoriyi Kilitle" else "Kilit Şifresi Belirle",
+                    text = if (isPasswordSet) stringResource(R.string.cat_lock_title) else stringResource(R.string.cat_set_lock_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
@@ -450,9 +451,9 @@ fun CategoryManagementScreen(
                 Column {
                     Text(
                         text = if (isPasswordSet) {
-                            "Bu kategoriyi kilitlemek için 6 haneli ana PIN kodunuzu girin:"
+                            stringResource(R.string.cat_lock_prompt_with_pwd)
                         } else {
-                            "Henüz bir şifre belirlenmedi. Kategoriyi kilitlemek için 6 haneli yeni bir PIN belirleyin:"
+                            stringResource(R.string.cat_lock_prompt_no_pwd)
                         },
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -475,7 +476,7 @@ fun CategoryManagementScreen(
                     onClick = {
                         val pin = enteredPin.trim()
                         if (pin.length != 6) {
-                            context.showToastShort("6 Haneli Bir PIN Giriniz")
+                            context.showToastShort(context.getString(R.string.pin_must_be_6_digits))
                             return@TextButton
                         }
 
@@ -484,25 +485,25 @@ fun CategoryManagementScreen(
                                 SecurityUtil.savePassword(context, pin)
                                 cat.isPassword = true
                                 categoryViewModel.update(cat)
-                                context.showToastShort("Şifre kaydedildi ve kategori kilitlendi")
+                                context.showToastShort(context.getString(R.string.cat_pwd_saved_and_locked_toast))
                             } else if (SecurityUtil.verifyPassword(context, pin)) {
                                 cat.isPassword = true
                                 categoryViewModel.update(cat)
-                                context.showToastShort("Kategori kilitlendi")
+                                context.showToastShort(context.getString(R.string.cat_locked_toast))
                             } else {
-                                context.showToastShort("Yanlış Şifre")
+                                context.showToastShort(context.getString(R.string.wrong_password))
                                 return@TextButton
                             }
                         }
                         showPinDialog = false
                     }
                 ) {
-                    Text("Kilitle", color = VibrantOrange, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.cat_lock_btn), color = VibrantOrange, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showPinDialog = false }) {
-                    Text("İptal", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
             },
             shape = RoundedCornerShape(18.dp),
@@ -515,11 +516,11 @@ fun CategoryManagementScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
             title = {
-                Text("Kategoriyi Sil", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(stringResource(R.string.cat_delete_title), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             },
             text = {
                 Text(
-                    text = "\"${deletingCategory?.name}\" kategorisini silmek istediğinizden emin misiniz?",
+                    text = stringResource(R.string.cat_delete_confirm_msg, deletingCategory?.name ?: ""),
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                 )
@@ -529,17 +530,17 @@ fun CategoryManagementScreen(
                     onClick = {
                         deletingCategory?.let { cat ->
                             categoryViewModel.deleteCategoryById(cat.id)
-                            context.showToastShort("Kategori silindi")
+                            context.showToastShort(context.getString(R.string.cat_deleted_toast))
                         }
                         showDeleteConfirmDialog = false
                     }
                 ) {
-                    Text("Sil", color = Color(0xFFE53935), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.delete), color = Color(0xFFE53935), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmDialog = false }) {
-                    Text("İptal", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
             },
             shape = RoundedCornerShape(18.dp),

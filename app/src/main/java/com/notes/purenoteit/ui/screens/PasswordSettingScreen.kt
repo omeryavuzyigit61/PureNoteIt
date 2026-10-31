@@ -93,12 +93,12 @@ fun PasswordSettingScreen(
         val repP = repeatPassword.trim()
 
         if (newP.isBlank() || repP.isBlank() || (hasPassword && curr.isBlank())) {
-            context.showToastShort("Lütfen Boş Alanları Doldurun")
+            context.showToastShort(context.getString(R.string.toast_fill_empty_fields))
             return
         }
 
         if (newP.length != 6 || !newP.all { it.isDigit() }) {
-            context.showToastShort("Şifre 6 Haneli Rakamlardan Oluşmalıdır")
+            context.showToastShort(context.getString(R.string.toast_pin_must_be_6_digits))
             return
         }
 
@@ -108,18 +108,18 @@ fun PasswordSettingScreen(
                 return
             }
             if (curr == newP) {
-                context.showToastShort("Yeni Şifre Mevcut Şifreyle Aynı Olamaz")
+                context.showToastShort(context.getString(R.string.toast_new_pin_cannot_be_same))
                 return
             }
         }
 
         if (newP != repP) {
-            context.showToastShort("Yeni Şifreler Eşleşmiyor")
+            context.showToastShort(context.getString(R.string.toast_pins_do_not_match))
             return
         }
 
         SecurityUtil.savePassword(context, newP)
-        context.showToastShort("Şifre Başarıyla Değiştirildi")
+        context.showToastShort(context.getString(R.string.toast_password_changed_success))
         onNavigateBack()
     }
 
@@ -129,7 +129,7 @@ fun PasswordSettingScreen(
                 modifier = Modifier.statusBarsPadding(),
                 title = {
                     Text(
-                        text = if (hasPassword) "Güvenlik Şifresi Değiştir" else "Güvenlik Şifresi Belirle",
+                        text = if (hasPassword) stringResource(R.string.pwd_title_change) else stringResource(R.string.pwd_title_set),
                         fontWeight = FontWeight.Bold,
                         fontSize = 19.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -139,7 +139,7 @@ fun PasswordSettingScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             painter = painterResource(id = R.drawable.arrow_left),
-                            contentDescription = "Geri",
+                            contentDescription = stringResource(R.string.back),
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -179,7 +179,7 @@ fun PasswordSettingScreen(
             ) {
                 AsyncImage(
                     model = R.drawable.rolling_pin_unscreen,
-                    contentDescription = "Güvenlik İkonu",
+                    contentDescription = null,
                     modifier = Modifier.size(80.dp)
                 )
             }
@@ -187,7 +187,7 @@ fun PasswordSettingScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Bitwarden Düzeyinde Kasa Güvenliği",
+                text = stringResource(R.string.pwd_bitwarden_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -197,7 +197,7 @@ fun PasswordSettingScreen(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "Kilitli notlarınız ve kategorileriniz AES-256-GCM ile şifrelenir. Uygulamadan çıktığınızda kasanız otomatik olarak kilitlenir.",
+                text = stringResource(R.string.pwd_bitwarden_desc),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,
@@ -224,7 +224,7 @@ fun PasswordSettingScreen(
                     if (hasPassword) {
                         Column {
                             Text(
-                                text = "Mevcut PIN Kodu",
+                                text = stringResource(R.string.pwd_current_pin),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -251,7 +251,7 @@ fun PasswordSettingScreen(
 
                     Column {
                         Text(
-                            text = if (hasPassword) "Yeni PIN Kodu (6 Haneli)" else "Yeni PIN Kodu (6 Haneli)",
+                            text = stringResource(R.string.pwd_new_pin),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -262,7 +262,7 @@ fun PasswordSettingScreen(
                             onValueChange = {
                                 if (it.length <= 6 && it.all { c -> c.isDigit() }) newPassword = it
                             },
-                            placeholder = { Text("6 haneli PIN", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)) },
+                            placeholder = { Text(stringResource(R.string.pwd_placeholder_pin), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                             visualTransformation = PasswordVisualTransformation(),
@@ -277,7 +277,7 @@ fun PasswordSettingScreen(
 
                     Column {
                         Text(
-                            text = "Yeni PIN Kodunu Doğrulayın",
+                            text = stringResource(R.string.pwd_repeat_pin),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -288,7 +288,7 @@ fun PasswordSettingScreen(
                             onValueChange = {
                                 if (it.length <= 6 && it.all { c -> c.isDigit() }) repeatPassword = it
                             },
-                            placeholder = { Text("6 haneli PIN tekrar", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)) },
+                            placeholder = { Text(stringResource(R.string.pwd_placeholder_repeat), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                             visualTransformation = PasswordVisualTransformation(),
@@ -324,7 +324,7 @@ fun PasswordSettingScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (hasPassword) "Şifreyi Güncelle" else "Şifreyi Kaydet",
+                    text = if (hasPassword) stringResource(R.string.pwd_btn_update) else stringResource(R.string.pwd_btn_save),
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
@@ -354,7 +354,7 @@ fun PasswordSettingScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "İpucu: Şifrenizi kaydettikten sonra kilitli notlarınıza ana ekrandan parmak izi veya biyometrik kimlik doğrulama ile de kolayca erişebilirsiniz.",
+                        text = stringResource(R.string.pwd_tip),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                         lineHeight = 17.sp

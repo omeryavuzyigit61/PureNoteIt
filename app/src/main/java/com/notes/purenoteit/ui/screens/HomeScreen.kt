@@ -216,7 +216,7 @@ fun HomeScreen(
 
     // Dialog state for Daily Agenda Confirmation
     var showAgendaConfirmDialog by remember { mutableStateOf(false) }
-    val todayDateStr = remember { SimpleDateFormat("d MMMM yyyy", Locale("tr")).format(Date()) }
+    val todayDateStr = remember { SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(Date()) }
     val existingTodayAgendaNote = remember(noteList, todayDateStr) {
         noteList.firstOrNull { it.title?.contains(todayDateStr) == true && it.icon == "📅" }
     }
@@ -344,9 +344,9 @@ fun HomeScreen(
                     )
                     prompt.authenticate(
                         BiometricPrompt.PromptInfo.Builder()
-                            .setTitle("Korumalı Not")
-                            .setSubtitle("Devam etmek için parmak izinizi okutun")
-                            .setNegativeButtonText("PIN Girin")
+                            .setTitle(context.getString(R.string.biometric_prompt_title))
+                            .setSubtitle(context.getString(R.string.biometric_prompt_subtitle))
+                            .setNegativeButtonText(context.getString(R.string.enter_pin))
                             .build()
                     )
                 } else {
@@ -937,7 +937,7 @@ fun HomeScreen(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "Sabitlenenler",
+                                            text = stringResource(R.string.pinned_notes),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1119,7 +1119,7 @@ fun HomeScreen(
                     Text(text = "📅", fontSize = 20.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (existingTodayAgendaNote != null) "Günün Ajandası Zaten Var" else "Günün Ajandası",
+                        text = if (existingTodayAgendaNote != null) stringResource(R.string.agenda_already_exists) else stringResource(R.string.agenda_title),
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -1129,9 +1129,9 @@ fun HomeScreen(
             text = {
                 Text(
                     text = if (existingTodayAgendaNote != null) {
-                        "Bugün için oluşturulmuş bir ajanda notunuz bulunuyor (\"${existingTodayAgendaNote.title}\"). Mevcut ajandayı mı açmak istersiniz, yoksa yeni bir tane mi oluşturulsun?"
+                        stringResource(R.string.agenda_exists_desc, existingTodayAgendaNote.title ?: "")
                     } else {
-                        "Bugün ($todayDateStr) için günün mottosu, öncelikli kontrol listesi görevleri ve not bölümlerini içeren hazır planlama şablonu oluşturulsun mu?"
+                        stringResource(R.string.agenda_create_desc, todayDateStr)
                     },
                     fontSize = 13.5.sp,
                     lineHeight = 20.sp,
@@ -1156,7 +1156,7 @@ fun HomeScreen(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = if (existingTodayAgendaNote != null) "Mevcut Olanı Aç" else "Oluştur ve Aç",
+                        text = if (existingTodayAgendaNote != null) stringResource(R.string.agenda_open_existing) else stringResource(R.string.agenda_create_and_open),
                         color = PureWhite,
                         fontWeight = FontWeight.Bold
                     )
@@ -1435,7 +1435,7 @@ private fun EmptyStateContent(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Yeni Not Oluştur", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(text = stringResource(R.string.create_new_note), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
@@ -1534,7 +1534,7 @@ private fun NotionRecentCoverCard(
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = if (note.title.isNullOrBlank()) "Başlıksız" else note.title!!,
+                        text = if (note.title.isNullOrBlank()) stringResource(R.string.untitled_note) else note.title!!,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) PureWhite else MaterialTheme.colorScheme.onSurface,
@@ -1551,7 +1551,7 @@ private fun NotionRecentCoverCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = SimpleDateFormat("d MMM", Locale("tr")).format(note.date),
+                            text = SimpleDateFormat("d MMM", Locale.getDefault()).format(note.date),
                             fontSize = 9.5.sp,
                             color = if (isDark) PureWhite.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                         )
@@ -1624,7 +1624,7 @@ private fun NotionMobileBottomDock(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.search),
-                    contentDescription = "Ara",
+                    contentDescription = stringResource(R.string.search),
                     tint = if (isDark) PureWhite.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     modifier = Modifier.size(16.dp)
                 )
@@ -1682,7 +1682,7 @@ private fun NotionMobileBottomDock(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.cancel),
-                            contentDescription = "Temizle",
+                            contentDescription = stringResource(R.string.clear),
                             tint = if (isDark) PureWhite.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             modifier = Modifier.size(14.dp)
                         )
@@ -1699,7 +1699,7 @@ private fun NotionMobileBottomDock(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.microphone_lines),
-                        contentDescription = "Sesle Ara",
+                        contentDescription = stringResource(R.string.voice_search),
                         tint = VibrantOrange,
                         modifier = Modifier.size(17.dp)
                     )
@@ -1731,7 +1731,7 @@ private fun NotionMobileBottomDock(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.file_edit),
-                    contentDescription = "Yeni Not",
+                    contentDescription = stringResource(R.string.new_note),
                     tint = VibrantOrange,
                     modifier = Modifier.size(20.dp)
                 )

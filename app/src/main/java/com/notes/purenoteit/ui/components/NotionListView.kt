@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -94,7 +95,7 @@ private fun NotionListRow(
     val category = categories.find { it.id == note.categoryId }
 
     val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == (note.status ?: "TODO") } ?: KANBAN_COLUMNS[0]
-    val dateStr = SimpleDateFormat("dd MMM", Locale("tr")).format(Date(note.date))
+    val dateStr = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.date))
 
     Surface(
         modifier = Modifier
@@ -138,7 +139,7 @@ private fun NotionListRow(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (note.title.isNullOrBlank()) "Başlıksız" else note.title!!,
+                        text = if (note.title.isNullOrBlank()) stringResource(R.string.untitled_note) else note.title!!,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -149,7 +150,7 @@ private fun NotionListRow(
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             painter = painterResource(id = R.drawable.ic_pin),
-                            contentDescription = "Sabitlendi",
+                            contentDescription = stringResource(R.string.pin_to_top),
                             tint = VibrantOrange,
                             modifier = Modifier.size(12.dp)
                         )
@@ -158,7 +159,7 @@ private fun NotionListRow(
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             painter = painterResource(id = R.drawable.lock),
-                            contentDescription = "Kilitli",
+                            contentDescription = null,
                             tint = VibrantOrange,
                             modifier = Modifier.size(12.dp)
                         )
@@ -167,7 +168,7 @@ private fun NotionListRow(
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             painter = painterResource(id = R.drawable.ic_alarm_clock),
-                            contentDescription = "Hatırlatıcı",
+                            contentDescription = null,
                             tint = VibrantOrange,
                             modifier = Modifier.size(12.dp)
                         )
@@ -177,7 +178,7 @@ private fun NotionListRow(
                 if (note.totalTasks > 0) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Görevler: ${note.completedTasks}/${note.totalTasks}",
+                        text = "${note.completedTasks}/${note.totalTasks}",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
@@ -197,7 +198,7 @@ private fun NotionListRow(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = currentStatusDef.title,
+                        text = stringResource(currentStatusDef.titleRes),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = currentStatusDef.badgeTextColor
@@ -210,7 +211,7 @@ private fun NotionListRow(
                 ) {
                     for (col in KANBAN_COLUMNS) {
                         DropdownMenuItem(
-                            text = { Text(col.title) },
+                            text = { Text(stringResource(col.titleRes)) },
                             onClick = {
                                 showStatusMenu = false
                                 onStatusChange(col.statusKey)
@@ -256,7 +257,7 @@ private fun NotionListRow(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.category_alt),
-                        contentDescription = "Seçenekler",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.size(16.dp)
                     )
@@ -267,14 +268,14 @@ private fun NotionListRow(
                     onDismissRequest = { showMenu = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text(if (note.isPinned) "Sabitlemeyi Kaldır" else "Başa Sabitle") },
+                        text = { Text(if (note.isPinned) stringResource(R.string.unpin) else stringResource(R.string.pin_to_top)) },
                         onClick = {
                             showMenu = false
                             onPinClick()
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Sil", color = Color(0xFFE53935)) },
+                        text = { Text(stringResource(R.string.delete), color = Color(0xFFE53935)) },
                         onClick = {
                             showMenu = false
                             onDeleteClick()

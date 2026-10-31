@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -61,7 +62,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Quick Inbox / Thought Stream View (Paket 4).
+ * Quick Inbox / Thought Stream View.
  * A chronological stream of quick thoughts that can be collected
  * and converted into formal structured notes in 1-click.
  */
@@ -78,8 +79,8 @@ fun NotionStreamView(
     val selectedItemIds = remember { mutableStateListOf<Int>() }
     val focusManager = LocalFocusManager.current
 
-    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale("tr")) }
-    val dateFormat = remember { SimpleDateFormat("d MMMM", Locale("tr")) }
+    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("d MMMM", Locale.getDefault()) }
 
     Box(
         modifier = modifier
@@ -131,7 +132,7 @@ fun NotionStreamView(
                         decorationBox = { inner ->
                             if (inputText.isEmpty()) {
                                 Text(
-                                    text = "Hızlı aklına gelen bir fikir yaz...",
+                                    text = stringResource(R.string.stream_input_placeholder),
                                     style = TextStyle(
                                         fontSize = 13.5.sp,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
@@ -186,14 +187,14 @@ fun NotionStreamView(
                         Text(text = "💡", fontSize = 42.sp)
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Hızlı Fikir Akışı Boş",
+                            text = stringResource(R.string.stream_empty_title),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Aklınıza gelen anlık düşünceleri yukarıdan yazın. İstediğiniz zaman seçip tek tıkla resmi bir nota dönüştürün.",
+                            text = stringResource(R.string.stream_empty_desc),
                             fontSize = 12.5.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -277,7 +278,7 @@ fun NotionStreamView(
                                 ) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.delete),
-                                        contentDescription = "Sil",
+                                        contentDescription = stringResource(R.string.delete),
                                         tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                                         modifier = Modifier.size(16.dp)
                                     )
@@ -292,7 +293,7 @@ fun NotionStreamView(
             }
         }
 
-        // Floating Action Bar at Bottom: "Seçilenleri Nota Dönüştür"
+        // Floating Action Bar at Bottom: Convert to Note
         AnimatedVisibility(
             visible = selectedItemIds.isNotEmpty(),
             enter = fadeIn(),
@@ -303,7 +304,7 @@ fun NotionStreamView(
         ) {
             Button(
                 onClick = {
-                    onConvertToNote(selectedItemIds.toList(), "Fikir Akışı Notu")
+                    onConvertToNote(selectedItemIds.toList(), "Idea Stream Note")
                     selectedItemIds.clear()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = VibrantOrange),
@@ -314,7 +315,7 @@ fun NotionStreamView(
                     Text(text = "📝", fontSize = 14.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "${selectedItemIds.size} Fikri Nota Dönüştür",
+                        text = "${selectedItemIds.size} " + stringResource(R.string.stream_convert_to_note),
                         fontWeight = FontWeight.Bold,
                         color = PureWhite
                     )

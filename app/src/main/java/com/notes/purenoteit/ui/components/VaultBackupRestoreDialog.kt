@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,12 +77,12 @@ fun VaultBackupRestoreDialog(
                 uri = selectedUri,
                 onSuccess = { notesCount, catsCount ->
                     isRestoring = false
-                    restoreSuccessMessage = "$notesCount not ve $catsCount kategori başarıyla kasanıza aktarıldı!"
-                    context.showToastShort("Yedek başarıyla yüklendi!")
+                    restoreSuccessMessage = context.getString(R.string.vault_restore_success_desc, notesCount, catsCount)
+                    context.showToastShort(context.getString(R.string.vault_restore_success_toast))
                 },
                 onError = { err ->
                     isRestoring = false
-                    context.showToastShort("Geri yükleme hatası: ${err.message}")
+                    context.showToastShort(err.message ?: "")
                 }
             )
         }
@@ -117,13 +118,13 @@ fun VaultBackupRestoreDialog(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "Kasa Yedekleme & Geri Yükleme",
+                            text = stringResource(R.string.vault_title),
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Tüm notlarınızı arşivleyin ve geri yükleyin",
+                            text = stringResource(R.string.vault_subtitle),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -136,7 +137,7 @@ fun VaultBackupRestoreDialog(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.cancel),
-                        contentDescription = "Kapat",
+                        contentDescription = stringResource(R.string.close),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.size(16.dp)
                     )
@@ -167,7 +168,7 @@ fun VaultBackupRestoreDialog(
                             color = VibrantOrange
                         )
                         Text(
-                            text = "Toplam Not",
+                            text = stringResource(R.string.tab_cards),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -188,7 +189,7 @@ fun VaultBackupRestoreDialog(
                             color = Color(0xFF388E3C)
                         )
                         Text(
-                            text = "Kategori",
+                            text = stringResource(R.string.category_setting),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -209,7 +210,7 @@ fun VaultBackupRestoreDialog(
                             color = Color(0xFF1976D2)
                         )
                         Text(
-                            text = "Şifreli Arşiv",
+                            text = "Vault",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -231,11 +232,11 @@ fun VaultBackupRestoreDialog(
                             onSuccess = { file ->
                                 isBackingUp = false
                                 VaultBackupManager.shareBackupFile(context, file)
-                                context.showToastShort("Kasa yedeği hazırlandı!")
+                                context.showToastShort(context.getString(R.string.vault_backup_success_toast))
                             },
                             onError = { err ->
                                 isBackingUp = false
-                                context.showToastShort("Yedekleme hatası: ${err.message}")
+                                context.showToastShort(err.message ?: "")
                             }
                         )
                     },
@@ -271,14 +272,14 @@ fun VaultBackupRestoreDialog(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isBackingUp) "Yedek Paketi Hazırlanıyor..." else "Kasayı Yedekle (.purevault)",
+                            text = if (isBackingUp) stringResource(R.string.vault_export_backing_up) else stringResource(R.string.vault_export_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Tüm notları, medyaları ve şifreli verileri Google Drive, WhatsApp veya İndirilenler'e kaydet.",
+                            text = stringResource(R.string.vault_export_desc),
                             fontSize = 11.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 16.sp
@@ -295,7 +296,6 @@ fun VaultBackupRestoreDialog(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .clickable(enabled = !isBackingUp && !isRestoring) {
-                        // Open file picker allowing .purevault and .zip
                         restoreFileLauncher.launch(
                             arrayOf("application/zip", "application/octet-stream", "*/*")
                         )
@@ -332,14 +332,14 @@ fun VaultBackupRestoreDialog(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isRestoring) "Veriler Geri Yükleniyor..." else "Yedekten Geri Yükle (.purevault / .zip)",
+                            text = if (isRestoring) stringResource(R.string.vault_restore_restoring) else stringResource(R.string.vault_restore_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Google Drive veya telefonunuzdaki yedek dosyasını seçerek notlarınızı tek tıkla geri getirin.",
+                            text = stringResource(R.string.vault_restore_desc),
                             fontSize = 11.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 16.sp
@@ -359,7 +359,7 @@ fun VaultBackupRestoreDialog(
             icon = { Text(text = "🎉", fontSize = 28.sp) },
             title = {
                 Text(
-                    text = "Geri Yükleme Tamamlandı!",
+                    text = stringResource(R.string.vault_restore_success_title),
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -377,7 +377,7 @@ fun VaultBackupRestoreDialog(
                         onDismiss()
                     }
                 ) {
-                    Text("Tamam", fontWeight = FontWeight.Bold, color = VibrantOrange)
+                    Text(stringResource(R.string.ok), fontWeight = FontWeight.Bold, color = VibrantOrange)
                 }
             }
         )

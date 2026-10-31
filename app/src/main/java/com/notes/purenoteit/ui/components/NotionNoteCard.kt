@@ -159,7 +159,7 @@ fun NotionNoteCard(
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        if (note.isPinned) "Sabitlemeyi Kaldır" else "Başa Sabitle",
+                                        if (note.isPinned) stringResource(R.string.unpin) else stringResource(R.string.pin_to_top),
                                         color = PureWhite
                                     )
                                 },
@@ -178,7 +178,7 @@ fun NotionNoteCard(
                             )
 
                             DropdownMenuItem(
-                                text = { Text("Düzenle", color = PureWhite) },
+                                text = { Text(stringResource(R.string.edit), color = PureWhite) },
                                 onClick = {
                                     showMenu = false
                                     onClick()
@@ -194,7 +194,7 @@ fun NotionNoteCard(
                             )
 
                             DropdownMenuItem(
-                                text = { Text("Sil", color = Color(0xFFFF5252)) },
+                                text = { Text(stringResource(R.string.delete), color = Color(0xFFFF5252)) },
                                 onClick = {
                                     showMenu = false
                                     onDeleteClick()
@@ -217,7 +217,7 @@ fun NotionNoteCard(
 
             // Title
             Text(
-                text = if (isProtected) "******" else (note.title ?: "Başlıksız Not"),
+                text = if (isProtected) "******" else (note.title ?: stringResource(R.string.untitled_note)),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp

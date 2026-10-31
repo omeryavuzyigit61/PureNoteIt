@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,16 +81,16 @@ fun NotionToolbar(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.plus_small),
-                    contentDescription = "Blok Ekle",
+                    contentDescription = stringResource(R.string.tb_add_block),
                     tint = PureWhite,
                     modifier = Modifier.size(20.dp)
                 )
             }
 
-            // 1. Sesli Dikte (Voice-to-Text Transcription via SpeechRecognizer) - Front & Center
+            // 1. Sesli Dikte (Voice-to-Text Transcription)
             ToolbarItem(
                 iconRes = R.drawable.microphone_lines,
-                label = if (isVoiceDictating) "Dinleniyor..." else "Sesli Dikte",
+                label = if (isVoiceDictating) stringResource(R.string.tb_listening) else stringResource(R.string.tb_voice_dictation),
                 onClick = { onVoiceDictation?.invoke() },
                 iconTint = if (isVoiceDictating) Color(0xFF8E24AA) else Color(0xFF6A1B9A),
                 containerColor = if (isVoiceDictating) Color(0xFFEDE7F6) else Color(0xFFF3E5F5)
@@ -98,22 +99,22 @@ fun NotionToolbar(
             // 2. OCR Metin Tarama (Scan to Text)
             ToolbarItem(
                 iconRes = R.drawable.ic_ocr_scan,
-                label = "Metin Tara",
+                label = stringResource(R.string.tb_scan_ocr),
                 onClick = { onScanOcr?.invoke() },
                 iconTint = VibrantOrange
             )
 
-            // 3. El Çizimi Ekleme (Drawing Canvas)
+            // 3. El Çizimi (Drawing Canvas)
             ToolbarItem(
                 iconRes = R.drawable.ic_brush,
-                label = "Çizim",
+                label = stringResource(R.string.tb_drawing),
                 onClick = onOpenDrawing
             )
 
             // 4. Görev / Checklist (To-Do)
             ToolbarItem(
                 iconRes = R.drawable.ic_checklist,
-                label = "Görev",
+                label = stringResource(R.string.tb_todo),
                 onClick = { onAddBlock(BlockType.TODO) },
                 iconTint = VibrantOrange
             )
@@ -121,7 +122,7 @@ fun NotionToolbar(
             // 5. Not Bağla (Bi-directional Link [[Note]])
             ToolbarItem(
                 iconRes = R.drawable.ic_network_graph,
-                label = "Not Bağla",
+                label = stringResource(R.string.tb_link_note),
                 onClick = { onLinkNote?.invoke() },
                 iconTint = VibrantOrange
             )
@@ -129,7 +130,7 @@ fun NotionToolbar(
             // 6. Fosforlu Vurgu (Highlighter ==metin==)
             ToolbarItem(
                 iconRes = R.drawable.ic_brush,
-                label = "Vurgula",
+                label = stringResource(R.string.tb_highlight),
                 onClick = { onInsertHighlight?.invoke() },
                 iconTint = Color(0xFFF57F17),
                 containerColor = Color(0xFFFFF9C4)
@@ -138,36 +139,36 @@ fun NotionToolbar(
             // 7. Akıllı #Etiket
             ToolbarItem(
                 iconRes = R.drawable.category,
-                label = "# Etiket",
+                label = stringResource(R.string.tb_tag),
                 onClick = { onInsertTag?.invoke() },
                 iconTint = VibrantOrange
             )
 
-            // H1 Başlık (Heading 1) with clear icon & label
+            // H1 Başlık (Heading 1)
             ToolbarItem(
                 iconRes = R.drawable.ic_format_h1,
-                label = "Başlık 1",
+                label = stringResource(R.string.tb_heading_1),
                 onClick = { onAddBlock(BlockType.HEADING_1) }
             )
 
-            // H2 Alt Başlık (Heading 2) with clear icon & label
+            // H2 Alt Başlık (Heading 2)
             ToolbarItem(
                 iconRes = R.drawable.ic_format_h2,
-                label = "Başlık 2",
+                label = stringResource(R.string.tb_heading_2),
                 onClick = { onAddBlock(BlockType.HEADING_2) }
             )
 
             // Madde İmleri (Bullet list)
             ToolbarItem(
                 iconRes = R.drawable.ic_format_bullet,
-                label = "Liste",
+                label = stringResource(R.string.tb_bullet_list),
                 onClick = { onAddBlock(BlockType.BULLET_LIST) }
             )
 
             // Açılır Liste (Toggle)
             ToolbarItem(
                 iconRes = R.drawable.category,
-                label = "Açılır Liste",
+                label = stringResource(R.string.tb_toggle),
                 onClick = { onAddBlock(BlockType.TOGGLE) },
                 iconTint = VibrantOrange
             )
@@ -175,7 +176,7 @@ fun NotionToolbar(
             // Dinamik Tablo (Table)
             ToolbarItem(
                 iconRes = R.drawable.ic_table,
-                label = "Tablo",
+                label = stringResource(R.string.tb_table),
                 onClick = { onAddBlock(BlockType.TABLE) },
                 iconTint = VibrantOrange
             )
@@ -183,7 +184,7 @@ fun NotionToolbar(
             // Alt Sayfa (Nested Sub-Page)
             ToolbarItem(
                 iconRes = R.drawable.ic_subpage,
-                label = "Alt Sayfa",
+                label = stringResource(R.string.tb_subpage),
                 onClick = { onAddBlock(BlockType.SUB_PAGE) },
                 iconTint = VibrantOrange
             )
@@ -191,21 +192,21 @@ fun NotionToolbar(
             // Vurgu / Alıntı Kutusu (Callout / Quote)
             ToolbarItem(
                 iconRes = R.drawable.ic_format_quote,
-                label = "Alıntı",
+                label = stringResource(R.string.tb_callout),
                 onClick = { onAddBlock(BlockType.CALLOUT) }
             )
 
             // Fotoğraf Ekleme
             ToolbarItem(
                 iconRes = R.drawable.picture,
-                label = "Fotoğraf",
+                label = stringResource(R.string.tb_photo),
                 onClick = onPickImage
             )
 
-            // Ses Kaydı (changes visual style when recording)
+            // Ses Kaydı
             ToolbarItem(
                 iconRes = R.drawable.microphone_lines,
-                label = if (isRecordingAudio) "Kaydediliyor..." else "Ses Kaydı",
+                label = if (isRecordingAudio) stringResource(R.string.tb_recording) else stringResource(R.string.tb_audio_record),
                 onClick = onRecordAudio,
                 iconTint = if (isRecordingAudio) Color(0xFFE53935) else VibrantOrange,
                 containerColor = if (isRecordingAudio) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
@@ -214,7 +215,7 @@ fun NotionToolbar(
             // Ayırıcı Çizgi (Divider)
             ToolbarItem(
                 iconRes = R.drawable.category,
-                label = "Ayırıcı",
+                label = stringResource(R.string.tb_divider),
                 onClick = { onAddBlock(BlockType.DIVIDER) }
             )
         }

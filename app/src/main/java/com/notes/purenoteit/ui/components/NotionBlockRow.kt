@@ -52,6 +52,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -304,7 +305,7 @@ fun NotionBlockRow(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.cancel),
-                    contentDescription = "Sil",
+                    contentDescription = stringResource(R.string.delete),
                     tint = if (isDarkContainer || isDraggingBlock) PureWhite.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.size(11.dp)
                 )
@@ -440,7 +441,7 @@ fun NotionBlockRow(
                         decorationBox = { innerTextField ->
                             if (block.content.isEmpty()) {
                                 Text(
-                                    text = "Yapılacak görev...",
+                                    text = stringResource(R.string.block_todo_placeholder),
                                     style = textStyle.copy(
                                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
                                     )
@@ -479,7 +480,7 @@ fun NotionBlockRow(
                         decorationBox = { innerTextField ->
                             if (block.content.isEmpty()) {
                                 Text(
-                                    text = "Liste maddesi...",
+                                    text = stringResource(R.string.block_bullet_placeholder),
                                     style = textStyle.copy(
                                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
                                     )
@@ -524,7 +525,7 @@ fun NotionBlockRow(
                             decorationBox = { innerTextField ->
                                 if (block.content.isEmpty()) {
                                     Text(
-                                        text = "Vurgulanmış not veya alıntı...",
+                                        text = stringResource(R.string.block_callout_placeholder),
                                         style = textStyle.copy(
                                             color = CharcoalGray.copy(alpha = 0.45f)
                                         )
@@ -579,7 +580,7 @@ fun NotionBlockRow(
                             decorationBox = { innerTextField ->
                                 if (block.content.isEmpty()) {
                                     Text(
-                                        text = "Açılır başlık (Toggle)...",
+                                        text = stringResource(R.string.block_toggle_placeholder),
                                         style = textStyle.copy(
                                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
                                             fontWeight = FontWeight.SemiBold
@@ -621,7 +622,7 @@ fun NotionBlockRow(
                                 decorationBox = { innerTextField ->
                                     if (block.toggleBody.isEmpty()) {
                                         Text(
-                                            text = "Gizlenen içerik detayları...",
+                                            text = stringResource(R.string.block_toggle_body_placeholder),
                                             style = textStyle.copy(
                                                 fontSize = 13.5.sp,
                                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
@@ -680,7 +681,7 @@ fun NotionBlockRow(
                                 Text(text = "📊", fontSize = 14.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Dinamik Tablo",
+                                    text = stringResource(R.string.block_dynamic_table),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -730,7 +731,7 @@ fun NotionBlockRow(
                                                 decorationBox = { inner ->
                                                     if (cellText.isEmpty()) {
                                                         Text(
-                                                            text = if (isHeader) "Sütun ${cIndex + 1}" else "...",
+                                                            text = if (isHeader) stringResource(R.string.block_table_column, cIndex + 1) else "...",
                                                             style = textStyle.copy(
                                                                 fontSize = 12.sp,
                                                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
@@ -772,9 +773,9 @@ fun NotionBlockRow(
                                         onTableChange?.invoke(updated)
                                     }
                                     .padding(horizontal = 10.dp, vertical = 5.dp)
-                            ) {
+                                ) {
                                 Text(
-                                    text = "+ Satır Ekle",
+                                    text = stringResource(R.string.block_table_add_row),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = VibrantOrange
@@ -783,7 +784,7 @@ fun NotionBlockRow(
 
                             if (numericSum != null) {
                                 Text(
-                                    text = "∑ Toplam: " + if (numericSum % 1.0 == 0.0) "${numericSum.toLong()} ₺" else "${String.format(Locale.US, "%.2f", numericSum)} ₺",
+                                    text = stringResource(R.string.block_table_sum) + " " + if (numericSum % 1.0 == 0.0) "${numericSum.toLong()} ₺" else "${String.format(Locale.US, "%.2f", numericSum)} ₺",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = VibrantOrange
@@ -804,7 +805,7 @@ fun NotionBlockRow(
                 ) {
                     AsyncImage(
                         model = File(block.mediaPath ?: ""),
-                        contentDescription = "Not Görseli",
+                        contentDescription = stringResource(R.string.block_image_desc),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(200.dp)
@@ -833,7 +834,7 @@ fun NotionBlockRow(
                 ) {
                     AsyncImage(
                         model = File(drawingPath ?: ""),
-                        contentDescription = "El Çizimi",
+                        contentDescription = stringResource(R.string.block_drawing_desc),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(220.dp)
@@ -870,7 +871,7 @@ fun NotionBlockRow(
                                 ) {
                                     Text(text = "✏️", fontSize = 11.sp)
                                     Text(
-                                        text = "Düzenle",
+                                        text = stringResource(R.string.edit),
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = PureWhite
@@ -913,11 +914,12 @@ fun NotionBlockRow(
 
             BlockType.WEB_BOOKMARK -> {
                 val context = LocalContext.current
+                val fallbackDomain = stringResource(R.string.block_web_bookmark)
                 val domain = remember(block.content) {
                     try {
-                        Uri.parse(block.content).host ?: "Web Bağlantısı"
+                        Uri.parse(block.content).host ?: fallbackDomain
                     } catch (e: Exception) {
-                        "Web Bağlantısı"
+                        fallbackDomain
                     }
                 }
 
@@ -955,7 +957,7 @@ fun NotionBlockRow(
                                 cursorBrush = SolidColor(VibrantOrange),
                                 decorationBox = { inner ->
                                     if (block.content.isEmpty()) {
-                                        Text("https://... bağlantı yapıştırın", style = textStyle.copy(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)))
+                                        Text(stringResource(R.string.block_web_bookmark_placeholder), style = textStyle.copy(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)))
                                     }
                                     inner()
                                 },
@@ -1013,7 +1015,7 @@ fun NotionBlockRow(
                             cursorBrush = SolidColor(VibrantOrange),
                             decorationBox = { inner ->
                                 if (block.content.isEmpty()) {
-                                    Text("Alt sayfa başlığı...", style = textStyle.copy(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)))
+                                    Text(stringResource(R.string.block_subpage_placeholder), style = textStyle.copy(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)))
                                 }
                                 inner()
                             },
@@ -1021,7 +1023,7 @@ fun NotionBlockRow(
                         )
 
                         Text(
-                            text = "Aç ↗",
+                            text = stringResource(R.string.block_subpage_open),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = VibrantOrange,
@@ -1068,9 +1070,9 @@ fun NotionBlockRow(
                             decorationBox = { innerTextField ->
                                 if (block.content.isEmpty()) {
                                     val placeholderText = when (block.type) {
-                                        BlockType.HEADING_1 -> "Başlık 1 (Büyük Başlık)..."
-                                        BlockType.HEADING_2 -> "Başlık 2 (Alt Başlık)..."
-                                        else -> "Not yazın veya '/' ile komutları açın..."
+                                        BlockType.HEADING_1 -> stringResource(R.string.block_h1_placeholder)
+                                        BlockType.HEADING_2 -> stringResource(R.string.block_h2_placeholder)
+                                        else -> stringResource(R.string.block_paragraph_placeholder)
                                     }
                                     Text(
                                         text = placeholderText,

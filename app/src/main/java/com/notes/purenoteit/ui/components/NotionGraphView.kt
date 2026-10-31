@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,6 +75,7 @@ fun NotionGraphView(
     isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val defaultUntitled = stringResource(R.string.untitled_note)
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
@@ -318,7 +320,7 @@ fun NotionGraphView(
                     drawText(iconText, screenPos.x, screenPos.y + (5f * scale), iconPaint)
 
                     // Display note title below node
-                    val titleText = note.title?.take(16) ?: "Başlıksız"
+                    val titleText = note.title?.take(16) ?: defaultUntitled
                     drawText(titleText, screenPos.x, screenPos.y + nodeRadius + (16f * scale), paint)
                 }
             }
@@ -341,7 +343,7 @@ fun NotionGraphView(
                 Text(text = "🌌", fontSize = 14.sp)
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "${notes.size} Not • ${links.size} Neon Bağlantı",
+                    text = stringResource(R.string.graph_stats, notes.size, links.size),
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface

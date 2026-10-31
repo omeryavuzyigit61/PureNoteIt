@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,7 +56,7 @@ import com.notes.purenoteit.ui.theme.VibrantOrange
 
 data class KanbanColumnDef(
     val statusKey: String,
-    val title: String,
+    val titleRes: Int,
     val badgeBgColor: Color,
     val badgeTextColor: Color,
     val dotColor: Color
@@ -64,28 +65,28 @@ data class KanbanColumnDef(
 val KANBAN_COLUMNS = listOf(
     KanbanColumnDef(
         statusKey = "TODO",
-        title = "Yapılacaklar",
+        titleRes = R.string.kanban_col_todo,
         badgeBgColor = Color(0xFFF3E8FF),
         badgeTextColor = Color(0xFF7E22CE),
         dotColor = Color(0xFFA855F7)
     ),
     KanbanColumnDef(
         statusKey = "IN_PROGRESS",
-        title = "Devam Edenler",
+        titleRes = R.string.kanban_col_in_progress,
         badgeBgColor = Color(0xFFFEF3C7),
         badgeTextColor = Color(0xFFB45309),
         dotColor = Color(0xFFF59E0B)
     ),
     KanbanColumnDef(
         statusKey = "IN_REVIEW",
-        title = "İnceleniyor",
+        titleRes = R.string.kanban_col_review,
         badgeBgColor = Color(0xFFE0F2FE),
         badgeTextColor = Color(0xFF0369A1),
         dotColor = Color(0xFF0EA5E9)
     ),
     KanbanColumnDef(
         statusKey = "DONE",
-        title = "Tamamlandı",
+        titleRes = R.string.kanban_col_done,
         badgeBgColor = Color(0xFFDCFCE7),
         badgeTextColor = Color(0xFF15803D),
         dotColor = Color(0xFF22C55E)
@@ -173,7 +174,7 @@ private fun KanbanColumn(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = columnDef.title,
+                                text = stringResource(columnDef.titleRes),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = columnDef.badgeTextColor
@@ -199,7 +200,7 @@ private fun KanbanColumn(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.plus_small),
-                        contentDescription = "Not Ekle",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         modifier = Modifier.size(16.dp)
                     )
@@ -226,7 +227,7 @@ private fun KanbanColumn(
                     )
                 }
 
-                // Quick "+ Yeni Not" button at column bottom like Notion
+                // Quick "+ Add Note" button at column bottom like Notion
                 item {
                     Surface(
                         modifier = Modifier
@@ -251,7 +252,7 @@ private fun KanbanColumn(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Yeni Not Ekle",
+                                text = "+ " + stringResource(R.string.drawer_daily_agenda).take(0) + stringResource(R.string.no_notes_found_sub),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -306,7 +307,7 @@ private fun KanbanNoteCard(
                     }
 
                     Text(
-                        text = if (note.title.isNullOrBlank()) "Başlıksız" else note.title!!,
+                        text = if (note.title.isNullOrBlank()) stringResource(R.string.untitled_note) else note.title!!,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -326,7 +327,7 @@ private fun KanbanNoteCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = currentColumn.title,
+                            text = stringResource(currentColumn.titleRes),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = currentColumn.badgeTextColor
@@ -348,7 +349,7 @@ private fun KanbanNoteCard(
                                                 .background(col.dotColor)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text(col.title)
+                                        Text(stringResource(col.titleRes))
                                     }
                                 },
                                 onClick = {
@@ -411,7 +412,7 @@ private fun KanbanNoteCard(
                     if (note.isPassword == true) {
                         Icon(
                             painter = painterResource(id = R.drawable.lock),
-                            contentDescription = "Kilitli",
+                            contentDescription = null,
                             tint = VibrantOrange,
                             modifier = Modifier.size(12.dp)
                         )
