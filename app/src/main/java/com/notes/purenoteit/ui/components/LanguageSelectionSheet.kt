@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -81,13 +82,13 @@ fun LanguageSelectionSheet(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "Dil Seçimi / Language",
+                            text = stringResource(R.string.drawer_language),
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Uygulama arayüz dilini değiştirin",
+                            text = stringResource(R.string.drawer_language_sub),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -100,7 +101,7 @@ fun LanguageSelectionSheet(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.cancel),
-                        contentDescription = "Kapat",
+                        contentDescription = stringResource(R.string.close),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.size(16.dp)
                     )
@@ -120,8 +121,8 @@ fun LanguageSelectionSheet(
                             .clip(RoundedCornerShape(16.dp))
                             .clickable {
                                 selectedCode = option.code
-                                LanguageManager.setLanguage(context, option.code)
                                 onDismiss()
+                                LanguageManager.setLanguage(context, option.code)
                             },
                         shape = RoundedCornerShape(16.dp),
                         color = if (isSelected) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),

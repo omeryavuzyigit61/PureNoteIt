@@ -27,6 +27,8 @@
     <string name="saved_sound">Ses Kaydedildi</string>
 
     <!-- Navigation Drawer -->
+    <string name="drawer_title">PureNoteIt</string>
+    <string name="drawer_subtitle">Notion &amp; Kasa Mimarisi</string>
     <string name="drawer_category_mgmt">Kategori Yönetimi</string>
     <string name="drawer_category_mgmt_sub">Kategorileri yönet ve kilitle</string>
     <string name="drawer_pin_vault">PIN &amp; Kasa Kilidi</string>
@@ -43,7 +45,12 @@
     <string name="drawer_vault_center_sub">Yedek al ve verileri geri yükle</string>
     <string name="drawer_trash_bin">Çöp Kutusu</string>
     <string name="drawer_language">Dil Seçimi / Language</string>
+    <string name="drawer_language_sub">Uygulama dilini değiştirin</string>
     <string name="drawer_dark_mode">Karanlık Mod</string>
+    <string name="dark_theme_active">Koyu tema aktif</string>
+    <string name="light_theme_active">Açık tema aktif</string>
+    <string name="deleted_notes_count">silinmiş not saklanıyor</string>
+    <string name="empty">Boş</string>
 
     <!-- View Mode Tabs -->
     <string name="tab_cards">Kartlar</string>
@@ -54,11 +61,24 @@
     <string name="tab_whiteboard">Tuval</string>
     <string name="tab_stream">Akış</string>
 
+    <!-- Common UI -->
+    <string name="all_categories">Tümü</string>
+    <string name="search_placeholder">Notlarda veya etiketlerde ara…</string>
+    <string name="no_notes_found">Henüz not bulunamadı</string>
+    <string name="no_notes_found_sub">Yeni bir not oluşturmak için + butonuna dokunun</string>
+    <string name="recent_notes">Son Kullanılanlar</string>
+    <string name="cancel">İptal</string>
+    <string name="dismiss">Vazgeç</string>
+    <string name="confirm">Onayla</string>
+    <string name="undo">Geri Al</string>
+    <string name="redo">İleri Al</string>
+
     <!-- Subpage & Security -->
     <string name="subpage_badge">Alt Sayfa</string>
     <string name="locked_note_title">Korumalı Not (AES-256)</string>
     <string name="locked_note_subtitle">Bu not şifrelenmiştir. Görüntülemek için parmak izinizi okutun veya PIN girin.</string>
-    <string name="unlock_button">Kilidi Aç</string>
+    <string name="unlock_button">Kasanın Kilidini Aç</string>
     <string name="go_back">Geri Dön</string>
     <string name="enter_pin">PIN Girin</string>
+    <string name="enter_pin_desc">Korumalı notu açmak için 6 haneli PIN kodunuzu girin.</string>
 </resources>

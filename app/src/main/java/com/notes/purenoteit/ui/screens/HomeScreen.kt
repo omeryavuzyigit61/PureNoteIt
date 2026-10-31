@@ -142,14 +142,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class NotionViewMode(val title: String, val iconRes: Int) {
-    GRID("Kartlar", R.drawable.category),
-    LIST("Liste", R.drawable.ic_checklist),
-    BOARD("Pano", R.drawable.category_alt),
-    CALENDAR("Takvim", R.drawable.calendar),
-    GRAPH("Ağ", R.drawable.ic_network_graph),
-    WHITEBOARD("Tuval", R.drawable.ic_brush),
-    STREAM("Akış", R.drawable.ic_stream_timeline)
+enum class NotionViewMode(val titleRes: Int, val iconRes: Int) {
+    GRID(R.string.tab_cards, R.drawable.category),
+    LIST(R.string.tab_list, R.drawable.ic_checklist),
+    BOARD(R.string.tab_board, R.drawable.category_alt),
+    CALENDAR(R.string.tab_calendar, R.drawable.calendar),
+    GRAPH(R.string.tab_graph, R.drawable.ic_network_graph),
+    WHITEBOARD(R.string.tab_whiteboard, R.drawable.ic_brush),
+    STREAM(R.string.tab_stream, R.drawable.ic_stream_timeline)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -173,7 +173,7 @@ fun HomeScreen(
     val allLinks by noteViewModel.allLinks.observeAsState(emptyList())
     val streamItems by noteViewModel.streamItems.observeAsState(emptyList())
 
-    var selectedCategory by remember { mutableStateOf("Tümü") }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var currentViewMode by remember { mutableStateOf(NotionViewMode.GRID) }
     var isSearchFocused by remember { mutableStateOf(false) }
@@ -279,7 +279,7 @@ fun HomeScreen(
     // Filter notes
     val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles) {
         activeNotes.filter { note ->
-            val matchesCategory = if (selectedCategory == "Tümü") {
+            val matchesCategory = if (selectedCategory == null) {
                 true
             } else {
                 val cat = categoryList.find { it.name == selectedCategory }
@@ -399,7 +399,7 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
                             Text(
-                                text = "PureNoteIt",
+                                text = stringResource(R.string.drawer_title),
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -407,7 +407,7 @@ fun HomeScreen(
                                 )
                             )
                             Text(
-                                text = "Notion & Kasa Mimarisi",
+                                text = stringResource(R.string.drawer_subtitle),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
@@ -421,8 +421,8 @@ fun HomeScreen(
                     // Menu Item: Category Management
                     DrawerMenuTile(
                         iconRes = R.drawable.category,
-                        title = "Kategori Yönetimi",
-                        subtitle = "Kategorileri yönet ve kilitle",
+                        title = stringResource(R.string.drawer_category_mgmt),
+                        subtitle = stringResource(R.string.drawer_category_mgmt_sub),
                         onClick = {
                             scope.launch { drawerState.close() }
                             onNavigateToCategorySettings()
@@ -434,8 +434,8 @@ fun HomeScreen(
                     // Menu Item: PIN & Vault Settings
                     DrawerMenuTile(
                         iconRes = R.drawable.lock,
-                        title = "PIN & Kasa Kilidi",
-                        subtitle = "Bitwarden güvenlik ayarları",
+                        title = stringResource(R.string.drawer_pin_vault),
+                        subtitle = stringResource(R.string.drawer_pin_vault_sub),
                         onClick = {
                             scope.launch { drawerState.close() }
                             onNavigateToPasswordSettings()
@@ -447,8 +447,8 @@ fun HomeScreen(
                     // Menu Item: Daily Agenda Automation (Paket 2)
                     DrawerMenuTile(
                         iconRes = R.drawable.calendar,
-                        title = "Günün Ajandası",
-                        subtitle = "Otomatik günlük plan şablonu oluştur",
+                        title = stringResource(R.string.drawer_daily_agenda),
+                        subtitle = stringResource(R.string.drawer_daily_agenda_sub),
                         onClick = {
                             scope.launch {
                                 drawerState.close()
@@ -462,8 +462,8 @@ fun HomeScreen(
                     // Menu Item: 2D Knowledge Graph (Paket 1)
                     DrawerMenuTile(
                         iconRes = R.drawable.ic_network_graph,
-                        title = "Bilgi Ağı (2D Graph)",
-                        subtitle = "Notlar arası bağlantı haritası",
+                        title = stringResource(R.string.drawer_graph_view),
+                        subtitle = stringResource(R.string.drawer_graph_view_sub),
                         onClick = {
                             currentViewMode = NotionViewMode.GRAPH
                             scope.launch { drawerState.close() }
@@ -475,8 +475,8 @@ fun HomeScreen(
                     // Menu Item: Thought Stream (Paket 4)
                     DrawerMenuTile(
                         iconRes = R.drawable.ic_stream_timeline,
-                        title = "Fikir Akışı (Inbox)",
-                        subtitle = "Hızlı anlık düşünce timeline'ı",
+                        title = stringResource(R.string.drawer_stream_view),
+                        subtitle = stringResource(R.string.drawer_stream_view_sub),
                         onClick = {
                             currentViewMode = NotionViewMode.STREAM
                             scope.launch { drawerState.close() }
@@ -488,8 +488,8 @@ fun HomeScreen(
                     // Menu Item: Infinite Whiteboard (Feature 4)
                     DrawerMenuTile(
                         iconRes = R.drawable.ic_brush,
-                        title = "Sonsuz Tuval (Whiteboard)",
-                        subtitle = "Sürüklenebilir kartlar ve görsel harita",
+                        title = stringResource(R.string.drawer_whiteboard),
+                        subtitle = stringResource(R.string.drawer_whiteboard_sub),
                         onClick = {
                             currentViewMode = NotionViewMode.WHITEBOARD
                             scope.launch { drawerState.close() }
@@ -501,8 +501,8 @@ fun HomeScreen(
                     // Menu Item: Vault Backup & Restore Center (Feature 5)
                     DrawerMenuTile(
                         iconRes = R.drawable.lock,
-                        title = "Kasa Yedekleme & Geri Yükleme",
-                        subtitle = "Yedek al ve verileri geri yükle",
+                        title = stringResource(R.string.drawer_vault_center),
+                        subtitle = stringResource(R.string.drawer_vault_center_sub),
                         onClick = {
                             scope.launch { drawerState.close() }
                             showVaultRestoreDialog = true
@@ -514,8 +514,8 @@ fun HomeScreen(
                     // Menu Item: Trash Bin (Feature 2)
                     DrawerMenuTile(
                         iconRes = R.drawable.delete,
-                        title = "Çöp Kutusu",
-                        subtitle = if (trashedNotes.isNotEmpty()) "${trashedNotes.size} silinmiş not saklanıyor" else "Boş",
+                        title = stringResource(R.string.drawer_trash_bin),
+                        subtitle = if (trashedNotes.isNotEmpty()) "${trashedNotes.size} " + stringResource(R.string.deleted_notes_count) else stringResource(R.string.empty),
                         onClick = {
                             scope.launch { drawerState.close() }
                             showTrashBinSheet = true
@@ -527,7 +527,7 @@ fun HomeScreen(
                     // Menu Item: Language Selection (Çoklu Dil)
                     DrawerMenuTile(
                         iconRes = R.drawable.category,
-                        title = "Dil Seçimi / Language",
+                        title = stringResource(R.string.drawer_language),
                         subtitle = LanguageManager.getLanguageLabel(context),
                         onClick = {
                             scope.launch { drawerState.close() }
@@ -569,13 +569,13 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Karanlık Mod",
+                                    text = stringResource(R.string.drawer_dark_mode),
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = if (isDarkTheme) "Koyu tema aktif" else "Açık tema aktif",
+                                    text = if (isDarkTheme) stringResource(R.string.dark_theme_active) else stringResource(R.string.light_theme_active),
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                 )
@@ -694,12 +694,12 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 CategoryChip(
-                                    label = "Tümü",
-                                    isSelected = selectedCategory == "Tümü",
+                                    label = stringResource(R.string.all_categories),
+                                    isSelected = selectedCategory == null,
                                     onClick = {
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
-                                        selectedCategory = "Tümü"
+                                        selectedCategory = null
                                     }
                                 )
 
@@ -1356,7 +1356,7 @@ private fun ViewModeTab(
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = mode.title,
+                text = stringResource(id = mode.titleRes),
                 fontSize = 12.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface
@@ -1399,7 +1399,7 @@ private fun EmptyStateContent(
             Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = if (searchQuery.isNotBlank()) "Aramanızla eşleşen not bulunamadı" else "Henüz bir not yok",
+                text = stringResource(R.string.no_notes_found),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
@@ -1410,10 +1410,7 @@ private fun EmptyStateContent(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = if (searchQuery.isNotBlank())
-                    "Farklı bir arama terimi deneyebilir veya kategoriyi değiştirebilirsiniz."
-                else
-                    "Notion blokları, yapılacaklar listesi veya ses kaydı ile hemen yeni bir not oluşturun.",
+                text = stringResource(R.string.no_notes_found_sub),
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -1640,7 +1637,7 @@ private fun NotionMobileBottomDock(
                 ) {
                     if (searchQuery.isEmpty()) {
                         Text(
-                            text = "Notlarda ara veya sor...",
+                            text = stringResource(R.string.search_placeholder),
                             fontSize = 13.sp,
                             color = if (isDark) PureWhite.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                             maxLines = 1,

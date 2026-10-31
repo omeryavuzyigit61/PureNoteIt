@@ -84,6 +84,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -810,7 +811,7 @@ fun NoteDetailScreen(
                         }
                         Spacer(modifier = Modifier.height(20.dp))
                         Text(
-                            text = "Korumalı Not (AES-256)",
+                            text = stringResource(R.string.locked_note_title),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -818,7 +819,7 @@ fun NoteDetailScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Bu not şifrelenmiştir. Görüntülemek için kasanızın kilidini açın.",
+                            text = stringResource(R.string.locked_note_subtitle),
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -836,7 +837,7 @@ fun NoteDetailScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = VibrantOrange)
                         ) {
                             Text(
-                                text = "Kasanın Kilidini Aç",
+                                text = stringResource(R.string.unlock_button),
                                 fontWeight = FontWeight.Bold,
                                 color = PureWhite
                             )
@@ -847,7 +848,7 @@ fun NoteDetailScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "Geri Dön",
+                                text = stringResource(R.string.go_back),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -875,7 +876,7 @@ fun NoteDetailScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             painter = painterResource(id = R.drawable.arrow_left),
-                            contentDescription = "Geri",
+                            contentDescription = stringResource(R.string.go_back),
                             tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
@@ -889,7 +890,7 @@ fun NoteDetailScreen(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_undo),
-                            contentDescription = "Geri Al",
+                            contentDescription = stringResource(R.string.undo),
                             tint = if (undoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
                             modifier = Modifier.size(19.dp)
                         )
@@ -903,7 +904,7 @@ fun NoteDetailScreen(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_redo),
-                            contentDescription = "İleri Al",
+                            contentDescription = stringResource(R.string.redo),
                             tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
                             modifier = Modifier.size(19.dp)
                         )
@@ -982,7 +983,7 @@ fun NoteDetailScreen(
                         color = CharcoalGray
                     ) {
                         Text(
-                            text = "Kaydet",
+                            text = stringResource(R.string.save),
                             color = PureWhite,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
@@ -2629,12 +2630,12 @@ fun NoteDetailScreen(
                 gatekeeperSuccessAction = null
             },
             title = {
-                Text(text = "PIN Girin", fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.enter_pin), fontWeight = FontWeight.Bold)
             },
             text = {
                 Column {
                     Text(
-                        text = "Korumalı notu açmak için 6 haneli PIN kodunuzu girin.",
+                        text = stringResource(R.string.enter_pin_desc),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -2642,7 +2643,7 @@ fun NoteDetailScreen(
                     OutlinedTextField(
                         value = gatekeeperPinInput,
                         onValueChange = { if (it.length <= 10) gatekeeperPinInput = it },
-                        label = { Text("PIN Kodu") },
+                        label = { Text(stringResource(R.string.enter_pin)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         visualTransformation = PasswordVisualTransformation(),
@@ -2670,7 +2671,7 @@ fun NoteDetailScreen(
                         }
                     }
                 ) {
-                    Text("Onayla", fontWeight = FontWeight.Bold, color = VibrantOrange)
+                    Text(stringResource(R.string.confirm), fontWeight = FontWeight.Bold, color = VibrantOrange)
                 }
             },
             dismissButton = {
@@ -2681,7 +2682,7 @@ fun NoteDetailScreen(
                         gatekeeperSuccessAction = null
                     }
                 ) {
-                    Text("İptal")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )

@@ -1,11 +1,13 @@
 package com.notes.purenoteit.view
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.Crossfade
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -25,6 +28,7 @@ import com.notes.purenoteit.ui.screens.HomeScreen
 import com.notes.purenoteit.ui.screens.NoteDetailScreen
 import com.notes.purenoteit.ui.screens.PasswordSettingScreen
 import com.notes.purenoteit.ui.theme.PureNoteItTheme
+import com.notes.purenoteit.util.LanguageManager
 import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.SharedPrefencesUtil
 import com.notes.purenoteit.viewmodel.CategoryViewModel
@@ -37,6 +41,10 @@ class MainActivity : AppCompatActivity() {
     private val noteViewModel: NoteViewModel by viewModels()
     private val categoryViewModel: CategoryViewModel by viewModels()
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LanguageManager.wrapContext(newBase))
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -47,6 +55,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val savedLang = LanguageManager.getSelectedLanguage(this)
+        if (savedLang != LanguageManager.LANG_AUTO) {
+            val localeList = LocaleListCompat.forLanguageTags(savedLang)
+            AppCompatDelegate.setApplicationLocales(localeList)
+        }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 

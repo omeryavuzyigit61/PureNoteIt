@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -434,7 +435,7 @@ fun NotionNoteCard(
                                 Text(text = "📄", fontSize = 10.sp)
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
-                                    text = "$subpageCount Alt Sayfa",
+                                    text = "$subpageCount " + stringResource(R.string.subpage_badge),
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF5E35B1)

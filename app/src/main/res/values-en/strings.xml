@@ -27,6 +27,8 @@
     <string name="saved_sound">Audio Saved</string>
 
     <!-- Navigation Drawer -->
+    <string name="drawer_title">PureNoteIt</string>
+    <string name="drawer_subtitle">Notion &amp; Vault Architecture</string>
     <string name="drawer_category_mgmt">Category Management</string>
     <string name="drawer_category_mgmt_sub">Manage and lock categories</string>
     <string name="drawer_pin_vault">PIN &amp; Vault Lock</string>
@@ -43,7 +45,12 @@
     <string name="drawer_vault_center_sub">Backup vault and restore data</string>
     <string name="drawer_trash_bin">Trash Bin</string>
     <string name="drawer_language">Language / Dil</string>
+    <string name="drawer_language_sub">Change app interface language</string>
     <string name="drawer_dark_mode">Dark Mode</string>
+    <string name="dark_theme_active">Dark theme active</string>
+    <string name="light_theme_active">Light theme active</string>
+    <string name="deleted_notes_count">deleted notes saved</string>
+    <string name="empty">Empty</string>
 
     <!-- View Mode Tabs -->
     <string name="tab_cards">Cards</string>
@@ -54,11 +61,24 @@
     <string name="tab_whiteboard">Canvas</string>
     <string name="tab_stream">Stream</string>
 
+    <!-- Common UI -->
+    <string name="all_categories">All</string>
+    <string name="search_placeholder">Search notes or tags…</string>
+    <string name="no_notes_found">No notes found yet</string>
+    <string name="no_notes_found_sub">Tap the + button to create a new note</string>
+    <string name="recent_notes">Recent Notes</string>
+    <string name="cancel">Cancel</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="confirm">Confirm</string>
+    <string name="undo">Undo</string>
+    <string name="redo">Redo</string>
+
     <!-- Subpage & Security -->
-    <string name="subpage_badge">Sub-pages</string>
+    <string name="subpage_badge">Sub-page</string>
     <string name="locked_note_title">Protected Note (AES-256)</string>
     <string name="locked_note_subtitle">This note is encrypted. Scan your fingerprint or enter PIN to view.</string>
-    <string name="unlock_button">Unlock Note</string>
+    <string name="unlock_button">Unlock Vault</string>
     <string name="go_back">Go Back</string>
     <string name="enter_pin">Enter PIN</string>
+    <string name="enter_pin_desc">Enter your 6-digit PIN code to unlock the protected note.</string>
 </resources>
