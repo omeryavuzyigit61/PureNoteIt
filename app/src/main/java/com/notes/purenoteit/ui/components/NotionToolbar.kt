@@ -48,6 +48,8 @@ fun NotionToolbar(
     onLinkNote: (() -> Unit)? = null,
     onScanOcr: (() -> Unit)? = null,
     onVoiceDictation: (() -> Unit)? = null,
+    onInsertHighlight: (() -> Unit)? = null,
+    onInsertTag: (() -> Unit)? = null,
     isRecordingAudio: Boolean = false,
     isVoiceDictating: Boolean = false,
     modifier: Modifier = Modifier
@@ -121,6 +123,23 @@ fun NotionToolbar(
                 iconRes = R.drawable.ic_network_graph,
                 label = "Not Bağla",
                 onClick = { onLinkNote?.invoke() },
+                iconTint = VibrantOrange
+            )
+
+            // 6. Fosforlu Vurgu (Highlighter ==metin==)
+            ToolbarItem(
+                iconRes = R.drawable.ic_brush,
+                label = "Vurgula",
+                onClick = { onInsertHighlight?.invoke() },
+                iconTint = Color(0xFFF57F17),
+                containerColor = Color(0xFFFFF9C4)
+            )
+
+            // 7. Akıllı #Etiket
+            ToolbarItem(
+                iconRes = R.drawable.category,
+                label = "# Etiket",
+                onClick = { onInsertTag?.invoke() },
                 iconTint = VibrantOrange
             )
 

@@ -120,6 +120,8 @@ import com.notes.purenoteit.ui.components.NotionListView
 import com.notes.purenoteit.ui.components.NotionNoteCard
 import com.notes.purenoteit.ui.components.NotionStreamView
 import com.notes.purenoteit.ui.components.NotionWhiteboardView
+import com.notes.purenoteit.ui.components.TrashBinSheet
+import com.notes.purenoteit.ui.components.VaultBackupRestoreDialog
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -194,29 +196,14 @@ fun HomeScreen(
     var showPinDialog by remember { mutableStateOf(false) }
     var enteredPin by remember { mutableStateOf("") }
 
-    // Vault Backup & Restore state (Feature 5)
-    var isBackingUpVault by remember { mutableStateOf(false) }
-    var isRestoringVault by remember { mutableStateOf(false) }
+    // Dedicated Vault Backup & Restore Center Modal (Feature 5)
+    var showVaultRestoreDialog by remember { mutableStateOf(false) }
 
-    val restoreVaultLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            isRestoringVault = true
-            noteViewModel.restoreVault(
-                context = context,
-                uri = it,
-                onSuccess = { notesCount, catsCount ->
-                    isRestoringVault = false
-                    context.showToastShort("Yedek başarıyla yüklendi! ($notesCount not, $catsCount kategori)")
-                },
-                onError = { err ->
-                    isRestoringVault = false
-                    context.showToastShort("Geri yükleme hatası: ${err.message}")
-                }
-            )
-        }
-    }
+    // Trash Bin Sheet state (Feature 2)
+    var showTrashBinSheet by remember { mutableStateOf(false) }
+
+    // Smart Hashtag filter state (Feature 3)
+    var selectedHashtag by remember { mutableStateOf<String?>(null) }
 
     // Dialog state for Daily Agenda Confirmation
     var showAgendaConfirmDialog by remember { mutableStateOf(false) }
@@ -249,9 +236,27 @@ fun HomeScreen(
         }
     }
 
+    // Segregate active notes and trashed notes (Feature 2)
+    val activeNotes = remember(noteList) {
+        noteList.filter { it.status != "TRASH" }
+    }
+    val trashedNotes = remember(noteList) {
+        noteList.filter { it.status == "TRASH" }
+    }
+
+    // Extract all unique hashtags from active notes (Feature 3)
+    val allHashtags = remember(activeNotes) {
+        val tagRegex = Regex("""#([a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]+)""")
+        activeNotes.flatMap { note ->
+            tagRegex.findAll((note.title ?: "") + " " + (note.description ?: ""))
+                .map { "#" + it.groupValues[1] }
+                .toList()
+        }.distinct()
+    }
+
     // Filter notes
-    val filteredNotes = remember(noteList, selectedCategory, searchQuery) {
-        noteList.filter { note ->
+    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag) {
+        activeNotes.filter { note ->
             val matchesCategory = if (selectedCategory == "Tümü") {
                 true
             } else {
@@ -265,12 +270,25 @@ fun HomeScreen(
                 (note.title ?: "").lowercase().contains(q) ||
                         (note.description ?: "").lowercase().contains(q)
             }
-            matchesCategory && matchesQuery
+            val matchesHashtag = if (selectedHashtag == null) {
+                true
+            } else {
+                val text = (note.title ?: "") + " " + (note.description ?: "")
+                text.contains(selectedHashtag!!, ignoreCase = true)
+            }
+            matchesCategory && matchesQuery && matchesHashtag
         }
     }
 
     val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.isPinned } }
     val regularNotes = remember(filteredNotes) { filteredNotes.filter { !it.isPinned } }
+
+    val handleSoftDeleteNote: (NoteData) -> Unit = { note ->
+        val trashed = note.copy(status = "TRASH")
+        trashed.id = note.id
+        noteViewModel.saveNote(trashed, contentForLinks = null)
+        context.showToastShort("\"${note.title ?: "Not"}\" Çöp Kutusu'na taşındı (30 gün saklanır)")
+    }
 
     val handleNoteClick: (NoteData) -> Unit = { note ->
         focusManager.clearFocus()
@@ -453,39 +471,27 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Menu Item: Vault Backup (Feature 5)
+                    // Menu Item: Vault Backup & Restore Center (Feature 5)
                     DrawerMenuTile(
                         iconRes = R.drawable.lock,
-                        title = if (isBackingUpVault) "Yedekleniyor..." else "Kasayı Yedekle (.purevault)",
-                        subtitle = "Tüm notları, medyaları ve şifreleri dışa aktar",
+                        title = "Kasa Yedekleme & Geri Yükleme",
+                        subtitle = "Yedek al ve yedekten verileri anında geri çek",
                         onClick = {
                             scope.launch { drawerState.close() }
-                            isBackingUpVault = true
-                            noteViewModel.backupVault(
-                                context = context,
-                                onSuccess = { file ->
-                                    isBackingUpVault = false
-                                    com.notes.purenoteit.util.VaultBackupManager.shareBackupFile(context, file)
-                                    context.showToastShort("Kasa yedeği hazırlandı!")
-                                },
-                                onError = { e ->
-                                    isBackingUpVault = false
-                                    context.showToastShort("Yedekleme hatası: ${e.message}")
-                                }
-                            )
+                            showVaultRestoreDialog = true
                         }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Menu Item: Vault Restore (Feature 5)
+                    // Menu Item: Trash Bin (Feature 2)
                     DrawerMenuTile(
-                        iconRes = R.drawable.category,
-                        title = if (isRestoringVault) "Geri Yükleniyor..." else "Kasayı Geri Yükle",
-                        subtitle = ".purevault dosyasından notları içeri aktar",
+                        iconRes = R.drawable.delete,
+                        title = "Çöp Kutusu",
+                        subtitle = if (trashedNotes.isNotEmpty()) "${trashedNotes.size} silinmiş not saklanıyor" else "Boş",
                         onClick = {
                             scope.launch { drawerState.close() }
-                            restoreVaultLauncher.launch("*/*")
+                            showTrashBinSheet = true
                         }
                     )
 
@@ -668,6 +674,46 @@ fun HomeScreen(
                                     )
                                 }
                             }
+
+                            // Horizontal Hashtags (#Etiket) Row (Feature 3)
+                            if (allHashtags.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "🏷️",
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(start = 2.dp, end = 2.dp)
+                                    )
+
+                                    allHashtags.forEach { tag ->
+                                        val isTagSelected = selectedHashtag == tag
+                                        Surface(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    selectedHashtag = if (isTagSelected) null else tag
+                                                },
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = if (isTagSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                            border = if (isTagSelected) null else androidx.compose.foundation.BorderStroke(0.5.dp, BorderLight.copy(alpha = 0.6f))
+                                        ) {
+                                            Text(
+                                                text = tag,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isTagSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 },
@@ -750,7 +796,7 @@ fun HomeScreen(
                             categories = categoryList,
                             onNoteClick = handleNoteClick,
                             onPinClick = { note -> noteViewModel.togglePinStatus(note.id, note.isPinned) },
-                            onDeleteClick = { note -> noteViewModel.deleteNoteById(note.id) },
+                            onDeleteClick = { note -> handleSoftDeleteNote(note) },
                             onStatusChange = { note, newStatus -> noteViewModel.updateNoteStatus(note, newStatus) },
                             modifier = Modifier.padding(paddingValues)
                         )
@@ -862,7 +908,7 @@ fun HomeScreen(
                                         note = note,
                                         onClick = { handleNoteClick(note) },
                                         onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
-                                        onDeleteClick = { noteViewModel.deleteNoteById(note.id) }
+                                        onDeleteClick = { handleSoftDeleteNote(note) }
                                     )
                                 }
 
@@ -894,7 +940,7 @@ fun HomeScreen(
                                     note = note,
                                     onClick = { handleNoteClick(note) },
                                     onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
-                                    onDeleteClick = { noteViewModel.deleteNoteById(note.id) }
+                                    onDeleteClick = { handleSoftDeleteNote(note) }
                                 )
                             }
                         }
@@ -1097,6 +1143,38 @@ fun HomeScreen(
             },
             shape = RoundedCornerShape(20.dp),
             containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    // Vault Backup & Restore Modal Management Center (Feature 5)
+    if (showVaultRestoreDialog) {
+        VaultBackupRestoreDialog(
+            noteViewModel = noteViewModel,
+            totalNotesCount = activeNotes.size,
+            totalCategoriesCount = categoryList.size,
+            onDismiss = { showVaultRestoreDialog = false }
+        )
+    }
+
+    // 30-Day Trash Bin & Safe Note Recovery Sheet (Feature 2)
+    if (showTrashBinSheet) {
+        TrashBinSheet(
+            trashedNotes = trashedNotes,
+            onRestoreNote = { note ->
+                val restored = note.copy(status = "TODO")
+                restored.id = note.id
+                noteViewModel.saveNote(restored, null)
+                context.showToastShort("\"${note.title ?: "Not"}\" geri yüklendi!")
+            },
+            onPermanentDelete = { id ->
+                noteViewModel.deleteNoteById(id)
+                context.showToastShort("Not kalıcı olarak silindi")
+            },
+            onEmptyTrash = {
+                trashedNotes.forEach { noteViewModel.deleteNoteById(it.id) }
+                context.showToastShort("Çöp kutusu boşaltıldı")
+            },
+            onDismiss = { showTrashBinSheet = false }
         )
     }
 }

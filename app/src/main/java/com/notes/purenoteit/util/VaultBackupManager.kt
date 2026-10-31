@@ -128,20 +128,22 @@ object VaultBackupManager {
                 var jsonContent: String? = null
                 val filesDir = context.filesDir
 
-                context.contentResolver.openInputStream(backupUri)?.use { inputStream ->
-                    ZipInputStream(inputStream).use { zis ->
-                        var entry = zis.nextEntry
-                        while (entry != null) {
-                            if (entry.name == "vault_manifest.json") {
-                                jsonContent = zis.bufferedReader(Charsets.UTF_8).readText()
-                            } else if (entry.name.startsWith("media/")) {
-                                val relPath = entry.name.removePrefix("media/")
-                                val targetFile = File(filesDir, relPath)
-                                targetFile.parentFile?.mkdirs()
-                                FileOutputStream(targetFile).use { fos -> zis.copyTo(fos) }
+                context.contentResolver.openInputStream(backupUri)?.let { rawStream ->
+                    java.io.BufferedInputStream(rawStream).use { bufStream ->
+                        ZipInputStream(bufStream).use { zis ->
+                            var entry = zis.nextEntry
+                            while (entry != null) {
+                                if (entry.name == "vault_manifest.json") {
+                                    jsonContent = zis.bufferedReader(Charsets.UTF_8).readText()
+                                } else if (entry.name.startsWith("media/")) {
+                                    val relPath = entry.name.removePrefix("media/")
+                                    val targetFile = File(filesDir, relPath)
+                                    targetFile.parentFile?.mkdirs()
+                                    FileOutputStream(targetFile).use { fos -> zis.copyTo(fos) }
+                                }
+                                zis.closeEntry()
+                                entry = zis.nextEntry
                             }
-                            zis.closeEntry()
-                            entry = zis.nextEntry
                         }
                     }
                 }
@@ -157,9 +159,9 @@ object VaultBackupManager {
                     categoryDao.upsertCategory(cat).onErrorComplete().blockingAwait()
                 }
 
-                // Restore notes
+                // Restore notes safely
                 payload.notes.forEach { note ->
-                    noteDao.upsert(note).blockingAwait()
+                    noteDao.upsert(note).onErrorComplete().blockingAwait()
                 }
 
                 // Restore note links

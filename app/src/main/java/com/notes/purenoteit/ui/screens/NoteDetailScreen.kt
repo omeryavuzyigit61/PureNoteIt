@@ -107,6 +107,7 @@ import com.notes.purenoteit.ui.components.NotionToolbar
 import com.notes.purenoteit.ui.components.PdfExportStudioSheet
 import com.notes.purenoteit.ui.components.ReminderBottomSheet
 import com.notes.purenoteit.ui.components.SpotifyAudioVisualizer
+import com.notes.purenoteit.ui.components.ZenReadingModeView
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -235,6 +236,22 @@ fun NoteDetailScreen(
     var showLinkNotePicker by remember { mutableStateOf(false) }
     var linkSearchQuery by remember { mutableStateOf("") }
     val allNotesForLinking by noteViewModel.noteList.observeAsState(emptyList())
+
+    // Zen Mode & Stats states (Feature 4 & 2)
+    var isZenMode by remember { mutableStateOf(false) }
+    var showStatsDialog by remember { mutableStateOf(false) }
+    var showTrashConfirmDialog by remember { mutableStateOf(false) }
+
+    // Live Word Count, Character Count & Reading Time Metrics (Feature 4)
+    val allNoteText = remember(title, blocks.map { it.content + " " + it.toggleBody }) {
+        title + " " + blocks.joinToString(" ") { it.content + " " + it.toggleBody }
+    }
+    val wordCount = remember(allNoteText) {
+        val t = allNoteText.trim()
+        if (t.isEmpty()) 0 else t.split("\\s+".toRegex()).count { it.isNotBlank() }
+    }
+    val charCount = remember(allNoteText) { allNoteText.length }
+    val readingTimeMinutes = remember(wordCount) { maxOf(1, (wordCount + 199) / 200) }
 
     // Smart Link Suggestion (Feature 3)
     val suggestedLinkTitle = remember(blocks.map { it.content }, allNotesForLinking, noteId) {
@@ -638,7 +655,18 @@ fun NoteDetailScreen(
         onNavigateBack()
     }
 
-    Scaffold(
+    if (isZenMode) {
+        ZenReadingModeView(
+            title = title,
+            icon = selectedIcon,
+            blocks = blocks,
+            wordCount = wordCount,
+            readingTimeMinutes = readingTimeMinutes,
+            audioRecorder = audioRecorder,
+            onExit = { isZenMode = false }
+        )
+    } else {
+        Scaffold(
         topBar = {
             TopAppBar(
                 modifier = Modifier.statusBarsPadding(),
@@ -717,6 +745,29 @@ fun NoteDetailScreen(
                             tint = if (isPassword) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
+                    }
+
+                    // Zen Mode Action Button (Feature 4)
+                    IconButton(
+                        onClick = { isZenMode = true },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Text(text = "🧘", fontSize = 17.sp)
+                    }
+
+                    // Move to Trash Action Button (Feature 2)
+                    if (noteId != -1) {
+                        IconButton(
+                            onClick = { showTrashConfirmDialog = true },
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.delete),
+                                contentDescription = "Çöp Kutusuna Taşı",
+                                tint = Color(0xFFE53935),
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))
@@ -1200,6 +1251,26 @@ fun NoteDetailScreen(
                         showOcrSourceSheet = true
                     },
                     onVoiceDictation = { handleToggleVoiceDictation() },
+                    onInsertHighlight = {
+                        recordUndoState()
+                        if (blocks.isNotEmpty() && blocks.last().type == BlockType.PARAGRAPH && blocks.last().content.isNotBlank()) {
+                            val last = blocks.last()
+                            blocks[blocks.lastIndex] = last.copy(content = last.content + " ==vurgulanan metin==")
+                        } else {
+                            blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = "==vurgulanan metin=="))
+                        }
+                        context.showToastShort("Fosforlu vurgu eklendi")
+                    },
+                    onInsertTag = {
+                        recordUndoState()
+                        if (blocks.isNotEmpty() && blocks.last().type == BlockType.PARAGRAPH) {
+                            val last = blocks.last()
+                            blocks[blocks.lastIndex] = last.copy(content = (last.content + " #etiket").trim())
+                        } else {
+                            blocks.add(NoteBlock(type = BlockType.PARAGRAPH, content = "#etiket"))
+                        }
+                        context.showToastShort("#Etiket eklendi")
+                    },
                     isRecordingAudio = isRecordingAudio,
                     isVoiceDictating = isVoiceDictating
                 )
@@ -1378,6 +1449,30 @@ fun NoteDetailScreen(
                                 fontSize = 11.5.sp,
                                 fontWeight = if (hasActiveReminder) FontWeight.Bold else FontWeight.Medium,
                                 color = if (hasActiveReminder) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Live Word Count & Reading Time Stats Chip (Feature 4)
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showStatsDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = androidx.compose.foundation.BorderStroke(0.5.dp, BorderLight.copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "📊", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "$wordCount kelime • ~$readingTimeMinutes dk",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -2250,5 +2345,70 @@ fun NoteDetailScreen(
             },
             confirmButton = {}
         )
+    }
+
+    // Note Statistics Detailed Dialog (Feature 4)
+    if (showStatsDialog) {
+        AlertDialog(
+            onDismissRequest = { showStatsDialog = false },
+            icon = { Text(text = "📊", fontSize = 28.sp) },
+            title = { Text(text = "Not İstatistikleri", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = "• Kelime Sayısı: $wordCount kelime", fontSize = 13.sp)
+                    Text(text = "• Karakter Sayısı: $charCount karakter", fontSize = 13.sp)
+                    Text(text = "• Tahmini Okuma Süresi: ~$readingTimeMinutes dakika", fontSize = 13.sp)
+                    Text(text = "• Toplam Blok Sayısı: ${blocks.size} blok", fontSize = 13.sp)
+                    val totalTasks = blocks.count { it.type == BlockType.TODO }
+                    if (totalTasks > 0) {
+                        val completedTasks = blocks.count { it.type == BlockType.TODO && it.isChecked }
+                        Text(text = "• Görev İlerlemesi: $completedTasks / $totalTasks tamamlandı", fontSize = 13.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showStatsDialog = false }) {
+                    Text("Kapat", fontWeight = FontWeight.Bold, color = VibrantOrange)
+                }
+            }
+        )
+    }
+
+    // Move to Trash Confirmation Dialog (Feature 2)
+    if (showTrashConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showTrashConfirmDialog = false },
+            icon = { Text(text = "🗑️", fontSize = 28.sp) },
+            title = { Text(text = "Çöp Kutusuna Taşı?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = "Bu not Çöp Kutusu'na taşınacaktır ve 30 gün boyunca dilediğiniz zaman geri yükleyebilirsiniz.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showTrashConfirmDialog = false
+                        noteStatus = "TRASH"
+                        saveNote()
+                        context.showToastShort("Not Çöp Kutusu'na taşındı (30 gün saklanır)")
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFD32F2F),
+                        contentColor = PureWhite
+                    )
+                ) {
+                    Text("Çöp Kutusuna Taşı", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTrashConfirmDialog = false }) {
+                    Text("Vazgeç")
+                }
+            }
+        )
+    }
     }
 }

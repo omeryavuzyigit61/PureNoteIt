@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -382,6 +383,44 @@ fun NotionNoteCard(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            // Smart Hashtags (Feature 3)
+            val hashtags = remember(note.title, note.description) {
+                if (isProtected) emptyList() else {
+                    val text = (note.title ?: "") + " " + (note.description ?: "")
+                    Regex("""#([a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]+)""")
+                        .findAll(text)
+                        .map { "#" + it.groupValues[1] }
+                        .distinct()
+                        .take(3)
+                        .toList()
+                }
+            }
+
+            if (hashtags.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    for (tag in hashtags) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = SoftOrangeLight,
+                            border = BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.35f))
+                        ) {
+                            Text(
+                                text = tag,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
                         }
                     }
                 }

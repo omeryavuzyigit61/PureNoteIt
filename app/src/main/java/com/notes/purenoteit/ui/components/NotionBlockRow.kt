@@ -52,8 +52,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,6 +76,53 @@ import com.notes.purenoteit.ui.theme.VibrantOrange
 import com.notes.purenoteit.util.AudioRecorder
 import java.io.File
 import java.util.Locale
+
+// Markdown Highlighter (==highlight==), Bold (**bold**) & Hashtag (#tag) Visual Transformation
+private val NotionMarkdownVisualTransformation = VisualTransformation { text ->
+    val raw = text.text
+    val builder = AnnotatedString.Builder(raw)
+
+    // Highlighter: ==highlighted text==
+    val highlightRegex = Regex("""==([^=\n]+)==""")
+    for (match in highlightRegex.findAll(raw)) {
+        builder.addStyle(
+            SpanStyle(
+                background = Color(0xFFFFF59D), // Warm pastel highlighter yellow
+                color = Color(0xFF212121),
+                fontWeight = FontWeight.SemiBold
+            ),
+            start = match.range.first,
+            end = match.range.last + 1
+        )
+    }
+
+    // Bold: **bold text**
+    val boldRegex = Regex("""\*\*([^*\n]+)\*\*""")
+    for (match in boldRegex.findAll(raw)) {
+        builder.addStyle(
+            SpanStyle(
+                fontWeight = FontWeight.Bold
+            ),
+            start = match.range.first,
+            end = match.range.last + 1
+        )
+    }
+
+    // Hashtags: #tag
+    val tagRegex = Regex("""#([a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]+)""")
+    for (match in tagRegex.findAll(raw)) {
+        builder.addStyle(
+            SpanStyle(
+                color = VibrantOrange,
+                fontWeight = FontWeight.Bold
+            ),
+            start = match.range.first,
+            end = match.range.last + 1
+        )
+    }
+
+    TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
+}
 
 /**
  * Notion Block Row Component.
@@ -383,6 +435,7 @@ fun NotionBlockRow(
                         value = block.content,
                         onValueChange = onContentChange,
                         textStyle = textStyle,
+                        visualTransformation = NotionMarkdownVisualTransformation,
                         cursorBrush = SolidColor(VibrantOrange),
                         decorationBox = { innerTextField ->
                             if (block.content.isEmpty()) {
@@ -421,6 +474,7 @@ fun NotionBlockRow(
                         value = block.content,
                         onValueChange = onContentChange,
                         textStyle = textStyle,
+                        visualTransformation = NotionMarkdownVisualTransformation,
                         cursorBrush = SolidColor(VibrantOrange),
                         decorationBox = { innerTextField ->
                             if (block.content.isEmpty()) {
@@ -465,6 +519,7 @@ fun NotionBlockRow(
                             value = block.content,
                             onValueChange = onContentChange,
                             textStyle = textStyle,
+                            visualTransformation = NotionMarkdownVisualTransformation,
                             cursorBrush = SolidColor(VibrantOrange),
                             decorationBox = { innerTextField ->
                                 if (block.content.isEmpty()) {
@@ -519,6 +574,7 @@ fun NotionBlockRow(
                             value = block.content,
                             onValueChange = onContentChange,
                             textStyle = textStyle.copy(fontWeight = FontWeight.SemiBold),
+                            visualTransformation = NotionMarkdownVisualTransformation,
                             cursorBrush = SolidColor(VibrantOrange),
                             decorationBox = { innerTextField ->
                                 if (block.content.isEmpty()) {
@@ -987,6 +1043,13 @@ fun NotionBlockRow(
                         .toList()
                 }
 
+                val detectedHashtags = remember(block.content) {
+                    Regex("""#([a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]+)""").findAll(block.content)
+                        .map { "#" + it.groupValues[1] }
+                        .distinct()
+                        .toList()
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1000,6 +1063,7 @@ fun NotionBlockRow(
                             value = block.content,
                             onValueChange = onContentChange,
                             textStyle = textStyle,
+                            visualTransformation = NotionMarkdownVisualTransformation,
                             cursorBrush = SolidColor(VibrantOrange),
                             decorationBox = { innerTextField ->
                                 if (block.content.isEmpty()) {
@@ -1053,6 +1117,30 @@ fun NotionBlockRow(
                                             color = VibrantOrange
                                         )
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    // Interactive pills for #Hashtags inside paragraph (Feature 3)
+                    if (detectedHashtags.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.padding(top = 4.dp, start = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            for (tag in detectedHashtags) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = SoftOrangeLight,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.35f))
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VibrantOrange,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
+                                    )
                                 }
                             }
                         }
