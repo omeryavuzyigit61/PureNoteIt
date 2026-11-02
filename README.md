@@ -14,6 +14,7 @@
     <a href="#-özellikler--key-features">Özellikler</a> •
     <a href="#-ekran-görüntüleri--screenshots">Ekran Görüntüleri</a> •
     <a href="#-teknoloji-yığını--tech-stack">Teknoloji</a> •
+    <a href="#-sürüm-notları--changelog">Sürüm Notları</a> •
     <a href="#-kurulum--building">Kurulum</a> •
     <a href="PRIVACY_POLICY.md">Gizlilik Politikası</a> •
     <a href="LICENSE">Lisans</a>
@@ -26,6 +27,8 @@
     <img src="https://img.shields.io/badge/Database-Room%20SQLite-FF8F00?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room" />
     <img src="https://img.shields.io/badge/DI-Dagger%20Hilt-00C853?style=for-the-badge&logo=dagger&logoColor=white" alt="Hilt" />
     <img src="https://img.shields.io/badge/Security-AES--256%20Vault-175DDC?style=for-the-badge&logo=bitwarden&logoColor=white" alt="Security" />
+    <img src="https://img.shields.io/badge/Optimization-R8%20DEX%20Obfuscated-blueviolet?style=for-the-badge&logo=googleplay&logoColor=white" alt="R8 Obfuscation" />
+    <img src="https://img.shields.io/badge/Version-1.0.3-orange?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
   </p>
 
@@ -149,6 +152,19 @@ Buluta bağımlı olmayan **%100 Çevrimdışı (Offline-First)** mimarisi sayes
 - Uygulama içi dil değiştirici (cihaz dilinden bağımsız olarak Türkçe veya İngilizce seçebilme).
 - Tüm şablonlar, butonlar, diyaloglar ve hata mesajları her iki dilde de tam eşitliktedir.
 
+### 📱 13. Evrensel Cihaz Uyumluluğu & Duyarlı Tasarım (Device Responsiveness)
+- Küçük ekranlı, dar en-boy oranlı ve katlanabilir Android cihazlarda sıfır taşma garantisi.
+- Dinamik yükseklik hesaplamalı çizim kanvası ve alt paneller (Drawing Canvas & Template Hub).
+- Yatay kaydırmalı araç çubuğu (Notion Toolbar) ve tek satırda otomatik kesilen (ellipsis) başlıklar.
+
+### 🛡️ 14. Google Play Uyumlu R8 DEX Optimizasyonu & Kod Karartma
+- R8 Code Shrinking ve Obfuscation (Kod Karartma) ile %35 daha hafif bundle (~13.7 MB).
+- Tersine mühendisliğe karşı askeri seviyede güvenlik; Room, Hilt, Coroutines ve Biometrics için özel ProGuard tutma kuralları.
+
+### 🎨 15. OLED Koyu Tema & WCAG AAA Kontrast Standardı
+- Koyu temada göz yormayan, dinamik algılamalı yüksek kontrastlı butonlar (Derin mor + parlak lila metin).
+- Kök sayfa kilidi ve 500ms çift tıklama önleyici (double-pop debouncing) ile kesintisiz navigasyon kararlılığı.
+
 ---
 
 ## 🛠️ Mimari & Teknoloji Yığını / Architecture & Tech Stack
@@ -224,6 +240,27 @@ flowchart TD
 
 3. Çıktı APK dosyası:
    `app/build/outputs/apk/debug/app-debug.apk` dizininde oluşturulacaktır.
+
+---
+
+## 📋 Sürüm Notları / Changelog
+
+### v1.0.3 (En Son Sürüm / Latest)
+- 🎨 **Koyu Tema Kontrast İyileştirmesi:** "Sesli Dikte", "Fosforlu Vurgu" ve "Ses Kaydı" araç çubuğu butonları koyu temada dinamik renk algılamasıyla kristal netliğinde okunabilir hale getirildi.
+- 🛡️ **Navigasyon Yığını & Kök Sayfa Koruma Kilidi:** Hızlı geri tuşu dokunuşlarında ana sayfanın (`home`) navigasyon yığınından düşmesi engellendi, olası beyaz ekran parlamaları kökünden çözüldü.
+- ⚡ **Tıklama Debounce Koruması:** Geri ve Menü butonlarına 500ms çift dokunma filtresi eklenerek mükerrer sayfa geçişleri kilitlendi.
+- 🌙 **Gece Modu Pencere Eşitlemesi:** Android sistem penceresi (`windowBackground`) gece modunda `#1A1A1C` rengine bağlanarak UI geçişlerindeki tüm beyaz sızmalar yok edildi.
+
+### v1.0.2
+- 📱 **Evrensel Ekran Uyumluluğu:** Küçük ve dar ekranlı fiziksel cihazlarda butonların üst üste binmesi ve dikey mor buton sıkışması tamamen giderildi.
+- 🗜️ **R8 DEX Optimizasyonu:** Google Play kod karartma politikasına tam uyum sağlandı, paket boyutu 20.8 MB'tan 13.7 MB'a indirildi (%35 küçülme).
+- 🎨 **Üst Bar Sadeleştirmesi:** Not detay üst menüsü minimalist 3 ana aksiyon ve şık `⋮` (Daha Fazla) menüsüyle ferahlatıldı.
+
+### v1.0.1
+- 🚀 İlk Kapalı Test sürümü, 12 test kullanıcısı ortamı ve Google Play Console entegrasyonu.
+
+### v1.0.0
+- 🧱 Notion tarzı blok editör, Obsidian tarzı 2D Bilgi Grafiği, AES-256 Kasa ve Çevrimdışı mimari lansmanı.
 
 ---
 
