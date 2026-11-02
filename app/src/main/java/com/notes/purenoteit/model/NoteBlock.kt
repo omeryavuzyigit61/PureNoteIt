@@ -34,7 +34,8 @@ data class NoteBlock(
     var isExpanded: Boolean = true,
     var tableData: List<List<String>> = emptyList(),
     var toggleBody: String = "",
-    var codeLanguage: String = "kotlin"
+    var codeLanguage: String = "kotlin",
+    var subPageNoteId: Int? = null
 )
 
 data class SearchSnippetMatch(

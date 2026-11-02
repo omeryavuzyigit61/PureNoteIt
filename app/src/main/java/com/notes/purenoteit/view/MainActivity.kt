@@ -186,7 +186,20 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     },
                                     onNavigateToNote = { targetId ->
-                                        navController.navigate("note_detail/$targetId")
+                                        val targetRoute = "note_detail/$targetId"
+                                        val existsInBackStack = try {
+                                            navController.getBackStackEntry(targetRoute)
+                                            true
+                                        } catch (e: Exception) {
+                                            false
+                                        }
+                                        if (existsInBackStack) {
+                                            navController.popBackStack(targetRoute, inclusive = false)
+                                        } else {
+                                            navController.navigate(targetRoute) {
+                                                launchSingleTop = true
+                                            }
+                                        }
                                     }
                                 )
                             }

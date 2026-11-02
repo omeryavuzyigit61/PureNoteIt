@@ -302,7 +302,17 @@ fun HomeScreen(
             }.distinct()
     }
 
-    // Extract all sub-page titles across active notes (Seçenek A: Notion Tarzı Hiyerarşik Gizleme)
+    // Extract all sub-page titles & IDs across active notes (Notion Tarzı Hiyerarşik Gizleme)
+    val subpageIds = remember(activeNotes) {
+        activeNotes.flatMap { note ->
+            try {
+                val blocks = BlockParser.parse(note.description ?: "")
+                blocks.filter { it.type == BlockType.SUB_PAGE }.mapNotNull { it.subPageNoteId }
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }.toSet()
+    }
     val subpageTitles = remember(activeNotes) {
         activeNotes.flatMap { note ->
             try {
@@ -316,7 +326,7 @@ fun HomeScreen(
     }
 
     // Filter notes
-    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles, selectedSmartFilter, lockedCategoryIds) {
+    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles, subpageIds, selectedSmartFilter, lockedCategoryIds) {
         activeNotes.filter { note ->
             val isNoteProtected = note.isPassword == true || note.isEncrypted || (note.categoryId in lockedCategoryIds)
             val matchesCategory = if (selectedCategory == null) {
@@ -346,7 +356,10 @@ fun HomeScreen(
                 text.contains(selectedHashtag!!, ignoreCase = true)
             }
             // Notion Hiyerarşik Gizleme: Alt sayfalar ana ekranda gizlenir; arama yapıldığında ise doğrudan bulunur!
-            val isSubpage = note.title?.trim()?.lowercase() in subpageTitles
+            val isSubpageByMetadata = note.richBlocksJson?.contains("\"isSubPage\":true") == true || note.richBlocksJson?.contains("\"parentNoteId\"") == true
+            val isSubpageById = note.id in subpageIds
+            val isSubpageByTitle = note.title?.trim()?.lowercase() in subpageTitles
+            val isSubpage = isSubpageByMetadata || isSubpageById || isSubpageByTitle
             val matchesSubpageHierarchy = if (searchQuery.isBlank()) !isSubpage else true
 
             val matchesSmartFilter = when (selectedSmartFilter) {

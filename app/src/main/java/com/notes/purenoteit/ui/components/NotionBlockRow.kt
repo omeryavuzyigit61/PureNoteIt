@@ -156,7 +156,7 @@ fun NotionBlockRow(
     onToggleBodyChange: ((String) -> Unit)? = null,
     onTableChange: ((List<List<String>>) -> Unit)? = null,
     onOpenLinkedNote: ((String) -> Unit)? = null,
-    onOpenSubPage: ((String) -> Unit)? = null,
+    onOpenSubPage: ((NoteBlock) -> Unit)? = null,
     onCodeLanguageChange: ((String) -> Unit)? = null,
     allBlocks: List<NoteBlock> = emptyList(),
     onScrollToBlock: ((Int) -> Unit)? = null,
@@ -1346,7 +1346,7 @@ fun NotionBlockRow(
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .clickable { onOpenSubPage?.invoke(block.content) },
+                        .clickable { onOpenSubPage?.invoke(block) },
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f)),
@@ -1381,7 +1381,7 @@ fun NotionBlockRow(
                             fontWeight = FontWeight.Bold,
                             color = VibrantOrange,
                             modifier = Modifier
-                                .clickable { onOpenSubPage?.invoke(block.content) }
+                                .clickable { onOpenSubPage?.invoke(block) }
                                 .padding(horizontal = 6.dp)
                         )
 

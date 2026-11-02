@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.view.WindowManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -187,6 +188,10 @@ fun NoteDetailScreen(
             noteViewModel.loadBacklinksForNote(noteId)
         }
     }
+
+    var currentNoteId by remember(noteId) { mutableIntStateOf(noteId) }
+    var noteRichBlocksJson by remember { mutableStateOf<String?>(null) }
+    var isInitialLoadCompleted by remember { mutableStateOf(noteId == -1) }
 
     var title by remember { mutableStateOf("") }
     var selectedIcon by remember { mutableStateOf<String?>(null) }
@@ -444,32 +449,6 @@ fun NoteDetailScreen(
         }
     }
 
-    fun navigateToNoteByTitle(targetTitle: String) {
-        val trimmed = if (targetTitle.isBlank()) "Yeni Alt Sayfa" else targetTitle.trim()
-        val found = allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
-        if (found != null) {
-            if (found.isPassword == true && !SecurityUtil.isVaultUnlocked) {
-                requestGatekeeperUnlock {
-                    onNavigateToNote?.invoke(found.id)
-                }
-            } else {
-                onNavigateToNote?.invoke(found.id)
-            }
-        } else {
-            val newNote = NoteData(
-                title = trimmed,
-                description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
-                date = System.currentTimeMillis(),
-                categoryId = selectedCategoryId,
-                icon = "📄"
-            )
-            noteViewModel.saveNote(newNote, contentForLinks = null) { newId ->
-                context.showToastShort(context.getString(R.string.subpage_created_toast, trimmed))
-                onNavigateToNote?.invoke(newId)
-            }
-        }
-    }
-
     val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
 
     // Load existing note data
@@ -477,6 +456,8 @@ fun NoteDetailScreen(
         if (noteId != -1) {
             noteViewModel.getNoteById(noteId).subscribe({ note ->
                 loadedNoteRef = note
+                currentNoteId = note.id
+                noteRichBlocksJson = note.richBlocksJson
                 title = note.title ?: ""
                 selectedIcon = note.icon
                 isPassword = note.isPassword ?: false
@@ -494,18 +475,22 @@ fun NoteDetailScreen(
                     blocks.clear()
                     requestGatekeeperUnlock {
                         populateNoteBlocks(note)
+                        isInitialLoadCompleted = true
                     }
                 } else {
                     isAccessGranted = true
                     populateNoteBlocks(note)
+                    isInitialLoadCompleted = true
                 }
             }, { error ->
                 android.util.Log.e("NoteDetailScreen", "Error loading note $noteId: ${error.message}")
             })
         } else {
+            currentNoteId = -1
             isAccessGranted = true
             blocks.clear()
             blocks.add(NoteBlock())
+            isInitialLoadCompleted = true
         }
     }
 
@@ -734,18 +719,22 @@ fun NoteDetailScreen(
         }
     }
 
-    fun saveNote() {
-        if (isPassword && !isAccessGranted) return
-        val jsonContent = BlockParser.serialize(blocks)
+    val hasContent = remember(title, blocks.toList()) {
+        title.isNotBlank() || blocks.any {
+            it.content.isNotBlank() ||
+            it.mediaPath != null ||
+            it.type == BlockType.SUB_PAGE ||
+            it.type == BlockType.TABLE ||
+            it.type == BlockType.DRAWING ||
+            it.toggleBody.isNotBlank()
+        }
+    }
 
-        // Calculate tasks count
+    fun buildNoteDataObject(targetStatus: String = noteStatus): NoteData {
+        val jsonContent = BlockParser.serialize(blocks)
         val total = blocks.count { it.type == BlockType.TODO }
         val completed = blocks.count { it.type == BlockType.TODO && it.isChecked }
-
-        // Bitwarden AES-256 GCM encryption
         val finalContent = if (isPassword) SecurityUtil.encrypt(jsonContent) else jsonContent
-        val isEncrypted = isPassword
-
         val images = blocks.filter { it.type == BlockType.IMAGE && it.mediaPath != null }.map { it.mediaPath!! }
         val sounds = blocks.filter { it.type == BlockType.AUDIO && it.mediaPath != null }.map { it.mediaPath!! }
 
@@ -767,21 +756,27 @@ fun NoteDetailScreen(
             sounds = sounds,
             isPinned = isPinned,
             icon = selectedIcon,
-            isEncrypted = isEncrypted,
+            isEncrypted = isPassword,
             totalTasks = total,
             completedTasks = completed,
-            status = noteStatus,
+            status = targetStatus,
             reminderTime = reminderTime,
             reminderType = reminderType,
             reminderSound = reminderSound,
-            isReminderDone = isReminderDone
+            isReminderDone = isReminderDone,
+            richBlocksJson = noteRichBlocksJson
         )
-
-        if (noteId != -1) {
-            note.id = noteId
+        if (currentNoteId != -1) {
+            note.id = currentNoteId
         }
+        return note
+    }
 
-        // Save note and safely sync bi-directional [[Note]] & Sub-Page links with real SQLite ID (Paket 1)
+    fun performSilentAutoSave(onDone: ((Int) -> Unit)? = null) {
+        if (isPassword && !isAccessGranted) return
+        if (!hasContent && currentNoteId == -1) return
+
+        val note = buildNoteDataObject()
         val allContentText = title + " " + blocks.joinToString(" ") { block ->
             if (block.type == BlockType.SUB_PAGE && block.content.isNotBlank()) {
                 "[[${block.content.trim()}]]"
@@ -790,6 +785,23 @@ fun NoteDetailScreen(
             }
         }
         noteViewModel.saveNote(note, contentForLinks = allContentText) { actualId ->
+            currentNoteId = actualId
+            onDone?.invoke(actualId)
+        }
+    }
+
+    fun saveNote(andClose: Boolean = true) {
+        if (isPassword && !isAccessGranted) return
+        val note = buildNoteDataObject()
+        val allContentText = title + " " + blocks.joinToString(" ") { block ->
+            if (block.type == BlockType.SUB_PAGE && block.content.isNotBlank()) {
+                "[[${block.content.trim()}]]"
+            } else {
+                block.content + " " + block.toggleBody
+            }
+        }
+        noteViewModel.saveNote(note, contentForLinks = allContentText) { actualId ->
+            currentNoteId = actualId
             if (reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone) {
                 val safeTitle = if (isPassword) "🔒 Korumalı Not" else (note.title ?: "Başlıksız Not")
                 val noteDescPreview = if (isPassword) "ENC:" else (blocks.firstOrNull { it.content.isNotBlank() }?.content ?: "")
@@ -805,9 +817,142 @@ fun NoteDetailScreen(
             } else if (reminderTime == null && actualId != 0) {
                 ReminderManager.cancelReminder(context, actualId)
             }
+            if (andClose) {
+                safeNavigateBack()
+            }
         }
+    }
 
-        safeNavigateBack()
+    fun handleExitWithAutoSave() {
+        if (isPassword && !isAccessGranted) {
+            safeNavigateBack()
+            return
+        }
+        if (hasContent || currentNoteId != -1) {
+            saveNote(andClose = true)
+        } else {
+            safeNavigateBack()
+        }
+    }
+
+    fun navigateToSubPage(block: NoteBlock) {
+        if (isPassword && !isAccessGranted) return
+
+        performSilentAutoSave { savedParentId ->
+            val existingTarget = if (block.subPageNoteId != null) {
+                allNotesForLinking.find { it.id == block.subPageNoteId && it.status != "TRASH" }
+            } else {
+                val trimmed = block.content.trim()
+                if (trimmed.isNotBlank()) {
+                    allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) && it.status != "TRASH" }
+                } else null
+            }
+
+            if (existingTarget != null) {
+                block.subPageNoteId = existingTarget.id
+                if (block.content.isBlank()) {
+                    block.content = existingTarget.title ?: "Alt Sayfa"
+                }
+                performSilentAutoSave {
+                    if (existingTarget.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+                        requestGatekeeperUnlock {
+                            onNavigateToNote?.invoke(existingTarget.id)
+                        }
+                    } else {
+                        onNavigateToNote?.invoke(existingTarget.id)
+                    }
+                }
+            } else {
+                val childTitle = if (block.content.isBlank()) "Yeni Alt Sayfa" else block.content.trim()
+                val newChild = NoteData(
+                    title = childTitle,
+                    description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
+                    date = System.currentTimeMillis(),
+                    categoryId = selectedCategoryId,
+                    icon = "📄",
+                    richBlocksJson = "{\"isSubPage\":true,\"parentNoteId\":$savedParentId}"
+                )
+                noteViewModel.saveNote(newChild, contentForLinks = null) { newChildId ->
+                    block.subPageNoteId = newChildId
+                    if (block.content.isBlank()) {
+                        block.content = childTitle
+                    }
+                    performSilentAutoSave {
+                        context.showToastShort(context.getString(R.string.subpage_created_toast, childTitle))
+                        onNavigateToNote?.invoke(newChildId)
+                    }
+                }
+            }
+        }
+    }
+
+    fun navigateToNoteByTitle(targetTitle: String) {
+        val trimmed = if (targetTitle.isBlank()) "Yeni Alt Sayfa" else targetTitle.trim()
+        val found = allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
+        performSilentAutoSave {
+            if (found != null) {
+                if (found.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+                    requestGatekeeperUnlock {
+                        onNavigateToNote?.invoke(found.id)
+                    }
+                } else {
+                    onNavigateToNote?.invoke(found.id)
+                }
+            } else {
+                val newNote = NoteData(
+                    title = trimmed,
+                    description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
+                    date = System.currentTimeMillis(),
+                    categoryId = selectedCategoryId,
+                    icon = "📄"
+                )
+                noteViewModel.saveNote(newNote, contentForLinks = null) { newId ->
+                    context.showToastShort(context.getString(R.string.subpage_created_toast, trimmed))
+                    onNavigateToNote?.invoke(newId)
+                }
+            }
+        }
+    }
+
+    // Debounced real-time auto-save (800ms) - preserves Undo/Redo history in memory
+    LaunchedEffect(title, blocks.toList(), isPinned, selectedCategoryId, selectedIcon) {
+        if (!isInitialLoadCompleted) return@LaunchedEffect
+        delay(800L)
+        if (hasContent || currentNoteId != -1) {
+            performSilentAutoSave()
+        }
+    }
+
+    // Sub-page synchronization: auto-clean deleted child notes and sync renamed titles
+    LaunchedEffect(allNotesForLinking) {
+        if (allNotesForLinking.isNotEmpty() && isInitialLoadCompleted) {
+            var blocksModified = false
+            val iterator = blocks.listIterator()
+            while (iterator.hasNext()) {
+                val b = iterator.next()
+                if (b.type == BlockType.SUB_PAGE && b.subPageNoteId != null) {
+                    val targetNote = allNotesForLinking.find { it.id == b.subPageNoteId }
+                    if (targetNote == null || targetNote.status == "TRASH") {
+                        iterator.remove()
+                        blocksModified = true
+                    } else if (targetNote.title != null && targetNote.title!!.isNotBlank() && b.content != targetNote.title) {
+                        b.content = targetNote.title!!
+                        blocksModified = true
+                    }
+                }
+            }
+            if (blocks.isEmpty()) {
+                blocks.add(NoteBlock())
+            }
+            if (blocksModified) {
+                performSilentAutoSave()
+            }
+        }
+    }
+
+    // Android Hardware / Gesture Back button protection
+    BackHandler {
+        handleExitWithAutoSave()
     }
 
     if (!isAccessGranted && isPassword) {
@@ -922,7 +1067,7 @@ fun NoteDetailScreen(
                 modifier = Modifier.statusBarsPadding(),
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = safeNavigateBack) {
+                    IconButton(onClick = { handleExitWithAutoSave() }) {
                         Icon(
                             painter = painterResource(id = R.drawable.arrow_left),
                             contentDescription = stringResource(R.string.go_back),
@@ -1785,11 +1930,27 @@ fun NoteDetailScreen(
                     },
                     onDeleteBlock = {
                         recordUndoState()
+                        val blockToDelete = blocks.getOrNull(index)
+                        if (blockToDelete?.type == BlockType.SUB_PAGE) {
+                            val childId = blockToDelete.subPageNoteId
+                            if (childId != null) {
+                                noteViewModel.deleteNoteById(childId)
+                            } else {
+                                val trimmed = blockToDelete.content.trim()
+                                if (trimmed.isNotBlank()) {
+                                    val matched = allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
+                                    if (matched != null) {
+                                        noteViewModel.deleteNoteById(matched.id)
+                                    }
+                                }
+                            }
+                        }
                         if (blocks.size > 1) {
                             blocks.removeAt(index)
                         } else {
                             blocks[0] = NoteBlock()
                         }
+                        performSilentAutoSave()
                     },
                     onMoveUp = if (index > 0) {
                         {
@@ -1813,8 +1974,8 @@ fun NoteDetailScreen(
                     onOpenLinkedNote = { targetTitle ->
                         navigateToNoteByTitle(targetTitle)
                     },
-                    onOpenSubPage = { pageTitle ->
-                        navigateToNoteByTitle(pageTitle)
+                    onOpenSubPage = { subPageBlock ->
+                        navigateToSubPage(subPageBlock)
                     },
                     audioRecorder = audioRecorder
                 )
