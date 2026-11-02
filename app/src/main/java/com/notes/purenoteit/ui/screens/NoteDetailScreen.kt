@@ -1861,7 +1861,7 @@ fun NoteDetailScreen(
                         blocks[index] = block.copy(tableData = newTable)
                     },
                     onCodeLanguageChange = { newLang ->
-                        blocks[index] = block.copy(codeLanguage = newLang)
+                        blocks[index] = blocks[index].copy(codeLanguage = newLang)
                     },
                     allBlocks = blocks,
                     onScrollToBlock = { targetIndex ->

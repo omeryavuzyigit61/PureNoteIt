@@ -811,7 +811,9 @@ fun NotionBlockRow(
                 var showLangMenu by remember { mutableStateOf(false) }
                 var isCopied by remember { mutableStateOf(false) }
                 val context = LocalContext.current
-                val currentLang = block.codeLanguage.ifBlank { "kotlin" }
+                var currentLang by remember(block.id, block.codeLanguage) {
+                    mutableStateOf(block.codeLanguage.ifBlank { "kotlin" })
+                }
 
                 Surface(
                     modifier = Modifier
@@ -861,13 +863,25 @@ fun NotionBlockRow(
 
                                     DropdownMenu(
                                         expanded = showLangMenu,
-                                        onDismissRequest = { showLangMenu = false }
+                                        onDismissRequest = { showLangMenu = false },
+                                        modifier = Modifier
+                                            .background(Color(0xFF2C2C35))
+                                            .border(0.5.dp, Color(0xFF454552), RoundedCornerShape(12.dp))
                                     ) {
                                         SyntaxHighlighter.SUPPORTED_LANGUAGES.forEach { (key, label) ->
+                                            val isSelected = currentLang.equals(key, ignoreCase = true)
                                             DropdownMenuItem(
-                                                text = { Text(label) },
+                                                text = {
+                                                    Text(
+                                                        text = (if (isSelected) "✓  " else "    ") + label,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (isSelected) Color(0xFFFFB74D) else PureWhite,
+                                                        fontSize = 13.sp
+                                                    )
+                                                },
                                                 onClick = {
                                                     showLangMenu = false
+                                                    currentLang = key
                                                     block.codeLanguage = key
                                                     onCodeLanguageChange?.invoke(key)
                                                 }
@@ -907,6 +921,15 @@ fun NotionBlockRow(
                             }
                         }
 
+                        val codeVisualTransformation = remember(currentLang) {
+                            VisualTransformation { text ->
+                                TransformedText(
+                                    SyntaxHighlighter.highlight(text.text, currentLang, isDark = true),
+                                    OffsetMapping.Identity
+                                )
+                            }
+                        }
+
                         BasicTextField(
                             value = block.content,
                             onValueChange = onContentChange,
@@ -916,12 +939,7 @@ fun NotionBlockRow(
                                 color = PureWhite,
                                 lineHeight = 19.sp
                             ),
-                            visualTransformation = VisualTransformation { text ->
-                                TransformedText(
-                                    SyntaxHighlighter.highlight(text.text, currentLang, isDark = true),
-                                    OffsetMapping.Identity
-                                )
-                            },
+                            visualTransformation = codeVisualTransformation,
                             cursorBrush = SolidColor(VibrantOrange),
                             decorationBox = { innerTextField ->
                                 if (block.content.isEmpty()) {

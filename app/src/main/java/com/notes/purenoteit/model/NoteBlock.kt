@@ -66,6 +66,11 @@ object BlockParser {
             return try {
                 val type = object : TypeToken<List<NoteBlock>>() {}.type
                 val list: List<NoteBlock> = gson.fromJson(json, type)
+                list.forEach { b ->
+                    if (b.codeLanguage.isNullOrBlank()) {
+                        b.codeLanguage = "kotlin"
+                    }
+                }
                 if (list.isEmpty()) listOf(NoteBlock()) else list
             } catch (e: Exception) {
                 listOf(NoteBlock(type = BlockType.PARAGRAPH, content = raw))
