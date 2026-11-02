@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -277,6 +279,9 @@ fun DrawingCanvasSheet(
         }
     }
 
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    val canvasHeight = (screenHeight * 0.42f).coerceIn(240.dp, 360.dp)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -286,6 +291,7 @@ fun DrawingCanvasSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(14.dp)
         ) {
             // Header: Title + Actions (Undo, Clear, Save)
@@ -422,7 +428,7 @@ fun DrawingCanvasSheet(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(310.dp)
+                    .height(canvasHeight)
                     .clip(RoundedCornerShape(16.dp))
                     .border(1.5.dp, BorderLight, RoundedCornerShape(16.dp))
                     .onSizeChanged { canvasSize = it },

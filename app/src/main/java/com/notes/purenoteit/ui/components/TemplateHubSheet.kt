@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -119,11 +120,13 @@ fun TemplateHubSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            val maxListHeight = (LocalConfiguration.current.screenHeightDp.dp * 0.72f).coerceIn(300.dp, 560.dp)
+
             // Template cards list
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 480.dp),
+                    .heightIn(max = maxListHeight),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {

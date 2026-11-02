@@ -300,6 +300,7 @@ fun NoteDetailScreen(
     var isZenMode by remember { mutableStateOf(false) }
     var showStatsDialog by remember { mutableStateOf(false) }
     var showTrashConfirmDialog by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
 
     // Live Word Count, Character Count & Reading Time Metrics (Feature 4)
     val allNoteText = remember(title, blocks.map { it.content + " " + it.toggleBody }) {
@@ -949,7 +950,7 @@ fun NoteDetailScreen(
                         )
                     }
 
-                    // Export / Share Action Button (Feature 1)
+                    // Export / Share Action Button
                     IconButton(
                         onClick = { showExportSheet = true },
                         modifier = Modifier.size(34.dp)
@@ -962,60 +963,110 @@ fun NoteDetailScreen(
                         )
                     }
 
-                    // Bitwarden Lock Action Button
-                    IconButton(
-                        onClick = {
-                            if (!isPassword) {
-                                if (SecurityUtil.isPasswordSet(context)) {
-                                    isPassword = true
-                                    context.showToastShort(context.getString(R.string.note_aes_encrypted_toast))
-                                } else {
-                                    showPasswordDialog = true
-                                }
-                            } else {
-                                isPassword = false
-                                context.showToastShort(context.getString(R.string.note_lock_removed_toast))
-                            }
-                        },
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = if (isPassword) R.drawable.lock else R.drawable.unlock),
-                            contentDescription = stringResource(R.string.lock),
-                            tint = if (isPassword) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    // Zen Mode Action Button (Feature 4)
-                    IconButton(
-                        onClick = { isZenMode = true },
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Text(text = "🧘", fontSize = 17.sp)
-                    }
-
-                    // Move to Trash Action Button (Feature 2)
-                    if (noteId != -1) {
+                    // More Options Dropdown (⋮) for secondary actions (Responsive & never crowds screen)
+                    Box {
                         IconButton(
-                            onClick = { showTrashConfirmDialog = true },
+                            onClick = { showMoreMenu = true },
                             modifier = Modifier.size(34.dp)
                         ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.delete),
-                                contentDescription = stringResource(R.string.drawer_trash_bin),
-                                tint = Color(0xFFE53935),
-                                modifier = Modifier.size(19.dp)
+                            Text(
+                                text = "⋮",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                        ) {
+                            // Bitwarden Lock Action
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(id = if (isPassword) R.drawable.lock else R.drawable.unlock),
+                                        contentDescription = null,
+                                        tint = if (isPassword) VibrantOrange else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                text = {
+                                    Text(
+                                        text = if (isPassword) stringResource(R.string.note_lock_removed_toast) else stringResource(R.string.lock),
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isPassword) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    if (!isPassword) {
+                                        if (SecurityUtil.isPasswordSet(context)) {
+                                            isPassword = true
+                                            context.showToastShort(context.getString(R.string.note_aes_encrypted_toast))
+                                        } else {
+                                            showPasswordDialog = true
+                                        }
+                                    } else {
+                                        isPassword = false
+                                        context.showToastShort(context.getString(R.string.note_lock_removed_toast))
+                                    }
+                                }
+                            )
+
+                            // Zen Mode Action
+                            DropdownMenuItem(
+                                leadingIcon = { Text(text = "🧘", fontSize = 16.sp) },
+                                text = {
+                                    Text(
+                                        text = stringResource(R.string.zen_mode_badge),
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    isZenMode = true
+                                }
+                            )
+
+                            // Move to Trash (if existing note)
+                            if (noteId != -1) {
+                                DropdownMenuItem(
+                                    leadingIcon = {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.delete),
+                                            contentDescription = null,
+                                            tint = Color(0xFFE53935),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    text = {
+                                        Text(
+                                            text = stringResource(R.string.drawer_trash_bin),
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFFE53935)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showTrashConfirmDialog = true
+                                    }
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
 
                     // Save Button (Clean, single-line, never wraps or squishes)
                     Surface(
                         modifier = Modifier
-                            .padding(end = 8.dp)
+                            .padding(end = 4.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .clickable { saveNote() },
                         shape = RoundedCornerShape(12.dp),
@@ -1315,158 +1366,6 @@ fun NoteDetailScreen(
                                 maxLines = 4,
                                 overflow = TextOverflow.Ellipsis
                             )
-                        }
-                    }
-                }
-
-                // VIP Quick Access Action Dock (Sol Alt ve Sağ Alt Hızlı Erişim)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp, start = 2.dp, end = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Sol Alt: Hızlı Geri Al / İleri Al
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable(enabled = undoStack.isNotEmpty()) { handleUndo() },
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (undoStack.isNotEmpty()) 0.75f else 0.25f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_undo),
-                                    contentDescription = stringResource(R.string.undo),
-                                    tint = if (undoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                    modifier = Modifier.size(15.dp)
-                                )
-                            }
-                        }
-
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable(enabled = redoStack.isNotEmpty()) { handleRedo() },
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (redoStack.isNotEmpty()) 0.75f else 0.25f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_redo),
-                                    contentDescription = stringResource(R.string.redo),
-                                    tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                    modifier = Modifier.size(15.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Sağ Alt: VIP Butonlar [📷 Tara] [📤 Paylaş] [🎙️ Sesli Dikte]
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Hızlı Metin Tara (OCR)
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { showOcrSourceSheet = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = SoftOrangeLight,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.35f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_ocr_scan),
-                                    contentDescription = stringResource(R.string.tb_scan_ocr),
-                                    tint = VibrantOrange,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = stringResource(R.string.tb_scan_ocr),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = VibrantOrange
-                                )
-                            }
-                        }
-
-                        // Hızlı Paylaş / Dışa Aktar
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { showExportSheet = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.share_square),
-                                    contentDescription = stringResource(R.string.share),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = stringResource(R.string.share),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        // VIP Hızlı Sesli Dikte (Pulsing Purple Glow)
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { handleToggleVoiceDictation() },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isVoiceDictating) Color(0xFF8E24AA) else Color(0xFFF3E5F5),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.5.dp,
-                                if (isVoiceDictating) Color(0xFFBA68C8) else Color(0xFFCE93D8)
-                            ),
-                            shadowElevation = if (isVoiceDictating) 6.dp else 2.dp
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.microphone_lines),
-                                    contentDescription = stringResource(R.string.voice_dict_btn),
-                                    tint = if (isVoiceDictating) PureWhite else Color(0xFF6A1B9A),
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text(
-                                    text = if (isVoiceDictating) stringResource(R.string.listening_dots) else stringResource(R.string.voice_dict_btn),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = if (isVoiceDictating) PureWhite else Color(0xFF6A1B9A)
-                                )
-                            }
                         }
                     }
                 }
@@ -1810,7 +1709,9 @@ fun NoteDetailScreen(
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
@@ -1818,7 +1719,9 @@ fun NoteDetailScreen(
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 11.5.sp
-                                    )
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
@@ -1831,6 +1734,8 @@ fun NoteDetailScreen(
                                     color = PureWhite,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                 )
                             }

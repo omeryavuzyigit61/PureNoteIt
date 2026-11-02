@@ -321,10 +321,12 @@ fun NotionCalendarView(
                         ) {
                             Text(
                                 text = stringResource(mode.titleRes),
-                                fontSize = 11.5.sp,
+                                fontSize = 11.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
