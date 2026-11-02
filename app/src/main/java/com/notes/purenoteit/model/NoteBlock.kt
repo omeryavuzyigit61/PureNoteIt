@@ -18,7 +18,10 @@ enum class BlockType {
     IMAGE,
     DRAWING,
     WEB_BOOKMARK,
-    SUB_PAGE
+    SUB_PAGE,
+    CODE,
+    MATH,
+    TABLE_OF_CONTENTS
 }
 
 data class NoteBlock(
@@ -30,7 +33,14 @@ data class NoteBlock(
     var mediaPath: String? = null,
     var isExpanded: Boolean = true,
     var tableData: List<List<String>> = emptyList(),
-    var toggleBody: String = ""
+    var toggleBody: String = "",
+    var codeLanguage: String = "kotlin"
+)
+
+data class SearchSnippetMatch(
+    val snippet: String,
+    val matchStart: Int,
+    val matchEnd: Int
 )
 
 object BlockParser {
@@ -86,6 +96,13 @@ object BlockParser {
                 line.startsWith("> ") -> {
                     blocks.add(NoteBlock(type = BlockType.CALLOUT, content = line.removePrefix("> ")))
                 }
+                line.startsWith("```") -> {
+                    val lang = line.removePrefix("```").trim()
+                    blocks.add(NoteBlock(type = BlockType.CODE, codeLanguage = if (lang.isNotBlank()) lang else "kotlin"))
+                }
+                line.startsWith("$$") -> {
+                    blocks.add(NoteBlock(type = BlockType.MATH, content = line.removePrefix("$$").removeSuffix("$$").trim()))
+                }
                 line.trim() == "---" -> {
                     blocks.add(NoteBlock(type = BlockType.DIVIDER))
                 }
@@ -105,6 +122,47 @@ object BlockParser {
         return Pair(total, completed)
     }
 
+    /**
+     * Deep In-Content Search Snippet Extractor:
+     * Searches all block types (paragraphs, headings, code, formulas, tables, checklists)
+     * and extracts the context around the matched query with start/end indices for highlighting.
+     */
+    fun findSearchSnippet(rawDescription: String?, query: String): SearchSnippetMatch? {
+        if (rawDescription.isNullOrBlank() || query.isBlank()) return null
+        val blocks = parse(rawDescription)
+        val q = query.trim().lowercase()
+
+        for (block in blocks) {
+            val textsToSearch = mutableListOf<String>()
+            if (block.content.isNotBlank()) textsToSearch.add(block.content)
+            if (block.toggleBody.isNotBlank()) textsToSearch.add(block.toggleBody)
+            if (block.tableData.isNotEmpty()) {
+                block.tableData.forEach { row ->
+                    textsToSearch.add(row.joinToString(" | "))
+                }
+            }
+
+            for (text in textsToSearch) {
+                val idx = text.indexOf(q, ignoreCase = true)
+                if (idx != -1) {
+                    val start = maxOf(0, idx - 22)
+                    val end = minOf(text.length, idx + q.length + 32)
+                    val prefix = if (start > 0) "…" else ""
+                    val suffix = if (end < text.length) "…" else ""
+                    val cleanSnippet = prefix + text.substring(start, end).replace("\n", " ").trim() + suffix
+
+                    val snippetMatchIdx = cleanSnippet.indexOf(q, ignoreCase = true)
+                    return if (snippetMatchIdx != -1) {
+                        SearchSnippetMatch(cleanSnippet, snippetMatchIdx, snippetMatchIdx + q.length)
+                    } else {
+                        SearchSnippetMatch(cleanSnippet, 0, 0)
+                    }
+                }
+            }
+        }
+        return null
+    }
+
     fun toPlainTextSummary(blocks: List<NoteBlock>, maxLines: Int = 4): String {
         return blocks
             .filter { it.type != BlockType.DIVIDER && (it.content.isNotBlank() || it.tableData.isNotEmpty()) }
@@ -118,6 +176,9 @@ object BlockParser {
                     BlockType.TABLE -> "📊 Tablo (${if (block.tableData.isNotEmpty()) block.tableData.size - 1 else 0} satır)"
                     BlockType.WEB_BOOKMARK -> "🌐 ${block.content}"
                     BlockType.SUB_PAGE -> "📄 ${block.content}"
+                    BlockType.CODE -> "💻 Kod (${block.codeLanguage}): ${block.content.take(30)}"
+                    BlockType.MATH -> "∑ ${block.content}"
+                    BlockType.TABLE_OF_CONTENTS -> "📑 İçindekiler Tablosu"
                     else -> block.content
                 }
             }

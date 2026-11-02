@@ -1,5 +1,6 @@
 package com.notes.purenoteit.viewmodel
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -15,7 +16,9 @@ import com.notes.purenoteit.repository.CategoryRepository
 import com.notes.purenoteit.repository.KnowledgeRepository
 import com.notes.purenoteit.repository.NoteRepository
 import com.notes.purenoteit.util.VaultBackupManager
+import com.notes.purenoteit.widget.PureNoteWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
@@ -27,11 +30,20 @@ class NoteViewModel @Inject constructor(
     private val repository: NoteRepository,
     private val categoryRepository: CategoryRepository,
     private val knowledgeRepository: KnowledgeRepository,
-    private val automationEngine: AutomationEngine
+    private val automationEngine: AutomationEngine,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
     private val compositeDisposable = CompositeDisposable()
     private val _noteList = MutableLiveData<List<NoteData>>()
     val noteList: LiveData<List<NoteData>> = _noteList
+
+    private fun notifyWidgetSync() {
+        try {
+            PureNoteWidgetProvider.updateAllWidgets(context)
+        } catch (e: Exception) {
+            Log.e("NoteViewModel", "Error notifying widget sync: ${e.message}")
+        }
+    }
 
     private val _allLinks = MutableLiveData<List<NoteLinkData>>()
     val allLinks: LiveData<List<NoteLinkData>> = _allLinks
@@ -60,6 +72,7 @@ class NoteViewModel @Inject constructor(
         repository.upsert(item).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllNotes()
+                notifyWidgetSync()
                 Log.i("NoteViewModel", "Note upserted successfully")
             }, { error ->
                 Log.i("NoteViewModel", "Error upserting note: ${error.message}")
@@ -82,6 +95,7 @@ class NoteViewModel @Inject constructor(
                 val actualId = generatedId.toInt()
                 item.id = actualId
                 getAllNotes()
+                notifyWidgetSync()
                 if (!contentForLinks.isNullOrBlank()) {
                     syncNoteLinks(actualId, contentForLinks)
                 }
@@ -95,6 +109,7 @@ class NoteViewModel @Inject constructor(
         repository.delete(item).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllNotes()
+                notifyWidgetSync()
             }, {
                 Log.e("NoteViewModel", "Error deleting note: ${it.message}")
             }).let {
@@ -106,6 +121,7 @@ class NoteViewModel @Inject constructor(
         repository.deleteNoteById(id).subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllNotes()
+                notifyWidgetSync()
                 Log.i("NoteViewModel", "Note deleted successfully")
             }, { error ->
                 Log.e("NoteViewModel", "Error deleting note: ${error.message}")
@@ -120,6 +136,7 @@ class NoteViewModel @Inject constructor(
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe({
                 getAllNotes()
+                notifyWidgetSync()
                 Log.i("NoteViewModel", "Pin status toggled successfully")
             }, { error ->
                 Log.e("NoteViewModel", "Error toggling pin: ${error.message}")
@@ -311,6 +328,7 @@ class NoteViewModel @Inject constructor(
                     .subscribeOn(Schedulers.io())
                     .subscribe()
                 getAllNotes()
+                notifyWidgetSync()
                 loadStreamItems()
                 onSuccess(newNote)
             }, {
@@ -340,6 +358,7 @@ class NoteViewModel @Inject constructor(
             onSuccess = { notesCount, catsCount ->
                 getAllNotes()
                 getAllLinks()
+                notifyWidgetSync()
                 onSuccess(notesCount, catsCount)
             },
             onError = onError
@@ -350,6 +369,7 @@ class NoteViewModel @Inject constructor(
     fun createDailyAgenda(onSuccess: (NoteData) -> Unit) {
         automationEngine.createDailyAgendaNote { note ->
             getAllNotes()
+            notifyWidgetSync()
             onSuccess(note)
         }
     }

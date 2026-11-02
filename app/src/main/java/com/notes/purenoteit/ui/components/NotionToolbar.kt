@@ -181,6 +181,30 @@ fun NotionToolbar(
                 iconTint = VibrantOrange
             )
 
+            // Kod Bloğu (Code)
+            ToolbarItem(
+                iconRes = R.drawable.file_edit,
+                label = stringResource(R.string.tb_code),
+                onClick = { onAddBlock(BlockType.CODE) },
+                iconTint = Color(0xFF673AB7)
+            )
+
+            // Matematik Formülü (Math)
+            ToolbarItem(
+                iconRes = R.drawable.other,
+                label = stringResource(R.string.tb_math),
+                onClick = { onAddBlock(BlockType.MATH) },
+                iconTint = Color(0xFF00897B)
+            )
+
+            // İçindekiler Tablosu (Table of Contents)
+            ToolbarItem(
+                iconRes = R.drawable.ic_format_bullet,
+                label = stringResource(R.string.slash_toc_title),
+                onClick = { onAddBlock(BlockType.TABLE_OF_CONTENTS) },
+                iconTint = VibrantOrange
+            )
+
             // Alt Sayfa (Nested Sub-Page)
             ToolbarItem(
                 iconRes = R.drawable.ic_subpage,

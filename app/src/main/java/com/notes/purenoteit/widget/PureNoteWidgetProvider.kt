@@ -130,27 +130,74 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
                     categoryRepository.getAllCategories(),
                     io.reactivex.functions.BiFunction { notes, categories ->
                         val lockedCategoryIds = categories.filter { it.isPassword == true }.map { it.id }.toSet()
-                        val latestPublicNote = notes.filter { note ->
+                        val publicNotes = notes.filter { note ->
                             note.status != "TRASH" &&
                                 note.isPassword != true &&
                                 !note.isEncrypted &&
                                 !SecurityUtil.isEncryptedPayload(note.description) &&
                                 (note.categoryId == null || note.categoryId !in lockedCategoryIds)
-                        }.maxByOrNull { it.date }
+                        }
+                        val latestPublicNote = publicNotes.maxByOrNull { it.date }
 
-                        if (latestPublicNote != null && !latestPublicNote.title.isNullOrBlank()) {
-                            "Son not: \"${latestPublicNote.title}\""
+                        if (latestPublicNote != null) {
+                            val title = if (!latestPublicNote.title.isNullOrBlank()) latestPublicNote.title!! else "Başlıksız Not"
+                            val snippet = try {
+                                val blocks = com.notes.purenoteit.model.BlockParser.parse(latestPublicNote.description)
+                                val summary = com.notes.purenoteit.model.BlockParser.toPlainTextSummary(blocks, maxLines = 2)
+                                if (summary.isNotBlank()) summary else "Açmak için dokunun"
+                            } catch (e: Exception) {
+                                "Açmak için dokunun"
+                            }
+
+                            val totalTasks = latestPublicNote.totalTasks
+                            val completedTasks = latestPublicNote.completedTasks
+                            val taskSuffix = if (totalTasks > 0) " • ✓ $completedTasks/$totalTasks" else ""
+                            val iconPrefix = if (!latestPublicNote.icon.isNullOrBlank()) "${latestPublicNote.icon} " else "📝 "
+
+                            WidgetDisplayData(
+                                headerSubtext = "${publicNotes.size} Not • Son: ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(latestPublicNote.date))}",
+                                noteTitle = "$iconPrefix$title$taskSuffix",
+                                noteSnippet = snippet,
+                                noteId = latestPublicNote.id
+                            )
                         } else {
-                            "Aklındakileri anında yakala..."
+                            WidgetDisplayData(
+                                headerSubtext = "Aklındakileri anında yakala...",
+                                noteTitle = "Henüz Not Eklenmedi",
+                                noteSnippet = "Dokun ve ilk notunu oluştur ✨",
+                                noteId = null
+                            )
                         }
                     }
                 )
                     .subscribeOn(Schedulers.io())
-                    .subscribe({ text ->
-                        views.setTextViewText(R.id.widget_recent_note_text, text)
+                    .subscribe({ data ->
+                        views.setTextViewText(R.id.widget_recent_note_text, data.headerSubtext)
+                        views.setTextViewText(R.id.widget_note_card_title, data.noteTitle)
+                        views.setTextViewText(R.id.widget_note_card_snippet, data.noteSnippet)
+
+                        val previewIntent = Intent(context, MainActivity::class.java).apply {
+                            if (data.noteId != null) {
+                                putExtra("OPEN_NOTE_ID", data.noteId)
+                            } else {
+                                action = ACTION_NEW_NOTE
+                                putExtra(EXTRA_ACTION, "NEW_NOTE")
+                            }
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        }
+                        val previewPending = PendingIntent.getActivity(
+                            context,
+                            4,
+                            previewIntent,
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        )
+                        views.setOnClickPendingIntent(R.id.widget_note_preview_card, previewPending)
+
                         appWidgetManager.updateAppWidget(appWidgetId, views)
                     }, {
                         views.setTextViewText(R.id.widget_recent_note_text, "Aklındakileri anında yakala...")
+                        views.setTextViewText(R.id.widget_note_card_title, "PureNoteIt")
+                        views.setTextViewText(R.id.widget_note_card_snippet, "Hızlı not almak için dokunun ✨")
                         appWidgetManager.updateAppWidget(appWidgetId, views)
                     })
             } catch (e: Exception) {
@@ -159,3 +206,10 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
         }
     }
 }
+
+private data class WidgetDisplayData(
+    val headerSubtext: String,
+    val noteTitle: String,
+    val noteSnippet: String,
+    val noteId: Int?
+)

@@ -88,10 +88,17 @@ Buluta bağımlı olmayan **%100 Çevrimdışı (Offline-First)** mimarisi sayes
 
 ### 🧱 1. Notion Tarzı Dinamik Blok Editörü
 - **Zengin Blok Çeşitleri:** Paragraf, Başlık 1 (H1), Başlık 2 (H2), Yapılacaklar (Checklist), Madde İşaretli Liste, Callout (Önemli Kutu), Açılır Kapanır **Toggle** (Spoiler gizleme), Dinamik **Tablolar** (otomatik dip toplam), Serbest El Çizim Kanvası, Fotoğraf ve Ses Dosyaları.
+- **💻 Kod Bloğu (Syntax Highlighting) & Monospace:** Kotlin, Python, JavaScript, Java, C++, SQL, HTML, JSON, Bash dillerinde gerçek zamanlı sözdizimi renklendirmesi, macOS tarzı pencere tasarımı, satır numaraları ve tek dokunuşla panoya kopyalama.
+- **📐 LaTeX Matematik Bloğu (Math Formula Renderer):** Yunan harfleri (`\alpha`, `\pi`, `\theta`, vb.), kesirler (`\frac{a}{b}`), integraller (`\int`), toplam sembolleri (`\sum`) ve kökler için canlı matematiksel tipografi ve 19 sembollük hızlı matematik çipi paleti.
+- **📑 İçindekiler Tablosu (Table of Contents - TOC):** Not içerisindeki tüm H1 ve H2 başlıklarını anlık listeleyen, tıklanan başlığa yumuşak animasyonla kaydıran Notion tarzı içindekiler bloğu ve üst bar hızlı atlama çipi.
 - **Hiyerarşik Alt Sayfalar (`Sub-pages`):** Notion tarzı alt sayfalar ana ekranda karmaşayı önlemek için gizlenir, doğrudan bağlı olduğu sayfadan veya global aramayla açılır.
 - **Slash Menüsü (`/`):** İstediğiniz bloğu klavyeden tek tuşla ekleyin.
 
-### 🔐 2. Bitwarden Seviyesinde Güvenlik & Kasa
+### 🔍 2. Not İçi Derin Arama (Deep Content Search & Snippet Highlighting)
+- **Kapsamlı İçerik Taraması:** Başlığı hatırlanmayan notlar dahi içerisindeki tüm bloklardan (paragraf, tablo hücreleri, toggle gövdesi, kod blokları) taranarak milisaniyeler içinde bulunur.
+- **Pasaj & Kelime Vurgulama:** Arama terimi not başlığında ve not kartının üzerinde dikkat çekici sarı/turuncu rozetle (`🔍 İçerikte bulundu: ...[kelime]...`) canlı olarak vurgulanır.
+
+### 🔐 3. Bitwarden Seviyesinde Güvenlik & Kasa
 - **Donanım Destekli AES-256-GCM Şifreleme:** Kilitli notlar cihazınızın yerel Keystore'u ile şifrelenir.
 - **Biyometrik Kilit & PIN Doğrulama:** Parmak izi veya yüz tanıma ile anında güvenli erişim.
 - **Arka Plana Geçince Otomatik Kilit (Vault Timeout):** Uygulamadan çıkıldığında veya başka bir uygulamaya geçildiğinde güvenlik oturumu sıfırlanır.
@@ -126,18 +133,19 @@ Buluta bağımlı olmayan **%100 Çevrimdışı (Offline-First)** mimarisi sayes
 ### 📷 8. Google ML Kit On-Device Belge Tarama (OCR)
 - Kamera veya galeriden fotoğraf seçerek metinleri %100 çevrimdışı ve yapay zeka destekli olarak anında bloklara aktarın.
 
-### ⚡ 9. Android Uygulama İkonu Kısayolları (App Shortcuts)
-- Uygulama ikonuna uzun basarak tek hamlede:
+### ⚡ 10. Canlı Not Önizlemeli Widget 2.0 & Uygulama Kısayolları (App Shortcuts)
+- **Canlı Ana Ekran Widget'ı (Widget 2.0):** SQLite veri tabanıyla 0ms gecikmeyle senkronize çalışan, en son public notun başlığını, görev durumunu ve zengin içerik özetini önizleyen, nota tek dokunuşla doğrudan atlamayı sağlayan ve `[+ Yeni Not]`, `[📷 Tara]`, `[🎙️ Dikte]` VIP aksiyonları barındıran dinamik widget.
+- **Android App Shortcuts:** Uygulama ikonuna uzun basarak tek hamlede:
   - ➕ Yeni Not Oluştur
   - 🎙️ Sesli Dikte Başlat
   - 📷 Belge Tara / OCR
   - 📅 Günün Ajandasını Aç
 
-### 📄 10. PDF Studio & Zen Okuma Modu
-- **A4 PDF Dışa Aktarma:** Notları başlıkları, callout'ları, çizimleri ve tablolarıyla tertemiz birer PDF belgesine dönüştürün.
+### 📄 11. PDF Studio & Zen Okuma Modu
+- **A4 PDF & Markdown Dışa Aktarma:** Notları başlıkları, callout'ları, çizimleri, kod blokları, LaTeX formülleri ve tablolarıyla tertemiz profesyonel PDF ve GitHub-Flavored Markdown dosyalarına dönüştürün.
 - **Zen Okuma Modu:** Dikkat dağıtıcı tüm arayüzü gizleyen, kelime sayısı ve okuma süresi hesaplayan minimalist okuma alanı.
 
-### 🌐 11. %100 Çift Dilli Altyapı (Türkçe & English)
+### 🌐 12. %100 Çift Dilli Altyapı (Türkçe & English)
 - Uygulama içi dil değiştirici (cihaz dilinden bağımsız olarak Türkçe veya İngilizce seçebilme).
 - Tüm şablonlar, butonlar, diyaloglar ve hata mesajları her iki dilde de tam eşitliktedir.
 

@@ -37,6 +37,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
+import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
 import com.notes.purenoteit.ui.theme.VibrantOrange
@@ -59,6 +63,7 @@ fun NotionListView(
     onPinClick: (NoteData) -> Unit,
     onDeleteClick: (NoteData) -> Unit,
     onStatusChange: (NoteData, String) -> Unit,
+    searchQuery: String = "",
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -75,7 +80,8 @@ fun NotionListView(
                 onNoteClick = { onNoteClick(note) },
                 onPinClick = { onPinClick(note) },
                 onDeleteClick = { onDeleteClick(note) },
-                onStatusChange = { newStatus -> onStatusChange(note, newStatus) }
+                onStatusChange = { newStatus -> onStatusChange(note, newStatus) },
+                searchQuery = searchQuery
             )
         }
     }
@@ -88,7 +94,8 @@ private fun NotionListRow(
     onNoteClick: () -> Unit,
     onPinClick: () -> Unit,
     onDeleteClick: () -> Unit,
-    onStatusChange: (String) -> Unit
+    onStatusChange: (String) -> Unit,
+    searchQuery: String = ""
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
@@ -135,16 +142,50 @@ private fun NotionListRow(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            // Title + tasks count
+            // Title + tasks count + search snippet
             val isProtected = note.isPassword == true || note.isEncrypted || category?.isPassword == true
             Column(modifier = Modifier.weight(1f)) {
+                val displayTitle = when {
+                    isProtected -> "******"
+                    note.title.isNullOrBlank() -> stringResource(R.string.untitled_note)
+                    else -> note.title!!
+                }
+                val titleAnnotated = remember(displayTitle, searchQuery, isProtected) {
+                    if (searchQuery.isNotBlank() && !isProtected) {
+                        val lowerText = displayTitle.lowercase(Locale.getDefault())
+                        val lowerQ = searchQuery.trim().lowercase(Locale.getDefault())
+                        val builder = AnnotatedString.Builder()
+                        var curr = 0
+                        while (curr < displayTitle.length) {
+                            val idx = lowerText.indexOf(lowerQ, curr)
+                            if (idx == -1) {
+                                builder.append(displayTitle.substring(curr))
+                                break
+                            }
+                            if (idx > curr) {
+                                builder.append(displayTitle.substring(curr, idx))
+                            }
+                            val end = (idx + lowerQ.length).coerceAtMost(displayTitle.length)
+                            builder.pushStyle(
+                                SpanStyle(
+                                    background = Color(0xFFFFE082),
+                                    color = Color(0xFFD84315),
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            )
+                            builder.append(displayTitle.substring(idx, end))
+                            builder.pop()
+                            curr = end
+                        }
+                        builder.toAnnotatedString()
+                    } else {
+                        AnnotatedString(displayTitle)
+                    }
+                }
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = when {
-                            isProtected -> "******"
-                            note.title.isNullOrBlank() -> stringResource(R.string.untitled_note)
-                            else -> note.title!!
-                        },
+                        text = titleAnnotated,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -178,6 +219,45 @@ private fun NotionListRow(
                             modifier = Modifier.size(12.dp)
                         )
                     }
+                }
+
+                // In-content deep search snippet
+                val searchSnippetMatch = remember(note.description, searchQuery) {
+                    if (searchQuery.isNotBlank() && !isProtected) {
+                        BlockParser.findSearchSnippet(note.description, searchQuery)
+                    } else null
+                }
+                if (searchSnippetMatch != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    val snippetText = searchSnippetMatch.snippet
+                    val start = searchSnippetMatch.matchStart
+                    val end = searchSnippetMatch.matchEnd
+                    val annotatedSnippet = remember(snippetText, start, end) {
+                        buildAnnotatedString {
+                            if (start in 0..snippetText.length && end in start..snippetText.length) {
+                                append(snippetText.substring(0, start))
+                                pushStyle(
+                                    SpanStyle(
+                                        background = Color(0xFFFFE082),
+                                        color = Color(0xFFB71C1C),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                                append(snippetText.substring(start, end))
+                                pop()
+                                append(snippetText.substring(end))
+                            } else {
+                                append(snippetText)
+                            }
+                        }
+                    }
+                    Text(
+                        text = annotatedSnippet,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 if (note.totalTasks > 0) {

@@ -53,6 +53,9 @@ fun NotionSlashDialog(
         }
         add(SlashItem(BlockType.HEADING_1, stringResource(R.string.slash_h1_title), stringResource(R.string.slash_h1_desc), R.drawable.ic_format_h1))
         add(SlashItem(BlockType.HEADING_2, stringResource(R.string.slash_h2_title), stringResource(R.string.slash_h2_desc), R.drawable.ic_format_h2))
+        add(SlashItem(BlockType.CODE, stringResource(R.string.slash_code_title), stringResource(R.string.slash_code_desc), R.drawable.file_edit))
+        add(SlashItem(BlockType.MATH, stringResource(R.string.slash_math_title), stringResource(R.string.slash_math_desc), R.drawable.other))
+        add(SlashItem(BlockType.TABLE_OF_CONTENTS, stringResource(R.string.slash_toc_title), stringResource(R.string.slash_toc_desc), R.drawable.menu))
         add(SlashItem(BlockType.TODO, stringResource(R.string.slash_todo_title), stringResource(R.string.slash_todo_desc), R.drawable.ic_checklist))
         add(SlashItem(BlockType.BULLET_LIST, stringResource(R.string.slash_bullet_title), stringResource(R.string.slash_bullet_desc), R.drawable.ic_format_bullet))
         add(SlashItem(BlockType.CALLOUT, stringResource(R.string.slash_callout_title), stringResource(R.string.slash_callout_desc), R.drawable.ic_format_quote))

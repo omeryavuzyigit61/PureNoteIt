@@ -957,6 +957,7 @@ fun HomeScreen(
                             onPinClick = { note -> noteViewModel.togglePinStatus(note.id, note.isPinned) },
                             onDeleteClick = { note -> handleSoftDeleteNote(note) },
                             onStatusChange = { note, newStatus -> noteViewModel.updateNoteStatus(note, newStatus) },
+                            searchQuery = searchQuery,
                             modifier = Modifier.padding(paddingValues)
                         )
                     }
@@ -1068,7 +1069,8 @@ fun HomeScreen(
                                         onClick = { handleNoteClick(note) },
                                         onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
                                         onDeleteClick = { handleSoftDeleteNote(note) },
-                                        isCategoryLocked = note.categoryId in lockedCategoryIds
+                                        isCategoryLocked = note.categoryId in lockedCategoryIds,
+                                        searchQuery = searchQuery
                                     )
                                 }
 
@@ -1101,7 +1103,8 @@ fun HomeScreen(
                                     onClick = { handleNoteClick(note) },
                                     onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
                                     onDeleteClick = { handleSoftDeleteNote(note) },
-                                    isCategoryLocked = note.categoryId in lockedCategoryIds
+                                    isCategoryLocked = note.categoryId in lockedCategoryIds,
+                                    searchQuery = searchQuery
                                 )
                             }
                         }

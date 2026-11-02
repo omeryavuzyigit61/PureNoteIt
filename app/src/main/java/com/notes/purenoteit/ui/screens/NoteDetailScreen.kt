@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -76,6 +77,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -139,6 +141,7 @@ import com.notes.purenoteit.util.showToastShort
 import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -200,6 +203,8 @@ fun NoteDetailScreen(
     }
 
     val blocks = remember { mutableStateListOf<NoteBlock>() }
+    val coroutineScope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
     var isRecordingAudio by remember { mutableStateOf(false) }
     var recordingSeconds by remember { mutableIntStateOf(0) }
     var currentAmplitude by remember { mutableIntStateOf(0) }
@@ -1514,6 +1519,7 @@ fun NoteDetailScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -1711,6 +1717,62 @@ fun NoteDetailScreen(
                             )
                         }
                     }
+
+                    // Quick Table of Contents Jump Chip (TOC)
+                    val headingsCount = remember(blocks.size, blocks.map { it.content }) {
+                        blocks.count { (it.type == BlockType.HEADING_1 || it.type == BlockType.HEADING_2) && it.content.isNotBlank() }
+                    }
+                    if (headingsCount > 0) {
+                        var showTocMenu by remember { mutableStateOf(false) }
+                        Box {
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { showTocMenu = true },
+                                shape = RoundedCornerShape(12.dp),
+                                color = SoftOrangeLight.copy(alpha = 0.7f),
+                                border = androidx.compose.foundation.BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = "📑", fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = stringResource(R.string.toc_title) + " ($headingsCount)",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VibrantOrange
+                                    )
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = showTocMenu,
+                                onDismissRequest = { showTocMenu = false }
+                            ) {
+                                blocks.forEachIndexed { headIdx, headBlock ->
+                                    if ((headBlock.type == BlockType.HEADING_1 || headBlock.type == BlockType.HEADING_2) && headBlock.content.isNotBlank()) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = (if (headBlock.type == BlockType.HEADING_1) "• " else "   ◦ ") + headBlock.content,
+                                                    fontWeight = if (headBlock.type == BlockType.HEADING_1) FontWeight.Bold else FontWeight.Normal,
+                                                    fontSize = if (headBlock.type == BlockType.HEADING_1) 14.sp else 13.sp
+                                                )
+                                            },
+                                            onClick = {
+                                                showTocMenu = false
+                                                coroutineScope.launch {
+                                                    listState.animateScrollToItem((headIdx + 1).coerceAtLeast(0))
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Notion Ready-to-Use Templates Hub Banner (Visible on fresh/empty notes)
@@ -1797,6 +1859,15 @@ fun NoteDetailScreen(
                     },
                     onTableChange = { newTable ->
                         blocks[index] = block.copy(tableData = newTable)
+                    },
+                    onCodeLanguageChange = { newLang ->
+                        blocks[index] = block.copy(codeLanguage = newLang)
+                    },
+                    allBlocks = blocks,
+                    onScrollToBlock = { targetIndex ->
+                        coroutineScope.launch {
+                            listState.animateScrollToItem((targetIndex + 1).coerceAtLeast(0))
+                        }
                     },
                     onDeleteBlock = {
                         recordUndoState()

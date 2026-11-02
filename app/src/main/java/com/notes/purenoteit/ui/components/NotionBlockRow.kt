@@ -12,6 +12,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -27,12 +29,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.notes.purenoteit.util.MathFormulaRenderer
+import com.notes.purenoteit.util.SyntaxHighlighter
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -148,6 +157,9 @@ fun NotionBlockRow(
     onTableChange: ((List<List<String>>) -> Unit)? = null,
     onOpenLinkedNote: ((String) -> Unit)? = null,
     onOpenSubPage: ((String) -> Unit)? = null,
+    onCodeLanguageChange: ((String) -> Unit)? = null,
+    allBlocks: List<NoteBlock> = emptyList(),
+    onScrollToBlock: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -789,6 +801,329 @@ fun NotionBlockRow(
                                     fontWeight = FontWeight.Bold,
                                     color = VibrantOrange
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            BlockType.CODE -> {
+                var showLangMenu by remember { mutableStateOf(false) }
+                var isCopied by remember { mutableStateOf(false) }
+                val context = LocalContext.current
+                val currentLang = block.codeLanguage.ifBlank { "kotlin" }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFF1E1E24),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF33333D)),
+                    shadowElevation = 2.dp
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFFF5F56)))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFFFBD2E)))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF27C93F)))
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Box {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Color(0xFF2C2C35),
+                                        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF454552)),
+                                        modifier = Modifier.clickable { showLangMenu = true }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            val langLabel = SyntaxHighlighter.SUPPORTED_LANGUAGES.find { it.first.equals(currentLang, true) }?.second ?: currentLang.replaceFirstChar { it.uppercase() }
+                                            Text(
+                                                text = "$langLabel ▾",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFFFB74D)
+                                            )
+                                        }
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = showLangMenu,
+                                        onDismissRequest = { showLangMenu = false }
+                                    ) {
+                                        SyntaxHighlighter.SUPPORTED_LANGUAGES.forEach { (key, label) ->
+                                            DropdownMenuItem(
+                                                text = { Text(label) },
+                                                onClick = {
+                                                    showLangMenu = false
+                                                    block.codeLanguage = key
+                                                    onCodeLanguageChange?.invoke(key)
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isCopied) Color(0xFF2E7D32) else Color(0xFF2C2C35),
+                                    border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF454552)),
+                                    modifier = Modifier.clickable {
+                                        val clipManager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                        clipManager?.setPrimaryClip(android.content.ClipData.newPlainText("Code", block.content))
+                                        isCopied = true
+                                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ isCopied = false }, 2000L)
+                                    }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (isCopied) stringResource(R.string.code_copied) else ("📋 " + stringResource(R.string.code_copy)),
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isCopied) PureWhite else Color(0xFFE0E0E0)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(6.dp))
+                                BlockReorderControls(isDarkContainer = true)
+                            }
+                        }
+
+                        BasicTextField(
+                            value = block.content,
+                            onValueChange = onContentChange,
+                            textStyle = TextStyle(
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                fontSize = 13.sp,
+                                color = PureWhite,
+                                lineHeight = 19.sp
+                            ),
+                            visualTransformation = VisualTransformation { text ->
+                                TransformedText(
+                                    SyntaxHighlighter.highlight(text.text, currentLang, isDark = true),
+                                    OffsetMapping.Identity
+                                )
+                            },
+                            cursorBrush = SolidColor(VibrantOrange),
+                            decorationBox = { innerTextField ->
+                                if (block.content.isEmpty()) {
+                                    Text(
+                                        text = "// Kodu buraya yazın veya yapıştırın...",
+                                        style = TextStyle(
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontSize = 13.sp,
+                                            color = Color(0xFF757585),
+                                            fontStyle = FontStyle.Italic
+                                        )
+                                    )
+                                }
+                                innerTextField()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            BlockType.MATH -> {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB74D).copy(alpha = 0.5f)),
+                    shadowElevation = 1.dp
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "∑", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = VibrantOrange)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.slash_math_title),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            BlockReorderControls()
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            MathFormulaRenderer.QUICK_MATH_SYMBOLS.forEach { (symbol, _) ->
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = SoftOrangeLight,
+                                    border = androidx.compose.foundation.BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.4f)),
+                                    modifier = Modifier.clickable {
+                                        onContentChange(block.content + symbol)
+                                    }
+                                ) {
+                                    Text(
+                                        text = symbol,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VibrantOrange,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        BasicTextField(
+                            value = block.content,
+                            onValueChange = onContentChange,
+                            textStyle = textStyle.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 13.5.sp),
+                            cursorBrush = SolidColor(VibrantOrange),
+                            decorationBox = { inner ->
+                                if (block.content.isEmpty()) {
+                                    Text(
+                                        text = stringResource(R.string.math_input_placeholder),
+                                        style = textStyle.copy(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                                    )
+                                }
+                                inner()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                        )
+
+                        if (block.content.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFFFF8E1),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFE082))
+                            ) {
+                                Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                    Text(
+                                        text = stringResource(R.string.math_preview_title),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFF57F17)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = MathFormulaRenderer.formatMathFormula(block.content, isDark = false),
+                                        fontSize = 18.sp,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            BlockType.TABLE_OF_CONTENTS -> {
+                val headings = remember(allBlocks) {
+                    allBlocks.mapIndexedNotNull { idx, b ->
+                        if ((b.type == BlockType.HEADING_1 || b.type == BlockType.HEADING_2) && b.content.isNotBlank()) {
+                            Triple(idx, b.type, b.content)
+                        } else null
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.7f))
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "📑", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.toc_title),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            BlockReorderControls()
+                        }
+
+                        if (headings.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.toc_no_headings),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                fontStyle = FontStyle.Italic,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        } else {
+                            headings.forEach { (index, type, text) ->
+                                val indent = if (type == BlockType.HEADING_2) 16.dp else 0.dp
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = indent, top = 3.dp, bottom = 3.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { onScrollToBlock?.invoke(index) }
+                                        .padding(vertical = 3.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (type == BlockType.HEADING_1) "•" else "◦",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VibrantOrange
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = text,
+                                        fontSize = if (type == BlockType.HEADING_1) 13.sp else 12.sp,
+                                        fontWeight = if (type == BlockType.HEADING_1) FontWeight.Bold else FontWeight.Medium,
+                                        color = VibrantOrange,
+                                        textDecoration = TextDecoration.Underline,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }

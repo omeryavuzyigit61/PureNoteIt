@@ -38,6 +38,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,6 +64,7 @@ fun NotionNoteCard(
     onPinClick: () -> Unit,
     onDeleteClick: () -> Unit,
     isCategoryLocked: Boolean = false,
+    searchQuery: String = "",
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -216,9 +220,43 @@ fun NotionNoteCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Title
+            // Title with search query highlighting
+            val displayTitle = if (isProtected) "******" else (note.title ?: stringResource(R.string.untitled_note))
+            val titleAnnotated = remember(displayTitle, searchQuery, isProtected) {
+                if (searchQuery.isNotBlank() && !isProtected) {
+                    val lowerText = displayTitle.lowercase(Locale.getDefault())
+                    val lowerQ = searchQuery.trim().lowercase(Locale.getDefault())
+                    val builder = AnnotatedString.Builder()
+                    var curr = 0
+                    while (curr < displayTitle.length) {
+                        val idx = lowerText.indexOf(lowerQ, curr)
+                        if (idx == -1) {
+                            builder.append(displayTitle.substring(curr))
+                            break
+                        }
+                        if (idx > curr) {
+                            builder.append(displayTitle.substring(curr, idx))
+                        }
+                        val end = (idx + lowerQ.length).coerceAtMost(displayTitle.length)
+                        builder.pushStyle(
+                            SpanStyle(
+                                background = Color(0xFFFFE082),
+                                color = Color(0xFFD84315),
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        )
+                        builder.append(displayTitle.substring(idx, end))
+                        builder.pop()
+                        curr = end
+                    }
+                    builder.toAnnotatedString()
+                } else {
+                    AnnotatedString(displayTitle)
+                }
+            }
+
             Text(
-                text = if (isProtected) "******" else (note.title ?: stringResource(R.string.untitled_note)),
+                text = titleAnnotated,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
@@ -230,7 +268,7 @@ fun NotionNoteCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Content preview (Bitwarden Mask vs Notion Summary)
+            // Content preview (Bitwarden Mask vs Deep Search Snippet vs Notion Summary)
             if (isProtected) {
                 Row(
                     modifier = Modifier.padding(vertical = 8.dp),
@@ -250,22 +288,84 @@ fun NotionNoteCard(
                     )
                 }
             } else {
-                val summary = remember(note.description) {
-                    val blocks = BlockParser.parse(note.description)
-                    BlockParser.toPlainTextSummary(blocks, maxLines = 4)
+                val searchSnippetMatch = remember(note.description, searchQuery) {
+                    if (searchQuery.isNotBlank()) {
+                        BlockParser.findSearchSnippet(note.description, searchQuery)
+                    } else null
                 }
 
-                if (summary.isNotBlank()) {
-                    Text(
-                        text = summary,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            lineHeight = 18.sp,
-                            fontSize = 12.5.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                if (searchSnippetMatch != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = SoftOrangeLight.copy(alpha = 0.5f),
+                        border = BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "🔍", fontSize = 10.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(R.string.search_in_content_found),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val snippetText = searchSnippetMatch.snippet
+                            val start = searchSnippetMatch.matchStart
+                            val end = searchSnippetMatch.matchEnd
+                            val annotatedSnippet = remember(snippetText, start, end) {
+                                buildAnnotatedString {
+                                    if (start in 0..snippetText.length && end in start..snippetText.length) {
+                                        append(snippetText.substring(0, start))
+                                        pushStyle(
+                                            SpanStyle(
+                                                background = Color(0xFFFFE082),
+                                                color = Color(0xFFB71C1C),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        )
+                                        append(snippetText.substring(start, end))
+                                        pop()
+                                        append(snippetText.substring(end))
+                                    } else {
+                                        append(snippetText)
+                                    }
+                                }
+                            }
+                            Text(
+                                text = annotatedSnippet,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    lineHeight = 16.sp,
+                                    fontSize = 11.5.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                } else {
+                    val summary = remember(note.description) {
+                        val blocks = BlockParser.parse(note.description)
+                        BlockParser.toPlainTextSummary(blocks, maxLines = 4)
+                    }
+
+                    if (summary.isNotBlank()) {
+                        Text(
+                            text = summary,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                lineHeight = 18.sp,
+                                fontSize = 12.5.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 

@@ -162,6 +162,8 @@
     <string name="tb_audio_record">Ses Kaydı</string>
     <string name="tb_recording">Kaydediliyor...</string>
     <string name="tb_divider">Ayırıcı</string>
+    <string name="tb_code">Kod</string>
+    <string name="tb_math">Formül</string>
 
     <!-- Notion Slash Dialog -->
     <string name="slash_title">Temel Bloklar (Notion Tarzı)</string>
@@ -189,6 +191,20 @@
     <string name="slash_drawing_desc">Parmakla serbest çizim veya şema çizin</string>
     <string name="slash_divider_title">Ayırıcı Çizgi</string>
     <string name="slash_divider_desc">Blokları birbirinden ayıran yatay çizgi</string>
+    <string name="slash_code_title">Kod Bloğu (Code Block)</string>
+    <string name="slash_code_desc">Renkli sözdizimi vurgulu yazılım kod bloğu</string>
+    <string name="slash_math_title">Matematik Formülü (LaTeX)</string>
+    <string name="slash_math_desc">Denklem ve formül matematik bloğu</string>
+    <string name="slash_toc_title">İçindekiler Tablosu (TOC)</string>
+    <string name="slash_toc_desc">Başlıklara göre dinamik gezinme dizini</string>
+    <string name="search_in_content_found">İçerikte eşleşti: %1$s</string>
+    <string name="code_copy">Kopyala</string>
+    <string name="code_copied">Kopyalandı!</string>
+    <string name="code_select_lang">Dil Seç</string>
+    <string name="math_preview_title">Formül Önizleme</string>
+    <string name="math_input_placeholder">Örn: E = mc^2 veya \frac{a}{b}</string>
+    <string name="toc_title">📑 İçindekiler Tablosu</string>
+    <string name="toc_no_headings">Bu notta henüz Başlık 1 veya Başlık 2 bulunmuyor.</string>
 
     <!-- Trash Bin Sheet -->
     <string name="trash_title">Çöp Kutusu</string>

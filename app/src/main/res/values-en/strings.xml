@@ -162,6 +162,8 @@
     <string name="tb_audio_record">Voice Note</string>
     <string name="tb_recording">Recording...</string>
     <string name="tb_divider">Divider</string>
+    <string name="tb_code">Code</string>
+    <string name="tb_math">Formula</string>
 
     <!-- Notion Slash Dialog -->
     <string name="slash_title">Basic Blocks (Notion Style)</string>
@@ -189,6 +191,20 @@
     <string name="slash_drawing_desc">Draw, sketch, or take handwritten notes</string>
     <string name="slash_divider_title">Divider</string>
     <string name="slash_divider_desc">Visually divide blocks with a line</string>
+    <string name="slash_code_title">Code Block</string>
+    <string name="slash_code_desc">Syntax-highlighted software code snippet</string>
+    <string name="slash_math_title">Math Formula (LaTeX)</string>
+    <string name="slash_math_desc">Mathematical equation and formula block</string>
+    <string name="slash_toc_title">Table of Contents (TOC)</string>
+    <string name="slash_toc_desc">Dynamic navigation index based on headings</string>
+    <string name="search_in_content_found">Matched in content: %1$s</string>
+    <string name="code_copy">Copy</string>
+    <string name="code_copied">Copied!</string>
+    <string name="code_select_lang">Select Language</string>
+    <string name="math_preview_title">Formula Preview</string>
+    <string name="math_input_placeholder">E.g.: E = mc^2 or \\frac{a}{b}</string>
+    <string name="toc_title">📑 Table of Contents</string>
+    <string name="toc_no_headings">No Heading 1 or Heading 2 found in this note yet.</string>
 
     <!-- Trash Bin Sheet -->
     <string name="trash_title">Trash Bin</string>

@@ -58,8 +58,43 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginVertical="10dp"
+        android:layout_marginVertical="8dp"
         android:background="#14000000" />
+
+    <!-- Recent Note Preview Card (Feature 4: Canlı Not Önizleme) -->
+    <LinearLayout
+        android:id="@+id/widget_note_preview_card"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/widget_btn_secondary"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/widget_note_card_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Son Notun Burada Görünür"
+            android:textColor="#1C1C1E"
+            android:textSize="12.5sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/widget_note_card_snippet"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="Dokunarak PureNoteIt ile hızlıca not almaya başla ✨"
+            android:textColor="#636366"
+            android:textSize="10.5sp"
+            android:maxLines="2"
+            android:ellipsize="end" />
+    </LinearLayout>
 
     <!-- 3 Quick Action Buttons -->
     <LinearLayout

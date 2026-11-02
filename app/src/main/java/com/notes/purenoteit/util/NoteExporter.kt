@@ -72,6 +72,24 @@ object NoteExporter {
                 BlockType.AUDIO -> {
                     sb.append("🎙️ [Ses Kaydı Eki: ${block.mediaPath?.substringAfterLast("/") ?: "ses.mp4"}]\n\n")
                 }
+                BlockType.CODE -> {
+                    val lang = if (block.codeLanguage.isNotBlank()) block.codeLanguage else "text"
+                    sb.append("```").append(lang).append("\n").append(block.content).append("\n```\n\n")
+                }
+                BlockType.MATH -> {
+                    sb.append("$$\n").append(block.content).append("\n$$\n\n")
+                }
+                BlockType.TABLE_OF_CONTENTS -> {
+                    sb.append("### İçindekiler\n")
+                    for (b in blocks) {
+                        if (b.type == BlockType.HEADING_1 && b.content.isNotBlank()) {
+                            sb.append("- [").append(b.content).append("](#").append(b.content.lowercase().replace(" ", "-")).append(")\n")
+                        } else if (b.type == BlockType.HEADING_2 && b.content.isNotBlank()) {
+                            sb.append("  - [").append(b.content).append("](#").append(b.content.lowercase().replace(" ", "-")).append(")\n")
+                        }
+                    }
+                    sb.append("\n")
+                }
                 BlockType.DIVIDER -> sb.append("\n---\n\n")
                 else -> {
                     if (block.content.isNotBlank()) {
@@ -287,6 +305,46 @@ object NoteExporter {
             isAntiAlias = true
         }
 
+        val codeBgPaint = Paint().apply {
+            color = Color.parseColor("#F5F5F7")
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val codeBorderPaint = Paint().apply {
+            color = Color.parseColor("#E0E0E0")
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+            isAntiAlias = true
+        }
+
+        val codeTextPaint = Paint().apply {
+            color = Color.parseColor("#212121")
+            textSize = 9.5f
+            typeface = android.graphics.Typeface.MONOSPACE
+            isAntiAlias = true
+        }
+
+        val mathBgPaint = Paint().apply {
+            color = Color.parseColor("#E0F2F1")
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val mathBorderPaint = Paint().apply {
+            color = Color.parseColor("#80CBC4")
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+            isAntiAlias = true
+        }
+
+        val mathTextPaint = Paint().apply {
+            color = Color.parseColor("#004D40")
+            textSize = 12f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+
         var y = 50f
 
         fun ensurePageSpace(neededHeight: Float) {
@@ -499,6 +557,62 @@ object NoteExporter {
                     ensurePageSpace(14f)
                     canvas.drawLine(marginX, y, marginX + contentWidth, y, dividerPaint)
                     y += 14f
+                }
+
+                BlockType.CODE -> {
+                    if (config.includeText && block.content.isNotBlank()) {
+                        val lines = block.content.lines()
+                        val codeBoxHeight = (lines.size * 14f) + 24f
+                        ensurePageSpace(codeBoxHeight + 10f)
+
+                        val rect = RectF(marginX, y, marginX + contentWidth, y + codeBoxHeight)
+                        canvas.drawRoundRect(rect, 6f, 6f, codeBgPaint)
+                        canvas.drawRoundRect(rect, 6f, 6f, codeBorderPaint)
+
+                        val langLabel = if (block.codeLanguage.isNotBlank()) block.codeLanguage.uppercase() else "CODE"
+                        canvas.drawText("</> $langLabel", marginX + 10f, y + 14f, audioSubPaint)
+
+                        var codeY = y + 26f
+                        for (line in lines) {
+                            canvas.drawText(line, marginX + 10f, codeY, codeTextPaint)
+                            codeY += 14f
+                        }
+                        y += codeBoxHeight + 12f
+                    }
+                }
+
+                BlockType.MATH -> {
+                    if (config.includeText && block.content.isNotBlank()) {
+                        val mathBoxHeight = 36f
+                        ensurePageSpace(mathBoxHeight + 10f)
+
+                        val rect = RectF(marginX, y, marginX + contentWidth, y + mathBoxHeight)
+                        canvas.drawRoundRect(rect, 6f, 6f, mathBgPaint)
+                        canvas.drawRoundRect(rect, 6f, 6f, mathBorderPaint)
+
+                        val formatted = MathFormulaRenderer.formatFormula(block.content)
+                        canvas.drawText("fx  $formatted", marginX + 12f, y + 22f, mathTextPaint)
+                        y += mathBoxHeight + 12f
+                    }
+                }
+
+                BlockType.TABLE_OF_CONTENTS -> {
+                    if (config.includeText) {
+                        val headings = blocks.filter { (it.type == BlockType.HEADING_1 || it.type == BlockType.HEADING_2) && it.content.isNotBlank() }
+                        if (headings.isNotEmpty()) {
+                            val tocHeight = headings.size * 16f + 26f
+                            ensurePageSpace(tocHeight)
+                            canvas.drawText("📑  İçindekiler", marginX, y, h2Paint)
+                            y += 18f
+                            for (h in headings) {
+                                val indent = if (h.type == BlockType.HEADING_1) "• " else "    ◦ "
+                                val paint = if (h.type == BlockType.HEADING_1) h2Paint else bodyPaint
+                                canvas.drawText(indent + h.content, marginX + 4f, y, paint)
+                                y += 15f
+                            }
+                            y += 10f
+                        }
+                    }
                 }
 
                 else -> {
