@@ -12,7 +12,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.notes.purenoteit"
+        applicationId = "com.purenoteit.app"
         minSdk = 24
         targetSdk = 35
         versionCode = 2
