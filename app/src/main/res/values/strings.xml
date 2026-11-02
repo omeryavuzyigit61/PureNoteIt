@@ -449,4 +449,11 @@
     <string name="filter_audio">Ses Kayıtlılar</string>
     <string name="filter_tasks">Görevler</string>
     <string name="filter_tables">Tablolular</string>
+    <string name="filter_button_title">Filtrele</string>
+    <string name="filter_sheet_title">Filtreleme &amp; Sıralama</string>
+    <string name="filter_clear_all">Filtreleri Sıfırla</string>
+    <string name="filter_apply_btn">%d Notu Göster</string>
+    <string name="filter_section_categories">Kategoriler</string>
+    <string name="filter_section_smart">Akıllı Filtreler</string>
+    <string name="filter_section_tags">Etiketler (#)</string>
 </resources>

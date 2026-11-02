@@ -19,6 +19,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -63,6 +64,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
@@ -70,6 +73,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
@@ -166,7 +170,7 @@ enum class NotionViewMode(val titleRes: Int, val iconRes: Int) {
     STREAM(R.string.tab_stream, R.drawable.ic_stream_timeline)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     noteViewModel: NoteViewModel,
@@ -233,6 +237,10 @@ fun HomeScreen(
 
     // Smart Hashtag filter state (Feature 3)
     var selectedHashtag by remember { mutableStateOf<String?>(null) }
+
+    // Unified Filter Bottom Sheet & View Mode Menu states
+    var showFilterSheet by remember { mutableStateOf(false) }
+    var showViewModeMenu by remember { mutableStateOf(false) }
 
     // Dialog state for Daily Agenda Confirmation
     var showAgendaConfirmDialog by remember { mutableStateOf(false) }
@@ -729,49 +737,174 @@ fun HomeScreen(
                                 )
                             )
 
-                            // Right: Spacer for visual balance
-                            Spacer(modifier = Modifier.size(42.dp))
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Notion Multi-View Switcher Tabs
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            for (mode in NotionViewMode.values()) {
-                                ViewModeTab(
-                                    mode = mode,
-                                    isSelected = currentViewMode == mode,
+                            // Right: View Mode Selector Menu Button
+                            Box {
+                                IconButton(
                                     onClick = {
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
-                                        currentViewMode = mode
+                                        showViewModeMenu = true
+                                    },
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = currentViewMode.iconRes),
+                                        contentDescription = stringResource(currentViewMode.titleRes),
+                                        tint = VibrantOrange,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                DropdownMenu(
+                                    expanded = showViewModeMenu,
+                                    onDismissRequest = { showViewModeMenu = false },
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(MaterialTheme.colorScheme.surface)
+                                ) {
+                                    for (mode in NotionViewMode.values()) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        painter = painterResource(id = mode.iconRes),
+                                                        contentDescription = null,
+                                                        tint = if (currentViewMode == mode) VibrantOrange else MaterialTheme.colorScheme.onSurface,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(10.dp))
+                                                    Text(
+                                                        text = stringResource(mode.titleRes),
+                                                        fontWeight = if (currentViewMode == mode) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (currentViewMode == mode) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            },
+                                            onClick = {
+                                                showViewModeMenu = false
+                                                focusManager.clearFocus()
+                                                keyboardController?.hide()
+                                                currentViewMode = mode
+                                            }
+                                        )
                                     }
-                                )
+                                }
                             }
                         }
 
-                        // Horizontal Category Chips (Visible in Grid, List & Board views)
+                        // Tek Satır Birleşik Filtreleme Çubuğu (Unified Single Filter Bar)
                         if (currentViewMode != NotionViewMode.CALENDAR && currentViewMode != NotionViewMode.GRAPH && currentViewMode != NotionViewMode.STREAM && currentViewMode != NotionViewMode.WHITEBOARD) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val activeFilterCount = (if (selectedCategory != null) 1 else 0) +
+                                        (if (selectedSmartFilter != SmartFilter.ALL) 1 else 0) +
+                                        (if (selectedHashtag != null) 1 else 0)
+
+                                // 1. Filtrele Butonu (Bottom Sheet Açıcı)
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            focusManager.clearFocus()
+                                            keyboardController?.hide()
+                                            showFilterSheet = true
+                                        },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (activeFilterCount > 0) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                                    border = if (activeFilterCount == 0) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)) else null
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.customize),
+                                            contentDescription = stringResource(R.string.filter_button_title),
+                                            tint = if (activeFilterCount > 0) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = stringResource(R.string.filter_button_title) + if (activeFilterCount > 0) " ($activeFilterCount)" else "",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (activeFilterCount > 0) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                // 2. Aktif Filtre Rozetleri (Hızlı İptal [✕] Butonlu)
+                                if (selectedSmartFilter != SmartFilter.ALL) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { selectedSmartFilter = SmartFilter.ALL },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = SoftOrangeLight,
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = stringResource(selectedSmartFilter.titleRes),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = VibrantOrange
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(text = "✕", fontSize = 10.sp, color = VibrantOrange, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                if (selectedHashtag != null) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { selectedHashtag = null },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = SoftOrangeLight,
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = selectedHashtag!!,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = VibrantOrange
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(text = "✕", fontSize = 10.sp, color = VibrantOrange, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                // 3. Hızlı Kategori Seçimi (Tüm Kategoriler + Kategori Çipleri)
                                 CategoryChip(
                                     label = stringResource(R.string.all_categories),
-                                    isSelected = selectedCategory == null,
+                                    isSelected = selectedCategory == null && selectedSmartFilter == SmartFilter.ALL && selectedHashtag == null,
                                     onClick = {
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
                                         selectedCategory = null
+                                        selectedSmartFilter = SmartFilter.ALL
+                                        selectedHashtag = null
                                     }
                                 )
 
@@ -783,94 +916,9 @@ fun HomeScreen(
                                         onClick = {
                                             focusManager.clearFocus()
                                             keyboardController?.hide()
-                                            selectedCategory = category.name
+                                            selectedCategory = if (selectedCategory == category.name) null else category.name
                                         }
                                     )
-                                }
-                            }
-
-                            // Horizontal Smart Filter Chips (Zirve Özellik 3: Hızlı Filtreleme Çipleri)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                SmartFilter.values().forEach { filter ->
-                                    val isFilterSelected = selectedSmartFilter == filter
-                                    Surface(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable {
-                                                focusManager.clearFocus()
-                                                keyboardController?.hide()
-                                                selectedSmartFilter = filter
-                                            },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = if (isFilterSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        border = if (!isFilterSelected) androidx.compose.foundation.BorderStroke(0.6.dp, BorderLight.copy(alpha = 0.6f)) else null
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(id = filter.iconRes),
-                                                contentDescription = null,
-                                                tint = if (isFilterSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(13.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(5.dp))
-                                            Text(
-                                                text = stringResource(filter.titleRes),
-                                                fontSize = 12.sp,
-                                                fontWeight = if (isFilterSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isFilterSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Horizontal Hashtags (#Etiket) Row (Feature 3)
-                            if (allHashtags.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "🏷️",
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(start = 2.dp, end = 2.dp)
-                                    )
-
-                                    allHashtags.forEach { tag ->
-                                        val isTagSelected = selectedHashtag == tag
-                                        Surface(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .clickable {
-                                                    selectedHashtag = if (isTagSelected) null else tag
-                                                },
-                                            shape = RoundedCornerShape(12.dp),
-                                            color = if (isTagSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                            border = if (isTagSelected) null else androidx.compose.foundation.BorderStroke(0.5.dp, BorderLight.copy(alpha = 0.6f))
-                                        ) {
-                                            Text(
-                                                text = tag,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isTagSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                                            )
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -1369,6 +1417,192 @@ fun HomeScreen(
             }
         )
     }
+
+    // Unified Filter Bottom Sheet (Tek Filtreleme Alanı)
+    if (showFilterSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showFilterSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Header: Title & Clear All
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.filter_sheet_title),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    val hasFilters = selectedCategory != null || selectedSmartFilter != SmartFilter.ALL || selectedHashtag != null
+                    if (hasFilters) {
+                        TextButton(
+                            onClick = {
+                                selectedCategory = null
+                                selectedSmartFilter = SmartFilter.ALL
+                                selectedHashtag = null
+                            }
+                        ) {
+                            Text(
+                                text = stringResource(R.string.filter_clear_all),
+                                color = VibrantOrange,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Section 1: Kategoriler
+                Text(
+                    text = stringResource(R.string.filter_section_categories),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    CategoryChip(
+                        label = stringResource(R.string.all_categories),
+                        isSelected = selectedCategory == null,
+                        onClick = { selectedCategory = null }
+                    )
+                    categoryList.forEach { cat ->
+                        CategoryChip(
+                            label = cat.name,
+                            isSelected = selectedCategory == cat.name,
+                            isLocked = cat.isPassword == true,
+                            onClick = {
+                                selectedCategory = if (selectedCategory == cat.name) null else cat.name
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Section 2: Akıllı Filtreler
+                Text(
+                    text = stringResource(R.string.filter_section_smart),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    SmartFilter.values().forEach { filter ->
+                        val isSelected = selectedSmartFilter == filter
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { selectedSmartFilter = filter },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = if (!isSelected) androidx.compose.foundation.BorderStroke(0.6.dp, BorderLight.copy(alpha = 0.6f)) else null
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = filter.iconRes),
+                                    contentDescription = null,
+                                    tint = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = stringResource(filter.titleRes),
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Section 3: Etiketler (Hashtags)
+                if (allHashtags.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = stringResource(R.string.filter_section_tags),
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        allHashtags.forEach { tag ->
+                            val isSelected = selectedHashtag == tag
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        selectedHashtag = if (isSelected) null else tag
+                                    },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                border = if (isSelected) null else androidx.compose.foundation.BorderStroke(0.5.dp, BorderLight.copy(alpha = 0.6f))
+                            ) {
+                                Text(
+                                    text = tag,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                // Apply button
+                Button(
+                    onClick = { showFilterSheet = false },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = VibrantOrange)
+                ) {
+                    Text(
+                        text = stringResource(R.string.filter_apply_btn, filteredNotes.size),
+                        fontWeight = FontWeight.Bold,
+                        color = PureWhite,
+                        fontSize = 14.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
 }
 
 @Composable
@@ -1487,43 +1721,7 @@ private fun CategoryChip(
     }
 }
 
-@Composable
-private fun ViewModeTab(
-    mode: NotionViewMode,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (isSelected) VibrantOrange else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                painter = painterResource(id = mode.iconRes),
-                contentDescription = null,
-                tint = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                modifier = Modifier.size(15.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = stringResource(id = mode.titleRes),
-                fontSize = 12.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
+
 
 @Composable
 private fun EmptyStateContent(
