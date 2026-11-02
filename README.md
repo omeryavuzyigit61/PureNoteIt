@@ -48,36 +48,35 @@ Buluta bağımlı olmayan **%100 Çevrimdışı (Offline-First)** mimarisi sayes
     <tr>
       <td align="center" width="33%">
         <b>Aydınlık Tema Ana Ekran</b><br />
-        <sub>Kategoriler, Filtreler & Not Kartları</sub><br /><br />
+        <sub>Akıllı Filtreler, Kategoriler & Kartlar</sub><br /><br />
         <img src="assets/screenshots/01_home_light.png" width="260" alt="Home Screen Light" />
       </td>
       <td align="center" width="33%">
-        <b>Koyu Tema & İlerleme Takibi</b><br />
-        <sub>Staggered Grid & Medya Rozetleri</sub><br /><br />
-        <img src="assets/screenshots/02_home_dark.jpg" width="260" alt="Home Screen Dark" />
+        <b>Koyu Tema (OLED Black)</b><br />
+        <sub>Staggered Grid & Checklist İlerlemesi</sub><br /><br />
+        <img src="assets/screenshots/02_home_dark.png" width="260" alt="Home Screen Dark" />
       </td>
       <td align="center" width="33%">
-        <b>Notion Blok Editörü</b><br />
-        <sub>Başlıklar, Çizim, Checklist, Callout</sub><br /><br />
-        <img src="assets/screenshots/03_editor_blocks.jpg" width="260" alt="Block Editor" />
+        <b>Notion Blokları & Tablo</b><br />
+        <sub>Dinamik Tablo, Formül & Callout</sub><br /><br />
+        <img src="assets/screenshots/03_editor_blocks.png" width="260" alt="Block Editor" />
       </td>
     </tr>
     <tr>
       <td align="center" width="33%">
         <b>Aylık İnteraktif Takvim</b><br />
-        <sub>Etkinlik Noktaları & Zaman Çizelgesi</sub><br /><br />
+        <sub>Renkli Etkinlik Noktaları (Event Dots)</sub><br /><br />
         <img src="assets/screenshots/04_calendar_month.png" width="260" alt="Monthly Calendar View" />
       </td>
       <td align="center" width="33%">
         <b>Haftalık Kolon Ajandası</b><br />
-        <sub>Günlük Kolonlar & Hızlı Not Ekleme</sub><br /><br />
+        <sub>Günlük Kolonlar & Zaman Planı</sub><br /><br />
         <img src="assets/screenshots/05_calendar_week.png" width="260" alt="Weekly Column Planner" />
       </td>
       <td align="center" width="33%">
-        <b>Zirve Özellikler</b><br />
-        <sub>Şablon Galerisi, Kısayollar, OCR</sub><br /><br />
-        <img src="assets/logo.png" width="180" alt="PureNoteIt Ecosystem" /><br />
-        <sub>✨ 100% Offline & Bitwarden Vault</sub>
+        <b>Şablon Galerisi (Templates Hub)</b><br />
+        <sub>5 Profesyonel Notion Şablonu</sub><br /><br />
+        <img src="assets/screenshots/06_templates_hub.png" width="260" alt="Templates Hub Gallery" />
       </td>
     </tr>
   </table>
