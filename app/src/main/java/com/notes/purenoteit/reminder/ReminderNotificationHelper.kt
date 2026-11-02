@@ -5,13 +5,14 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.notes.purenoteit.R
+import com.notes.purenoteit.model.BlockParser
+import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.view.MainActivity
 
 object ReminderNotificationHelper {
@@ -26,7 +27,7 @@ object ReminderNotificationHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
-            // 1. Alarm Channel (High Priority, Sound, Vibration, Heads-up)
+            // 1. Alarm Channel (High Priority, Sound, Vibration, Heads-up, Private on Lockscreen)
             val alarmSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             val audioAttributes = AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -44,10 +45,10 @@ object ReminderNotificationHelper {
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 500, 200, 500, 200, 500)
                 setSound(alarmSoundUri, audioAttributes)
-                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PRIVATE
             }
 
-            // 2. Standard Reminder Channel (Default Priority)
+            // 2. Standard Reminder Channel (Default Priority, Private on Lockscreen)
             val reminderChannel = NotificationChannel(
                 CHANNEL_REMINDER_ID,
                 "PureNoteIt Standart Hatırlatıcılar",
@@ -57,10 +58,25 @@ object ReminderNotificationHelper {
                 enableLights(true)
                 lightColor = Color.rgb(255, 122, 0)
                 enableVibration(true)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PRIVATE
             }
 
             notificationManager.createNotificationChannel(alarmChannel)
             notificationManager.createNotificationChannel(reminderChannel)
+        }
+    }
+
+    private fun sanitizeDescriptionForNotification(rawDesc: String): String {
+        if (rawDesc.isBlank()) return "Zamanlanmış PureNoteIt hatırlatıcısı."
+        if (SecurityUtil.isEncryptedPayload(rawDesc)) {
+            return "🔒 Şifreli Kasa Notu (İçeriği görüntülemek için uygulamayı açın)"
+        }
+        return try {
+            val blocks = BlockParser.parse(rawDesc)
+            val summary = BlockParser.toPlainTextSummary(blocks, maxLines = 3)
+            if (summary.isBlank()) "Zamanlanmış PureNoteIt hatırlatıcısı." else summary.take(200)
+        } catch (e: Exception) {
+            rawDesc.take(200)
         }
     }
 
@@ -107,12 +123,16 @@ object ReminderNotificationHelper {
             flags
         )
 
+        val isEncryptedNote = SecurityUtil.isEncryptedPayload(noteDesc)
+        val safeTitle = if (isEncryptedNote) "🔒 Korumalı Not" else noteTitle
+        val cleanDesc = sanitizeDescriptionForNotification(noteDesc)
+
         // Snooze intent (5 min delay)
         val snoozeIntent = Intent(context, AlarmActionReceiver::class.java).apply {
             action = ACTION_SNOOZE_ALARM
             putExtra(ReminderManager.EXTRA_NOTE_ID, noteId)
-            putExtra(ReminderManager.EXTRA_NOTE_TITLE, noteTitle)
-            putExtra(ReminderManager.EXTRA_NOTE_DESC, noteDesc)
+            putExtra(ReminderManager.EXTRA_NOTE_TITLE, safeTitle)
+            putExtra(ReminderManager.EXTRA_NOTE_DESC, if (isEncryptedNote) "ENC:" else cleanDesc)
             putExtra(ReminderManager.EXTRA_REMINDER_TYPE, reminderType)
             putExtra(ReminderManager.EXTRA_REMINDER_SOUND, soundType)
         }
@@ -123,15 +143,22 @@ object ReminderNotificationHelper {
             flags
         )
 
-        val cleanDesc = if (noteDesc.isBlank()) "Zamanlanmış PureNoteIt hatırlatıcısı." else noteDesc.take(200)
+        // Redacted public notification for the Lock Screen (prevents shoulder-surfing on locked devices)
+        val publicLockscreenNotification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.note)
+            .setContentTitle(if (isAlarm) "⏰ PureNoteIt Alarm" else "🔔 PureNoteIt Hatırlatıcı")
+            .setContentText("🔒 İçeriği görüntülemek için ekran kilidini açın")
+            .setColor(Color.rgb(255, 122, 0))
+            .setPriority(if (isAlarm) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_DEFAULT)
+            .build()
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.note)
-            .setContentTitle(if (isAlarm) "⏰ ALARM: $noteTitle" else "🔔 Hatırlatıcı: $noteTitle")
+            .setContentTitle(if (isAlarm) "⏰ ALARM: $safeTitle" else "🔔 Hatırlatıcı: $safeTitle")
             .setContentText(cleanDesc)
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .setBigContentTitle("⏰ $noteTitle")
+                    .setBigContentTitle("⏰ $safeTitle")
                     .bigText(cleanDesc)
                     .setSummaryText("PureNoteIt • Hatırlatıcı")
             )
@@ -139,6 +166,8 @@ object ReminderNotificationHelper {
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
             .setDeleteIntent(stopPendingIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicLockscreenNotification)
             .setPriority(if (isAlarm) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_DEFAULT)
 
         if (isAlarm) {

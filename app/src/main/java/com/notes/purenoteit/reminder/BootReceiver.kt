@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.notes.purenoteit.data.db.NoteDao
+import com.notes.purenoteit.repository.NoteRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -18,7 +18,7 @@ class BootReceiver : BroadcastReceiver() {
     @EntryPoint
     @InstallIn(SingletonComponent::class)
     interface BootReceiverEntryPoint {
-        fun getNoteDao(): NoteDao
+        fun getNoteRepository(): NoteRepository
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -30,19 +30,20 @@ class BootReceiver : BroadcastReceiver() {
                     context.applicationContext,
                     BootReceiverEntryPoint::class.java
                 )
-                val noteDao = entryPoint.getNoteDao()
+                val noteRepository = entryPoint.getNoteRepository()
 
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        val activeNotes = noteDao.getActiveReminders(System.currentTimeMillis()).blockingGet()
+                        val activeNotes = noteRepository.getActiveReminders(System.currentTimeMillis()).blockingGet()
                         activeNotes.forEach { note ->
                             val remTime = note.reminderTime
-                            if (remTime != null && remTime > System.currentTimeMillis()) {
+                            if (remTime != null && remTime > System.currentTimeMillis() && note.status != "TRASH") {
+                                val isLocked = note.isPassword == true || note.isEncrypted
                                 ReminderManager.scheduleReminder(
                                     context = context,
                                     noteId = note.id,
-                                    noteTitle = note.title ?: "Başlıksız Not",
-                                    noteDesc = note.description ?: "",
+                                    noteTitle = if (isLocked) "🔒 Korumalı Not" else (note.title ?: "Başlıksız Not"),
+                                    noteDesc = if (isLocked) "ENC:" else (note.description ?: ""),
                                     reminderTimeMs = remTime,
                                     reminderType = note.reminderType ?: "ALARM",
                                     soundType = note.reminderSound ?: "default"

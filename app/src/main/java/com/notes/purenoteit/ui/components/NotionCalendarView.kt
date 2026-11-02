@@ -914,8 +914,13 @@ fun NotionCalendarEventCard(
                             Text(text = note.icon!!, fontSize = 12.sp)
                             Spacer(modifier = Modifier.width(4.dp))
                         }
+                        val isProtected = note.isPassword == true || note.isEncrypted || cat?.isPassword == true
                         Text(
-                            text = if (note.title.isNullOrBlank()) "Başlıksız" else note.title!!,
+                            text = when {
+                                isProtected -> "******"
+                                note.title.isNullOrBlank() -> "Başlıksız"
+                                else -> note.title!!
+                            },
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isDark) PureWhite else Color(0xFF18181B),

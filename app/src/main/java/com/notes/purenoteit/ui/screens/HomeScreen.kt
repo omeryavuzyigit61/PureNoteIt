@@ -106,6 +106,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -271,14 +273,23 @@ fun HomeScreen(
         noteList.filter { it.status == "TRASH" }
     }
 
-    // Extract all unique hashtags from active notes (Feature 3)
-    val allHashtags = remember(activeNotes) {
+    // Set of locked category IDs for unified Vault security
+    val lockedCategoryIds = remember(categoryList) {
+        categoryList.filter { it.isPassword == true }.map { it.id }.toSet()
+    }
+
+    // Extract all unique hashtags from public (non-locked) active notes (Feature 3)
+    val allHashtags = remember(activeNotes, lockedCategoryIds) {
         val tagRegex = Regex("""#([a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]+)""")
-        activeNotes.flatMap { note ->
-            tagRegex.findAll((note.title ?: "") + " " + (note.description ?: ""))
-                .map { "#" + it.groupValues[1] }
-                .toList()
-        }.distinct()
+        activeNotes
+            .filter { note ->
+                note.isPassword != true && !note.isEncrypted && (note.categoryId !in lockedCategoryIds)
+            }
+            .flatMap { note ->
+                tagRegex.findAll((note.title ?: "") + " " + (note.description ?: ""))
+                    .map { "#" + it.groupValues[1] }
+                    .toList()
+            }.distinct()
     }
 
     // Extract all sub-page titles across active notes (Seçenek A: Notion Tarzı Hiyerarşik Gizleme)
@@ -295,8 +306,9 @@ fun HomeScreen(
     }
 
     // Filter notes
-    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles, selectedSmartFilter) {
+    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles, selectedSmartFilter, lockedCategoryIds) {
         activeNotes.filter { note ->
+            val isNoteProtected = note.isPassword == true || note.isEncrypted || (note.categoryId in lockedCategoryIds)
             val matchesCategory = if (selectedCategory == null) {
                 true
             } else {
@@ -307,11 +319,18 @@ fun HomeScreen(
                 true
             } else {
                 val q = searchQuery.trim().lowercase()
-                (note.title ?: "").lowercase().contains(q) ||
-                        (note.description ?: "").lowercase().contains(q)
+                if (isNoteProtected && !SecurityUtil.isVaultUnlocked) {
+                    // Prevent Boolean Search Oracle attacks on locked notes when Vault is locked
+                    false
+                } else {
+                    (note.title ?: "").lowercase().contains(q) ||
+                            (note.description ?: "").lowercase().contains(q)
+                }
             }
             val matchesHashtag = if (selectedHashtag == null) {
                 true
+            } else if (isNoteProtected && !SecurityUtil.isVaultUnlocked) {
+                false
             } else {
                 val text = (note.title ?: "") + " " + (note.description ?: "")
                 text.contains(selectedHashtag!!, ignoreCase = true)
@@ -323,7 +342,7 @@ fun HomeScreen(
             val matchesSmartFilter = when (selectedSmartFilter) {
                 SmartFilter.ALL -> true
                 SmartFilter.PINNED -> note.isPinned
-                SmartFilter.LOCKED -> (note.isPassword == true || note.isEncrypted)
+                SmartFilter.LOCKED -> isNoteProtected
                 SmartFilter.REMINDERS -> (note.reminderTime != null && note.reminderTime!! > 0L)
                 SmartFilter.PHOTOS -> (!note.images.isNullOrEmpty()) ||
                         (note.description ?: "").contains("\"type\":\"IMAGE\"") ||
@@ -356,7 +375,8 @@ fun HomeScreen(
     val handleNoteClick: (NoteData) -> Unit = { note ->
         focusManager.clearFocus()
         keyboardController?.hide()
-        if (note.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+        val isNoteProtected = note.isPassword == true || note.isEncrypted || (note.categoryId in lockedCategoryIds)
+        if (isNoteProtected && !SecurityUtil.isVaultUnlocked) {
             pendingUnlockNoteId = note.id
             // Try biometrics first, fallback to PIN dialog
             val activity = context as? FragmentActivity
@@ -1047,7 +1067,8 @@ fun HomeScreen(
                                         note = note,
                                         onClick = { handleNoteClick(note) },
                                         onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
-                                        onDeleteClick = { handleSoftDeleteNote(note) }
+                                        onDeleteClick = { handleSoftDeleteNote(note) },
+                                        isCategoryLocked = note.categoryId in lockedCategoryIds
                                     )
                                 }
 
@@ -1079,7 +1100,8 @@ fun HomeScreen(
                                     note = note,
                                     onClick = { handleNoteClick(note) },
                                     onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
-                                    onDeleteClick = { handleSoftDeleteNote(note) }
+                                    onDeleteClick = { handleSoftDeleteNote(note) },
+                                    isCategoryLocked = note.categoryId in lockedCategoryIds
                                 )
                             }
                         }
@@ -1166,6 +1188,8 @@ fun HomeScreen(
                         value = enteredPin,
                         onValueChange = { if (it.length <= 6 && it.all { char -> char.isDigit() }) enteredPin = it },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
                         placeholder = { Text("••••••") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
@@ -1653,13 +1677,19 @@ private fun NotionRecentCoverCard(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
+                    val isProtectedRecent = note.isPassword == true || note.isEncrypted || cat?.isPassword == true
                     Text(
-                        text = if (!note.icon.isNullOrBlank()) note.icon!! else "📄",
+                        text = when {
+                            isProtectedRecent -> "🔒"
+                            !note.icon.isNullOrBlank() -> note.icon!!
+                            else -> "📄"
+                        },
                         fontSize = 14.sp
                     )
                 }
 
                 // Title and Date
+                val isProtectedTitle = note.isPassword == true || note.isEncrypted || cat?.isPassword == true
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1667,7 +1697,11 @@ private fun NotionRecentCoverCard(
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = if (note.title.isNullOrBlank()) stringResource(R.string.untitled_note) else note.title!!,
+                        text = when {
+                            isProtectedTitle -> "******"
+                            note.title.isNullOrBlank() -> stringResource(R.string.untitled_note)
+                            else -> note.title!!
+                        },
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) PureWhite else MaterialTheme.colorScheme.onSurface,

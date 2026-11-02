@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Explicitly scoped least-privilege media directories (No root "." wildcard exposure) -->
     <files-path
         name="shared_images"
-        path="shared_images/"/>
+        path="shared_images/" />
     <files-path
         name="shared_sounds"
-        path="recordings/"/>
+        path="recordings/" />
     <files-path
-        name="shared_files"
-        path="."/>
+        name="shared_drawings"
+        path="drawings/" />
     <cache-path
-        name="shared_cache"
-        path="."/>
+        name="camera_ocr"
+        path="camera_ocr/" />
+    <cache-path
+        name="pdf_exports"
+        path="exports/" />
+    <cache-path
+        name="vault_backups"
+        path="backups/" />
 </paths>

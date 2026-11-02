@@ -11,9 +11,9 @@ import com.notes.purenoteit.data.db.StreamItemData
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
+import com.notes.purenoteit.repository.CategoryRepository
 import com.notes.purenoteit.repository.KnowledgeRepository
 import com.notes.purenoteit.repository.NoteRepository
-import com.notes.purenoteit.data.db.NoteDatabase
 import com.notes.purenoteit.util.VaultBackupManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.reactivex.Single
@@ -25,9 +25,9 @@ import javax.inject.Inject
 @HiltViewModel
 class NoteViewModel @Inject constructor(
     private val repository: NoteRepository,
+    private val categoryRepository: CategoryRepository,
     private val knowledgeRepository: KnowledgeRepository,
-    private val automationEngine: AutomationEngine,
-    private val db: NoteDatabase
+    private val automationEngine: AutomationEngine
 ) : ViewModel() {
     private val compositeDisposable = CompositeDisposable()
     private val _noteList = MutableLiveData<List<NoteData>>()
@@ -318,13 +318,13 @@ class NoteViewModel @Inject constructor(
             }).let { compositeDisposable.add(it) }
     }
 
-    // --- Vault Backup & Restore (Feature 5) ---
+    // --- Vault Backup & Restore (Feature 5 - Clean Repository Layer) ---
     fun backupVault(context: android.content.Context, onSuccess: (java.io.File) -> Unit, onError: (Exception) -> Unit) {
         VaultBackupManager.createBackup(
             context = context,
-            noteDao = db.getNoteDao(),
-            categoryDao = db.getCategoryDao(),
-            noteLinkDao = db.getNoteLinkDao(),
+            noteRepository = repository,
+            categoryRepository = categoryRepository,
+            knowledgeRepository = knowledgeRepository,
             onSuccess = onSuccess,
             onError = onError
         )
@@ -334,9 +334,9 @@ class NoteViewModel @Inject constructor(
         VaultBackupManager.restoreBackup(
             context = context,
             backupUri = uri,
-            noteDao = db.getNoteDao(),
-            categoryDao = db.getCategoryDao(),
-            noteLinkDao = db.getNoteLinkDao(),
+            noteRepository = repository,
+            categoryRepository = categoryRepository,
+            knowledgeRepository = knowledgeRepository,
             onSuccess = { notesCount, catsCount ->
                 getAllNotes()
                 getAllLinks()

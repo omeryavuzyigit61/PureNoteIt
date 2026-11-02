@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.notes.purenoteit.data.db.NoteDao
+import com.notes.purenoteit.repository.NoteRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -18,7 +18,7 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
     @EntryPoint
     @InstallIn(SingletonComponent::class)
     interface ReminderReceiverEntryPoint {
-        fun getNoteDao(): NoteDao
+        fun getNoteRepository(): NoteRepository
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -47,16 +47,16 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
             soundType = soundType
         )
 
-        // 3. Mark reminder as done in Room database
+        // 3. Mark reminder as done in Room database via NoteRepository
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 context.applicationContext,
                 ReminderReceiverEntryPoint::class.java
             )
-            val noteDao = entryPoint.getNoteDao()
+            val noteRepository = entryPoint.getNoteRepository()
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    noteDao.updateReminderDone(noteId, true).blockingAwait()
+                    noteRepository.updateReminderDone(noteId, true).blockingAwait()
                 } catch (e: Exception) {
                     Log.e("ReminderReceiver", "Error marking reminder done", e)
                 }

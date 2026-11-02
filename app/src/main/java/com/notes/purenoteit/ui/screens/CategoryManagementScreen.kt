@@ -298,20 +298,12 @@ fun CategoryManagementScreen(
                                     }
                                 }
 
-                                // Lock / Unlock Toggle
+                                // Lock / Unlock Toggle (Both Lock and Unlock require PIN verification!)
                                 IconButton(
                                     onClick = {
-                                        if (isLocked) {
-                                            // Unlock category
-                                            category.isPassword = false
-                                            categoryViewModel.update(category)
-                                            context.showToastShort(context.getString(R.string.cat_unlocked_toast))
-                                        } else {
-                                            // Prompt for PIN to lock
-                                            targetCategoryForPin = category
-                                            enteredPin = ""
-                                            showPinDialog = true
-                                        }
+                                        targetCategoryForPin = category
+                                        enteredPin = ""
+                                        showPinDialog = true
                                     },
                                     modifier = Modifier.size(36.dp)
                                 ) {
@@ -481,15 +473,21 @@ fun CategoryManagementScreen(
                         }
 
                         targetCategoryForPin?.let { cat ->
+                            val isCurrentlyLocked = cat.isPassword == true
                             if (!isPasswordSet) {
                                 SecurityUtil.savePassword(context, pin)
                                 cat.isPassword = true
                                 categoryViewModel.update(cat)
                                 context.showToastShort(context.getString(R.string.cat_pwd_saved_and_locked_toast))
                             } else if (SecurityUtil.verifyPassword(context, pin)) {
-                                cat.isPassword = true
+                                cat.isPassword = !isCurrentlyLocked
                                 categoryViewModel.update(cat)
-                                context.showToastShort(context.getString(R.string.cat_locked_toast))
+                                val toastRes = if (isCurrentlyLocked) {
+                                    R.string.cat_unlocked_toast
+                                } else {
+                                    R.string.cat_locked_toast
+                                }
+                                context.showToastShort(context.getString(toastRes))
                             } else {
                                 context.showToastShort(context.getString(R.string.wrong_password))
                                 return@TextButton

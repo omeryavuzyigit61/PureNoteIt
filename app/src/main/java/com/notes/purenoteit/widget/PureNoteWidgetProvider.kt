@@ -8,11 +8,25 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import com.notes.purenoteit.R
-import com.notes.purenoteit.data.db.NoteDatabase
+import com.notes.purenoteit.repository.CategoryRepository
+import com.notes.purenoteit.repository.NoteRepository
+import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.view.MainActivity
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 
 class PureNoteWidgetProvider : AppWidgetProvider() {
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface WidgetEntryPoint {
+        fun getNoteRepository(): NoteRepository
+        fun getCategoryRepository(): CategoryRepository
+    }
 
     override fun onUpdate(
         context: Context,
@@ -102,23 +116,37 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.btn_widget_voice, voicePending)
 
-            // 5. Asynchronously fetch latest note to show preview
+            // 5. Asynchronously fetch latest public (non-locked, non-trashed) note via Hilt Repository
             try {
-                val db = androidx.room.Room.databaseBuilder(
+                val entryPoint = EntryPointAccessors.fromApplication(
                     context.applicationContext,
-                    NoteDatabase::class.java,
-                    "Note"
-                ).build()
+                    WidgetEntryPoint::class.java
+                )
+                val noteRepository = entryPoint.getNoteRepository()
+                val categoryRepository = entryPoint.getCategoryRepository()
 
-                db.getNoteDao().getAllNotes()
-                    .subscribeOn(Schedulers.io())
-                    .subscribe({ notes ->
-                        val latestNote = notes.maxByOrNull { it.date }
-                        val text = if (latestNote != null && !latestNote.title.isNullOrBlank()) {
-                            "Son not: \"${latestNote.title}\""
+                Single.zip(
+                    noteRepository.getAllNotes(),
+                    categoryRepository.getAllCategories(),
+                    io.reactivex.functions.BiFunction { notes, categories ->
+                        val lockedCategoryIds = categories.filter { it.isPassword == true }.map { it.id }.toSet()
+                        val latestPublicNote = notes.filter { note ->
+                            note.status != "TRASH" &&
+                                note.isPassword != true &&
+                                !note.isEncrypted &&
+                                !SecurityUtil.isEncryptedPayload(note.description) &&
+                                (note.categoryId == null || note.categoryId !in lockedCategoryIds)
+                        }.maxByOrNull { it.date }
+
+                        if (latestPublicNote != null && !latestPublicNote.title.isNullOrBlank()) {
+                            "Son not: \"${latestPublicNote.title}\""
                         } else {
                             "Aklındakileri anında yakala..."
                         }
+                    }
+                )
+                    .subscribeOn(Schedulers.io())
+                    .subscribe({ text ->
                         views.setTextViewText(R.id.widget_recent_note_text, text)
                         appWidgetManager.updateAppWidget(appWidgetId, views)
                     }, {

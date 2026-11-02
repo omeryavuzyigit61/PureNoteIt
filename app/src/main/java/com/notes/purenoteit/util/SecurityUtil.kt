@@ -1,30 +1,56 @@
 package com.notes.purenoteit.util
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PersistableBundle
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
 import com.notes.purenoteit.util.Constants.SHARED_PREFENCES_KEY
+import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 object SecurityUtil {
+    // V2 PBKDF2-HMAC-SHA256 Salted PIN Storage Keys
+    private const val KEY_PIN_HASH_V2 = "pin_hash_v2_pbkdf2"
+    private const val KEY_PIN_SALT_V2 = "pin_salt_v2_random"
+    private const val PBKDF2_ITERATIONS = 60_000
+    private const val PBKDF2_KEY_BITS = 256
+
+    // Brute-Force Rate Limiting Keys
+    private const val KEY_FAILED_ATTEMPTS = "pin_failed_attempts"
+    private const val KEY_LOCKOUT_UNTIL_MS = "pin_lockout_until_ms"
+    private const val MAX_FAILED_ATTEMPTS = 5
+    private const val LOCKOUT_DURATION_MS = 30_000L
+
+    // Legacy PIN Keys (Kept strictly for transparent migration)
     private const val KEY_PIN_HASH = "pin_hash_key"
     private const val KEY_LEGACY_PIN = "password_key"
     private const val APP_SALT = "PureNoteIt_Secure_Salt_2026"
     private const val AES_KEY_SALT = "PureNoteIt_AES_Salt_V2_2026"
+
+    // Hardware AndroidKeyStore Constants
+    private const val ANDROID_KEYSTORE = "AndroidKeyStore"
+    private const val KEYSTORE_ALIAS = "PureNoteIt_Master_AES256_Key"
     private const val GCM_TAG_LENGTH = 128
     private const val GCM_IV_LENGTH = 12
 
     // Bitwarden Session Vault Lock
+    @Volatile
     var isVaultUnlocked: Boolean = false
         private set
 
@@ -36,7 +62,56 @@ object SecurityUtil {
         isVaultUnlocked = false
     }
 
-    private fun hash(pin: String): String {
+    // --- Brute-Force Protection ---
+
+    fun isPinLockedOut(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        val lockoutUntil = prefs.getLong(KEY_LOCKOUT_UNTIL_MS, 0L)
+        return System.currentTimeMillis() < lockoutUntil
+    }
+
+    fun getRemainingLockoutSeconds(context: Context): Int {
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        val remainingMs = prefs.getLong(KEY_LOCKOUT_UNTIL_MS, 0L) - System.currentTimeMillis()
+        return if (remainingMs > 0) ((remainingMs + 999) / 1000).toInt() else 0
+    }
+
+    private fun recordFailedAttempt(context: Context) {
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        val attempts = prefs.getInt(KEY_FAILED_ATTEMPTS, 0) + 1
+        val editor = prefs.edit()
+        if (attempts >= MAX_FAILED_ATTEMPTS) {
+            editor.putLong(KEY_LOCKOUT_UNTIL_MS, System.currentTimeMillis() + LOCKOUT_DURATION_MS)
+            editor.putInt(KEY_FAILED_ATTEMPTS, 0)
+        } else {
+            editor.putInt(KEY_FAILED_ATTEMPTS, attempts)
+        }
+        editor.apply()
+    }
+
+    private fun resetFailedAttempts(context: Context) {
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        if (prefs.contains(KEY_FAILED_ATTEMPTS) || prefs.contains(KEY_LOCKOUT_UNTIL_MS)) {
+            prefs.edit()
+                .remove(KEY_FAILED_ATTEMPTS)
+                .remove(KEY_LOCKOUT_UNTIL_MS)
+                .apply()
+        }
+    }
+
+    // --- Salted PBKDF2-HMAC-SHA256 PIN Hashing ---
+
+    private fun derivePinHashV2(pin: String, salt: ByteArray): ByteArray {
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val spec = PBEKeySpec(pin.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_BITS)
+        return try {
+            factory.generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
+        }
+    }
+
+    private fun legacyHash(pin: String): String {
         val input = "$APP_SALT$pin"
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
@@ -44,26 +119,72 @@ object SecurityUtil {
 
     fun isPasswordSet(context: Context): Boolean {
         val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
-        return prefs.contains(KEY_PIN_HASH) || (prefs.getInt(KEY_LEGACY_PIN, -1) != -1)
+        return prefs.contains(KEY_PIN_HASH_V2) ||
+                prefs.contains(KEY_PIN_HASH) ||
+                (prefs.getInt(KEY_LEGACY_PIN, -1) != -1)
     }
 
     fun verifyPassword(context: Context, enteredPin: String): Boolean {
-        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
-        val savedHash = prefs.getString(KEY_PIN_HASH, null)
+        if (isPinLockedOut(context)) {
+            val remaining = getRemainingLockoutSeconds(context)
+            context.showToastShort("Çok fazla hatalı deneme! Lütfen $remaining sn bekleyin.")
+            return false
+        }
 
-        if (savedHash != null) {
-            val valid = savedHash == hash(enteredPin)
-            if (valid) unlockVault()
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+
+        // 1. Check V2 PBKDF2-HMAC-SHA256 with per-device random salt & constant-time comparison
+        val savedHashV2Base64 = prefs.getString(KEY_PIN_HASH_V2, null)
+        val savedSaltV2Base64 = prefs.getString(KEY_PIN_SALT_V2, null)
+        if (savedHashV2Base64 != null && savedSaltV2Base64 != null) {
+            return try {
+                val saltBytes = Base64.decode(savedSaltV2Base64, Base64.NO_WRAP)
+                val expectedHash = Base64.decode(savedHashV2Base64, Base64.NO_WRAP)
+                val candidateHash = derivePinHashV2(enteredPin, saltBytes)
+                val valid = MessageDigest.isEqual(expectedHash, candidateHash)
+                if (valid) {
+                    resetFailedAttempts(context)
+                    unlockVault()
+                } else {
+                    recordFailedAttempt(context)
+                }
+                valid
+            } catch (e: Exception) {
+                Log.e("SecurityUtil", "PBKDF2 PIN verification failed: ${e.message}")
+                false
+            }
+        }
+
+        // 2. Legacy V1 SHA-256 hash migration
+        val savedLegacyHash = prefs.getString(KEY_PIN_HASH, null)
+        if (savedLegacyHash != null) {
+            val valid = MessageDigest.isEqual(
+                savedLegacyHash.toByteArray(Charsets.UTF_8),
+                legacyHash(enteredPin).toByteArray(Charsets.UTF_8)
+            )
+            if (valid) {
+                // Transparently upgrade to V2 Salted PBKDF2
+                savePassword(context, enteredPin)
+                resetFailedAttempts(context)
+                unlockVault()
+            } else {
+                recordFailedAttempt(context)
+            }
             return valid
         }
 
-        // Backward compatibility: If an old plaintext integer PIN exists, verify & migrate
+        // 3. Legacy V0 plaintext integer PIN migration
         val legacyPin = prefs.getInt(KEY_LEGACY_PIN, -1)
-        if (legacyPin != -1 && enteredPin.toIntOrNull() == legacyPin) {
-            savePassword(context, enteredPin)
-            prefs.edit().remove(KEY_LEGACY_PIN).apply()
-            unlockVault()
-            return true
+        if (legacyPin != -1) {
+            val valid = enteredPin.toIntOrNull() == legacyPin
+            if (valid) {
+                savePassword(context, enteredPin)
+                resetFailedAttempts(context)
+                unlockVault()
+            } else {
+                recordFailedAttempt(context)
+            }
+            return valid
         }
 
         return false
@@ -71,26 +192,96 @@ object SecurityUtil {
 
     fun savePassword(context: Context, newPin: String) {
         val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        val randomSalt = ByteArray(16)
+        SecureRandom().nextBytes(randomSalt)
+        val derivedHash = derivePinHashV2(newPin, randomSalt)
+
         prefs.edit()
-            .putString(KEY_PIN_HASH, hash(newPin))
+            .putString(KEY_PIN_SALT_V2, Base64.encodeToString(randomSalt, Base64.NO_WRAP))
+            .putString(KEY_PIN_HASH_V2, Base64.encodeToString(derivedHash, Base64.NO_WRAP))
+            .remove(KEY_PIN_HASH)
             .remove(KEY_LEGACY_PIN)
+            .remove(KEY_FAILED_ATTEMPTS)
+            .remove(KEY_LOCKOUT_UNTIL_MS)
             .apply()
         unlockVault()
     }
 
-    // --- Bitwarden-Grade AES-256 GCM Encryption ---
+    // --- Hardware-Backed AndroidKeyStore AES-256-GCM Encryption (with V1 Legacy Fallback) ---
 
-    private fun deriveKey(): SecretKeySpec {
+    private fun getOrCreateHardwareKey(): SecretKey? {
+        return try {
+            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+            val existingEntry = keyStore.getEntry(KEYSTORE_ALIAS, null) as? KeyStore.SecretKeyEntry
+            if (existingEntry != null) {
+                return existingEntry.secretKey
+            }
+            val keyGenerator = KeyGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES,
+                ANDROID_KEYSTORE
+            )
+            val keyGenSpec = KeyGenParameterSpec.Builder(
+                KEYSTORE_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .setRandomizedEncryptionRequired(true)
+                .build()
+            keyGenerator.init(keyGenSpec)
+            keyGenerator.generateKey()
+        } catch (e: Exception) {
+            Log.w("SecurityUtil", "Hardware Keystore unavailable, falling back to PBKDF2 key: ${e.message}")
+            null
+        }
+    }
+
+    private fun deriveLegacyKey(): SecretKeySpec {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         val spec = PBEKeySpec(APP_SALT.toCharArray(), AES_KEY_SALT.toByteArray(), 1000, 256)
         val tmp = factory.generateSecret(spec)
         return SecretKeySpec(tmp.encoded, "AES")
     }
 
+    fun isEncryptedPayload(text: String?): Boolean {
+        if (text.isNullOrBlank()) return false
+        return text.startsWith("ENC_V2:") || text.startsWith("ENC:")
+    }
+
     fun encrypt(plainText: String): String {
+        if (plainText.isEmpty() || isEncryptedPayload(plainText)) return plainText
+        // 1. Prefer Hardware-Backed AndroidKeyStore (ENC_V2:)
+        try {
+            val hardwareKey = getOrCreateHardwareKey()
+            if (hardwareKey != null) {
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.ENCRYPT_MODE, hardwareKey)
+                val iv = cipher.iv
+                val cipherText = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
+
+                val combined = ByteArray(1 + iv.size + cipherText.size)
+                combined[0] = iv.size.toByte()
+                System.arraycopy(iv, 0, combined, 1, iv.size)
+                System.arraycopy(cipherText, 0, combined, 1 + iv.size, cipherText.size)
+
+                return "ENC_V2:" + Base64.encodeToString(combined, Base64.NO_WRAP)
+            }
+        } catch (e: Exception) {
+            Log.w("SecurityUtil", "Hardware encryption fallback triggered: ${e.message}")
+        }
+
+        // 2. Fallback to software AES-256-GCM (ENC:) for cross-device backup portability / JVM tests
+        return encryptPortable(plainText)
+    }
+
+    /**
+     * Portable AES-256-GCM encryption used for cross-device .purevault backup manifests.
+     */
+    fun encryptPortable(plainText: String): String {
         if (plainText.isEmpty()) return plainText
         return try {
-            val key = deriveKey()
+            val key = deriveLegacyKey()
             val iv = ByteArray(GCM_IV_LENGTH)
             SecureRandom().nextBytes(iv)
 
@@ -98,19 +289,45 @@ object SecurityUtil {
             cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv))
             val cipherText = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
 
-            // Prepend IV to ciphertext
             val combined = ByteArray(iv.size + cipherText.size)
             System.arraycopy(iv, 0, combined, 0, iv.size)
             System.arraycopy(cipherText, 0, combined, iv.size, cipherText.size)
 
             "ENC:" + Base64.encodeToString(combined, Base64.NO_WRAP)
         } catch (e: Exception) {
-            Log.e("SecurityUtil", "Encryption failed: ${e.message}")
+            Log.e("SecurityUtil", "Portable encryption failed: ${e.message}")
             plainText
         }
     }
 
     fun decrypt(encryptedText: String): String {
+        if (encryptedText.startsWith("ENC_V2:")) {
+            return try {
+                val rawBase64 = encryptedText.removePrefix("ENC_V2:")
+                val combined = Base64.decode(rawBase64, Base64.NO_WRAP)
+                if (combined.size < 2) return encryptedText
+
+                val ivLength = combined[0].toInt() and 0xFF
+                if (ivLength <= 0 || combined.size <= 1 + ivLength) return encryptedText
+
+                val iv = ByteArray(ivLength)
+                System.arraycopy(combined, 1, iv, 0, ivLength)
+
+                val cipherText = ByteArray(combined.size - 1 - ivLength)
+                System.arraycopy(combined, 1 + ivLength, cipherText, 0, cipherText.size)
+
+                val hardwareKey = getOrCreateHardwareKey() ?: return encryptedText
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.DECRYPT_MODE, hardwareKey, GCMParameterSpec(GCM_TAG_LENGTH, iv))
+
+                val original = cipher.doFinal(cipherText)
+                String(original, Charsets.UTF_8)
+            } catch (e: Exception) {
+                Log.e("SecurityUtil", "Hardware V2 decryption failed: ${e.message}")
+                encryptedText
+            }
+        }
+
         if (!encryptedText.startsWith("ENC:")) return encryptedText
         return try {
             val rawBase64 = encryptedText.removePrefix("ENC:")
@@ -124,7 +341,7 @@ object SecurityUtil {
             val cipherText = ByteArray(combined.size - GCM_IV_LENGTH)
             System.arraycopy(combined, GCM_IV_LENGTH, cipherText, 0, cipherText.size)
 
-            val key = deriveKey()
+            val key = deriveLegacyKey()
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv))
 
@@ -136,7 +353,7 @@ object SecurityUtil {
         }
     }
 
-    // --- Bitwarden Clipboard Auto-Clear ---
+    // --- Bitwarden Clipboard Auto-Clear with Android 13+ Sensitive Flag ---
 
     fun copyToClipboardWithAutoClear(
         context: Context,
@@ -146,19 +363,22 @@ object SecurityUtil {
     ) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
         val clip = ClipData.newPlainText(label, text)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            clip.description.extras = PersistableBundle().apply {
+                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+            }
+        }
         clipboard.setPrimaryClip(clip)
         context.showToastShort("Panoya kopyalandı ($timeoutSeconds sn sonra temizlenecek)")
 
         Handler(Looper.getMainLooper()).postDelayed({
             try {
-                val currentClip = clipboard.primaryClip
-                if (currentClip != null && currentClip.itemCount > 0) {
-                    val clipText = currentClip.getItemAt(0).text?.toString()
-                    if (clipText == text) {
-                        clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                        Log.i("SecurityUtil", "Clipboard auto-cleared securely")
-                    }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    clipboard.clearPrimaryClip()
+                } else {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
                 }
+                Log.i("SecurityUtil", "Clipboard auto-cleared securely")
             } catch (e: Exception) {
                 Log.e("SecurityUtil", "Clipboard clear failed: ${e.message}")
             }

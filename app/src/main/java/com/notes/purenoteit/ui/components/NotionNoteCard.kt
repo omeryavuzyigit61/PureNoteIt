@@ -60,10 +60,11 @@ fun NotionNoteCard(
     onClick: () -> Unit,
     onPinClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    isCategoryLocked: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    val isProtected = note.isPassword == true
+    val isProtected = note.isPassword == true || note.isEncrypted || isCategoryLocked
 
     Card(
         modifier = modifier

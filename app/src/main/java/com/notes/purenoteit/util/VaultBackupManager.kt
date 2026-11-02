@@ -5,18 +5,16 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import com.notes.purenoteit.data.db.CategoryDao
 import com.notes.purenoteit.data.db.CategoryData
-import com.notes.purenoteit.data.db.NoteDao
 import com.notes.purenoteit.data.db.NoteData
-import com.notes.purenoteit.data.db.NoteLinkDao
 import com.notes.purenoteit.data.db.NoteLinkData
+import com.notes.purenoteit.repository.CategoryRepository
+import com.notes.purenoteit.repository.KnowledgeRepository
+import com.notes.purenoteit.repository.NoteRepository
 import io.reactivex.schedulers.Schedulers
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.InputStreamReader
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,7 +23,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 data class VaultBackupPayload(
-    val version: Int = 1,
+    val version: Int = 2,
     val backupDate: Long = System.currentTimeMillis(),
     val notes: List<NoteData>,
     val categories: List<CategoryData>,
@@ -35,40 +33,65 @@ data class VaultBackupPayload(
 object VaultBackupManager {
 
     private val gson = Gson()
+    private const val MAX_ARCHIVE_ENTRIES = 2000
+    private const val MAX_SINGLE_FILE_BYTES = 100L * 1024L * 1024L // 100 MB per media file limit
 
     /**
-     * Creates a compressed .purevault archive containing all notes, categories, links and media files.
+     * Creates a compressed, AES-256-GCM encrypted .purevault archive containing all notes,
+     * categories, links, and media files via Clean Architecture Repositories.
      */
     fun createBackup(
         context: Context,
-        noteDao: NoteDao,
-        categoryDao: CategoryDao,
-        noteLinkDao: NoteLinkDao,
+        noteRepository: NoteRepository,
+        categoryRepository: CategoryRepository,
+        knowledgeRepository: KnowledgeRepository,
         onSuccess: (File) -> Unit,
         onError: (Exception) -> Unit
     ) {
         Schedulers.io().scheduleDirect {
             try {
-                val notes = noteDao.getAllNotes().blockingGet() ?: emptyList()
-                val categories = categoryDao.getAllCategories().blockingGet() ?: emptyList()
-                val links = noteLinkDao.getAllLinks().blockingGet() ?: emptyList()
+                val rawNotes = noteRepository.getAllNotes().blockingGet() ?: emptyList()
+                val categories = categoryRepository.getAllCategories().blockingGet() ?: emptyList()
+                val links = knowledgeRepository.getAllLinks().blockingGet() ?: emptyList()
+
+                // Convert any hardware-bound ENC_V2 note descriptions into portable AES-256-GCM (ENC:)
+                // so the backup can be safely restored even on a different device.
+                val portableNotes = rawNotes.map { note ->
+                    val desc = note.description
+                    val portableDesc = when {
+                        desc != null && desc.startsWith("ENC_V2:") -> {
+                            val plain = SecurityUtil.decrypt(desc)
+                            SecurityUtil.encryptPortable(plain)
+                        }
+                        note.isPassword == true && !desc.isNullOrBlank() && !SecurityUtil.isEncryptedPayload(desc) -> {
+                            SecurityUtil.encryptPortable(desc)
+                        }
+                        else -> desc
+                    }
+                    note.copy(
+                        description = portableDesc,
+                        isEncrypted = note.isEncrypted || (note.isPassword == true)
+                    ).also { it.id = note.id }
+                }
 
                 val payload = VaultBackupPayload(
-                    notes = notes,
+                    notes = portableNotes,
                     categories = categories,
                     links = links
                 )
-                val jsonString = gson.toJson(payload)
+                val rawJsonString = gson.toJson(payload)
+                // Encrypt the entire manifest with AES-256-GCM so plaintext metadata never leaks in transit
+                val encryptedManifest = SecurityUtil.encryptPortable(rawJsonString)
 
                 val backupDir = File(context.cacheDir, "backups").apply { mkdirs() }
                 val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                 val zipFile = File(backupDir, "PureNoteIt_Kasa_$timeStamp.purevault")
 
                 ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
-                    // 1. Add manifest JSON
+                    // 1. Add AES-256-GCM encrypted manifest
                     val manifestEntry = ZipEntry("vault_manifest.json")
                     zos.putNextEntry(manifestEntry)
-                    zos.write(jsonString.toByteArray(Charsets.UTF_8))
+                    zos.write(encryptedManifest.toByteArray(Charsets.UTF_8))
                     zos.closeEntry()
 
                     // 2. Add media files from filesDir
@@ -112,34 +135,59 @@ object VaultBackupManager {
     }
 
     /**
-     * Restores a .purevault / zip backup archive from a chosen URI.
+     * Restores a .purevault / zip backup archive with strict CWE-22 Zip Slip Path Traversal protection
+     * and Zip Bomb resource limits.
      */
     fun restoreBackup(
         context: Context,
         backupUri: Uri,
-        noteDao: NoteDao,
-        categoryDao: CategoryDao,
-        noteLinkDao: NoteLinkDao,
+        noteRepository: NoteRepository,
+        categoryRepository: CategoryRepository,
+        knowledgeRepository: KnowledgeRepository,
         onSuccess: (restoredNotesCount: Int, restoredCategoriesCount: Int) -> Unit,
         onError: (Exception) -> Unit
     ) {
         Schedulers.io().scheduleDirect {
             try {
-                var jsonContent: String? = null
-                val filesDir = context.filesDir
+                var manifestRawOrEncrypted: String? = null
+                val filesDir = context.filesDir.canonicalFile
+                var entriesCount = 0
 
                 context.contentResolver.openInputStream(backupUri)?.let { rawStream ->
                     java.io.BufferedInputStream(rawStream).use { bufStream ->
                         ZipInputStream(bufStream).use { zis ->
                             var entry = zis.nextEntry
                             while (entry != null) {
+                                entriesCount++
+                                if (entriesCount > MAX_ARCHIVE_ENTRIES) {
+                                    throw SecurityException("Yedek arşivinde aşırı fazla dosya tespit edildi (Zip Bomb koruması)")
+                                }
+
                                 if (entry.name == "vault_manifest.json") {
-                                    jsonContent = zis.bufferedReader(Charsets.UTF_8).readText()
-                                } else if (entry.name.startsWith("media/")) {
+                                    manifestRawOrEncrypted = zis.bufferedReader(Charsets.UTF_8).readText()
+                                } else if (entry.name.startsWith("media/") && !entry.isDirectory) {
                                     val relPath = entry.name.removePrefix("media/")
-                                    val targetFile = File(filesDir, relPath)
+                                    val targetFile = File(filesDir, relPath).canonicalFile
+
+                                    // CWE-22 Zip Slip Path Traversal Guard
+                                    if (!targetFile.path.startsWith(filesDir.path + File.separator)) {
+                                        throw SecurityException("Güvenlik İhlali Engellendi: Zip Slip dizin aşımı tespit edildi (${entry.name})")
+                                    }
+
                                     targetFile.parentFile?.mkdirs()
-                                    FileOutputStream(targetFile).use { fos -> zis.copyTo(fos) }
+                                    FileOutputStream(targetFile).use { fos ->
+                                        val buffer = ByteArray(8192)
+                                        var totalWritten = 0L
+                                        var read = zis.read(buffer)
+                                        while (read != -1) {
+                                            totalWritten += read
+                                            if (totalWritten > MAX_SINGLE_FILE_BYTES) {
+                                                throw SecurityException("Dosya boyutu güvenlik sınırını aştı")
+                                            }
+                                            fos.write(buffer, 0, read)
+                                            read = zis.read(buffer)
+                                        }
+                                    }
                                 }
                                 zis.closeEntry()
                                 entry = zis.nextEntry
@@ -148,25 +196,37 @@ object VaultBackupManager {
                     }
                 }
 
-                if (jsonContent.isNullOrBlank()) {
+                if (manifestRawOrEncrypted.isNullOrBlank()) {
                     throw IllegalStateException("Yedek dosyası geçersiz veya manifest bulunamadı")
+                }
+
+                // Support both V2 encrypted manifests (ENC: / ENC_V2:) and V1 legacy plaintext JSON manifests
+                val jsonContent = if (SecurityUtil.isEncryptedPayload(manifestRawOrEncrypted)) {
+                    SecurityUtil.decrypt(manifestRawOrEncrypted!!)
+                } else {
+                    manifestRawOrEncrypted!!
                 }
 
                 val payload = gson.fromJson(jsonContent, VaultBackupPayload::class.java)
 
-                // Restore categories
+                // Restore categories via CategoryRepository
                 payload.categories.forEach { cat ->
-                    categoryDao.upsertCategory(cat).onErrorComplete().blockingAwait()
+                    categoryRepository.categoryUpsert(cat).onErrorComplete().blockingAwait()
                 }
 
-                // Restore notes safely
+                // Restore notes via NoteRepository (re-wrapping encrypted notes into hardware AndroidKeyStore ENC_V2)
                 payload.notes.forEach { note ->
-                    noteDao.upsert(note).onErrorComplete().blockingAwait()
+                    val desc = note.description
+                    if (desc != null && desc.startsWith("ENC:")) {
+                        val plain = SecurityUtil.decrypt(desc)
+                        note.description = SecurityUtil.encrypt(plain)
+                    }
+                    noteRepository.upsert(note).onErrorComplete().blockingAwait()
                 }
 
-                // Restore note links
+                // Restore note links via KnowledgeRepository
                 if (payload.links.isNotEmpty()) {
-                    noteLinkDao.insertAll(payload.links).onErrorComplete().blockingAwait()
+                    knowledgeRepository.insertAllLinks(payload.links).onErrorComplete().blockingAwait()
                 }
 
                 android.os.Handler(android.os.Looper.getMainLooper()).post {

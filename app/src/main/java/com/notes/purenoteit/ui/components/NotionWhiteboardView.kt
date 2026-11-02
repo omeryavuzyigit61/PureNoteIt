@@ -339,16 +339,19 @@ private fun WhiteboardCard(
     isDark: Boolean
 ) {
     val cardColor = if (isDark) Color(0xFF222225) else PureWhite
-    val parsedBlocks = remember(note.description) {
-        try {
-            BlockParser.parse(note.description ?: "")
-        } catch (e: Exception) {
-            emptyList()
+    val isProtected = note.isPassword == true || note.isEncrypted
+    val parsedBlocks = remember(note.description, isProtected) {
+        if (isProtected) emptyList() else {
+            try {
+                BlockParser.parse(note.description ?: "")
+            } catch (e: Exception) {
+                emptyList()
+            }
         }
     }
     val emptyContentStr = stringResource(R.string.whiteboard_no_content)
-    val previewText = remember(parsedBlocks, emptyContentStr) {
-        parsedBlocks.firstOrNull { it.content.isNotBlank() }?.content ?: emptyContentStr
+    val previewText = remember(parsedBlocks, emptyContentStr, isProtected) {
+        if (isProtected) "🔒 Korumalı Not (AES-256)" else (parsedBlocks.firstOrNull { it.content.isNotBlank() }?.content ?: emptyContentStr)
     }
 
     Surface(
@@ -382,12 +385,16 @@ private fun WhiteboardCard(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(
-                            text = note.icon ?: "📝",
+                            text = if (isProtected) "🔒" else (note.icon ?: "📝"),
                             fontSize = 15.sp
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (note.title.isNullOrBlank()) stringResource(R.string.untitled_note) else note.title!!,
+                            text = when {
+                                isProtected -> "******"
+                                note.title.isNullOrBlank() -> stringResource(R.string.untitled_note)
+                                else -> note.title!!
+                            },
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurface,

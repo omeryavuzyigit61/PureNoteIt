@@ -306,8 +306,13 @@ private fun KanbanNoteCard(
                         Spacer(modifier = Modifier.width(6.dp))
                     }
 
+                    val isProtected = note.isPassword == true || note.isEncrypted || category?.isPassword == true
                     Text(
-                        text = if (note.title.isNullOrBlank()) stringResource(R.string.untitled_note) else note.title!!,
+                        text = when {
+                            isProtected -> "******"
+                            note.title.isNullOrBlank() -> stringResource(R.string.untitled_note)
+                            else -> note.title!!
+                        },
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface,

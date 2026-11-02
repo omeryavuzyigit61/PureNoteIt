@@ -136,10 +136,15 @@ private fun NotionListRow(
             Spacer(modifier = Modifier.width(10.dp))
 
             // Title + tasks count
+            val isProtected = note.isPassword == true || note.isEncrypted || category?.isPassword == true
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (note.title.isNullOrBlank()) stringResource(R.string.untitled_note) else note.title!!,
+                        text = when {
+                            isProtected -> "******"
+                            note.title.isNullOrBlank() -> stringResource(R.string.untitled_note)
+                            else -> note.title!!
+                        },
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface,

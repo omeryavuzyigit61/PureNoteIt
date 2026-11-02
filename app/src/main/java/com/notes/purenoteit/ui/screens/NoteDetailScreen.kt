@@ -1,10 +1,12 @@
 package com.notes.purenoteit.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -263,6 +265,13 @@ fun NoteDetailScreen(
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, isPassword) {
+        val window = (context as? Activity)?.window
+        if (isPassword) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 if (isPassword && !SecurityUtil.isVaultUnlocked) {
@@ -273,6 +282,7 @@ fun NoteDetailScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
@@ -766,11 +776,12 @@ fun NoteDetailScreen(
         }
         noteViewModel.saveNote(note, contentForLinks = allContentText) { actualId ->
             if (reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone) {
-                val noteDescPreview = blocks.firstOrNull { it.content.isNotBlank() }?.content ?: ""
+                val safeTitle = if (isPassword) "🔒 Korumalı Not" else (note.title ?: "Başlıksız Not")
+                val noteDescPreview = if (isPassword) "ENC:" else (blocks.firstOrNull { it.content.isNotBlank() }?.content ?: "")
                 ReminderManager.scheduleReminder(
                     context = context,
                     noteId = actualId,
-                    noteTitle = note.title ?: "Başlıksız Not",
+                    noteTitle = safeTitle,
                     noteDesc = noteDescPreview,
                     reminderTimeMs = reminderTime!!,
                     reminderType = reminderType,
@@ -2404,6 +2415,8 @@ fun NoteDetailScreen(
                         onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) pinInput = it },
                         placeholder = { Text(stringResource(R.string.pwd_placeholder_pin)) },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

@@ -1,11 +1,11 @@
 package com.notes.purenoteit.automation
 
 import android.util.Log
-import com.notes.purenoteit.data.db.CategoryDao
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
+import com.notes.purenoteit.repository.CategoryRepository
 import com.notes.purenoteit.repository.KnowledgeRepository
 import com.notes.purenoteit.repository.NoteRepository
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -20,7 +20,7 @@ import javax.inject.Singleton
 class AutomationEngine @Inject constructor(
     private val knowledgeRepository: KnowledgeRepository,
     private val noteRepository: NoteRepository,
-    private val categoryDao: CategoryDao
+    private val categoryRepository: CategoryRepository
 ) {
     /**
      * Evaluates note-level triggers when a note is created or updated.
@@ -89,7 +89,7 @@ class AutomationEngine @Inject constructor(
             )
         )
 
-        categoryDao.getAllCategories()
+        categoryRepository.getAllCategories()
             .subscribeOn(Schedulers.io())
             .flatMap { categories ->
                 val dailyCat = categories.firstOrNull { it.name.equals("Günlük", ignoreCase = true) }

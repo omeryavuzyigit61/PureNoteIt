@@ -311,7 +311,8 @@ fun NotionGraphView(
                     }
 
                     // Display emoji inside node if available, else first letter
-                    val iconText = note.icon ?: (note.title?.take(1) ?: "•")
+                    val isProtected = note.isPassword == true || note.isEncrypted
+                    val iconText = if (isProtected) "🔒" else (note.icon ?: (note.title?.take(1) ?: "•"))
                     val iconPaint = android.graphics.Paint().apply {
                         textSize = (13f * scale).coerceIn(20f, 42f)
                         textAlign = android.graphics.Paint.Align.CENTER
@@ -320,7 +321,7 @@ fun NotionGraphView(
                     drawText(iconText, screenPos.x, screenPos.y + (5f * scale), iconPaint)
 
                     // Display note title below node
-                    val titleText = note.title?.take(16) ?: defaultUntitled
+                    val titleText = if (isProtected) "******" else (note.title?.take(16) ?: defaultUntitled)
                     drawText(titleText, screenPos.x, screenPos.y + nodeRadius + (16f * scale), paint)
                 }
             }

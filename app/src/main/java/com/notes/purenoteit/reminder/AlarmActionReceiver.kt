@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
-import com.notes.purenoteit.data.db.NoteDao
+import com.notes.purenoteit.repository.NoteRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -18,7 +18,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
     @EntryPoint
     @InstallIn(SingletonComponent::class)
     interface AlarmActionEntryPoint {
-        fun getNoteDao(): NoteDao
+        fun getNoteRepository(): NoteRepository
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -54,16 +54,16 @@ class AlarmActionReceiver : BroadcastReceiver() {
                     soundType = soundType
                 )
 
-                // Update database
+                // Update database via NoteRepository
                 try {
                     val entryPoint = EntryPointAccessors.fromApplication(
                         context.applicationContext,
                         AlarmActionEntryPoint::class.java
                     )
-                    val noteDao = entryPoint.getNoteDao()
+                    val noteRepository = entryPoint.getNoteRepository()
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
-                            noteDao.updateReminderTime(noteId, newReminderTime).blockingAwait()
+                            noteRepository.updateReminderTime(noteId, newReminderTime).blockingAwait()
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }

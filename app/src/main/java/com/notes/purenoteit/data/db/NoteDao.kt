@@ -17,7 +17,7 @@ interface NoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertNote(note: NoteData): Single<Long>
 
-    @Query("SELECT * FROM notes")
+    @Query("SELECT * FROM notes ORDER BY isPinned DESC, date DESC")
     fun getAllNotes(): Single<List<NoteData>>
 
     @Delete
@@ -27,8 +27,6 @@ interface NoteDao {
         """
     SELECT notes.*
     FROM notes
-    LEFT JOIN categories ON notes.categoryId = categories.id
-    WHERE categories.isPassword IS NULL OR categories.isPassword = 0
     ORDER BY notes.isPinned DESC, notes.date DESC
 """
     )
@@ -40,6 +38,7 @@ interface NoteDao {
     FROM notes
     LEFT JOIN categories ON notes.categoryId = categories.id
     WHERE (categories.isPassword IS NULL OR categories.isPassword = 0)
+      AND (notes.isPassword IS NULL OR notes.isPassword = 0)
       AND (notes.title LIKE '%' || :query || '%' OR notes.description LIKE '%' || :query || '%')
     ORDER BY notes.isPinned DESC, notes.date DESC
     """
