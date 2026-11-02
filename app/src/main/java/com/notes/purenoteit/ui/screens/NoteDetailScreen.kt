@@ -74,6 +74,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -162,6 +163,14 @@ fun NoteDetailScreen(
     val context = LocalContext.current
     val audioRecorder = remember { AudioRecorder(context) }
     val voiceHelper = remember { VoiceTranscriptionHelper(context) }
+    var lastBackPressTime by remember { mutableLongStateOf(0L) }
+    val safeNavigateBack = {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastBackPressTime > 600L) {
+            lastBackPressTime = currentTime
+            onNavigateBack()
+        }
+    }
     var isVoiceDictating by remember { mutableStateOf(false) }
     var liveVoiceText by remember { mutableStateOf("") }
 
@@ -798,7 +807,7 @@ fun NoteDetailScreen(
             }
         }
 
-        onNavigateBack()
+        safeNavigateBack()
     }
 
     if (!isAccessGranted && isPassword) {
@@ -808,7 +817,7 @@ fun NoteDetailScreen(
                     modifier = Modifier.statusBarsPadding(),
                     title = {},
                     navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
+                        IconButton(onClick = safeNavigateBack) {
                             Icon(
                                 painter = painterResource(id = R.drawable.arrow_left),
                                 contentDescription = "Geri",
@@ -884,7 +893,7 @@ fun NoteDetailScreen(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         TextButton(
-                            onClick = onNavigateBack,
+                            onClick = safeNavigateBack,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
@@ -913,7 +922,7 @@ fun NoteDetailScreen(
                 modifier = Modifier.statusBarsPadding(),
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = safeNavigateBack) {
                         Icon(
                             painter = painterResource(id = R.drawable.arrow_left),
                             contentDescription = stringResource(R.string.go_back),

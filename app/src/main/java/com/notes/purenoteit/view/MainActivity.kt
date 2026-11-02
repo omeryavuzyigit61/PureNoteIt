@@ -181,7 +181,9 @@ class MainActivity : AppCompatActivity() {
                                     noteViewModel = noteViewModel,
                                     categoryViewModel = categoryViewModel,
                                     onNavigateBack = {
-                                        navController.popBackStack()
+                                        if (navController.previousBackStackEntry != null) {
+                                            navController.popBackStack()
+                                        }
                                     },
                                     onNavigateToNote = { targetId ->
                                         navController.navigate("note_detail/$targetId")
@@ -193,7 +195,9 @@ class MainActivity : AppCompatActivity() {
                                 CategoryManagementScreen(
                                     categoryViewModel = categoryViewModel,
                                     onNavigateBack = {
-                                        navController.popBackStack()
+                                        if (navController.previousBackStackEntry != null) {
+                                            navController.popBackStack()
+                                        }
                                     }
                                 )
                             }
@@ -201,7 +205,9 @@ class MainActivity : AppCompatActivity() {
                             composable("password_settings") {
                                 PasswordSettingScreen(
                                     onNavigateBack = {
-                                        navController.popBackStack()
+                                        if (navController.previousBackStackEntry != null) {
+                                            navController.popBackStack()
+                                        }
                                     }
                                 )
                             }

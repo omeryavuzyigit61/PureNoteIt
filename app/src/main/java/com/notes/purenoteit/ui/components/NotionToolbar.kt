@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.R
 import com.notes.purenoteit.model.BlockType
+import com.notes.purenoteit.ui.theme.BorderDark
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -55,11 +57,13 @@ fun NotionToolbar(
     isVoiceDictating: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.7f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) BorderDark else BorderLight.copy(alpha = 0.7f)),
         shadowElevation = 8.dp
     ) {
         Row(
@@ -88,12 +92,29 @@ fun NotionToolbar(
             }
 
             // 1. Sesli Dikte (Voice-to-Text Transcription)
+            val voiceBg = when {
+                isVoiceDictating && isDark -> Color(0xFF4A148C)
+                isVoiceDictating && !isDark -> Color(0xFFEDE7F6)
+                isDark -> Color(0xFF381E4B)
+                else -> Color(0xFFF3E5F5)
+            }
+            val voiceTint = when {
+                isVoiceDictating -> Color(0xFFCE93D8)
+                isDark -> Color(0xFFE1BEE7)
+                else -> Color(0xFF6A1B9A)
+            }
+            val voiceText = when {
+                isDark -> Color(0xFFF3E5F5)
+                else -> Color(0xFF4A148C)
+            }
+
             ToolbarItem(
                 iconRes = R.drawable.microphone_lines,
                 label = if (isVoiceDictating) stringResource(R.string.tb_listening) else stringResource(R.string.tb_voice_dictation),
                 onClick = { onVoiceDictation?.invoke() },
-                iconTint = if (isVoiceDictating) Color(0xFF8E24AA) else Color(0xFF6A1B9A),
-                containerColor = if (isVoiceDictating) Color(0xFFEDE7F6) else Color(0xFFF3E5F5)
+                iconTint = voiceTint,
+                containerColor = voiceBg,
+                textColor = voiceText
             )
 
             // 2. OCR Metin Tarama (Scan to Text)
@@ -128,12 +149,17 @@ fun NotionToolbar(
             )
 
             // 6. Fosforlu Vurgu (Highlighter ==metin==)
+            val highlightBg = if (isDark) Color(0xFF4D3800) else Color(0xFFFFF9C4)
+            val highlightTint = if (isDark) Color(0xFFFFD54F) else Color(0xFFF57F17)
+            val highlightText = if (isDark) Color(0xFFFFF9C4) else Color(0xFFE65100)
+
             ToolbarItem(
                 iconRes = R.drawable.ic_brush,
                 label = stringResource(R.string.tb_highlight),
                 onClick = { onInsertHighlight?.invoke() },
-                iconTint = Color(0xFFF57F17),
-                containerColor = Color(0xFFFFF9C4)
+                iconTint = highlightTint,
+                containerColor = highlightBg,
+                textColor = highlightText
             )
 
             // 7. Akıllı #Etiket
@@ -228,12 +254,21 @@ fun NotionToolbar(
             )
 
             // Ses Kaydı
+            val audioBg = when {
+                isRecordingAudio && isDark -> Color(0xFF5C1D1D)
+                isRecordingAudio && !isDark -> Color(0xFFFFEBEE)
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
+            val audioTint = if (isRecordingAudio) Color(0xFFFF8A80) else VibrantOrange
+            val audioText = if (isRecordingAudio && isDark) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.onSurface
+
             ToolbarItem(
                 iconRes = R.drawable.microphone_lines,
                 label = if (isRecordingAudio) stringResource(R.string.tb_recording) else stringResource(R.string.tb_audio_record),
                 onClick = onRecordAudio,
-                iconTint = if (isRecordingAudio) Color(0xFFE53935) else VibrantOrange,
-                containerColor = if (isRecordingAudio) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
+                iconTint = audioTint,
+                containerColor = audioBg,
+                textColor = audioText
             )
 
             // Ayırıcı Çizgi (Divider)
@@ -252,7 +287,8 @@ private fun ToolbarItem(
     label: String,
     onClick: () -> Unit,
     iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+    textColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     Surface(
         modifier = Modifier
@@ -277,7 +313,7 @@ private fun ToolbarItem(
                 text = label,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = textColor
             )
         }
     }
