@@ -1,21 +1,38 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# PureNoteIt ProGuard / R8 Optimization & Obfuscation Rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# 1. Line numbers and debugging attributes (Preserves line numbers in crash reports)
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# 2. Room Database Rules
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Dao interface * { *; }
+-keep @androidx.room.Entity class * { *; }
+-keep class com.notes.purenoteit.data.db.** { *; }
+-dontwarn androidx.room.paging.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# 3. Model & Data Classes (Gson / JSON serialization)
+-keepclassmembers enum * { *; }
+-keep class com.notes.purenoteit.model.** { *; }
+-keepclassmembers class com.notes.purenoteit.model.** { *; }
+-keep class com.notes.purenoteit.util.Converters { *; }
+
+# 4. Dagger Hilt & Dependency Injection
+-keep class * extends dagger.hilt.internal.GeneratedComponent
+-keep @dagger.hilt.android.lifecycle.HiltViewModel class * { *; }
+-keep @dagger.hilt.EntryPoint interface * { *; }
+-keep @dagger.hilt.InstallIn interface * { *; }
+
+# 5. Jetpack Compose Material 3 & Navigation
+-keep class androidx.compose.material3.** { *; }
+-keep class com.notes.purenoteit.ui.** { *; }
+-dontwarn androidx.compose.**
+
+# 6. Biometrics & ML Kit
+-keep class androidx.biometric.** { *; }
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+
+# 7. Coroutines
+-dontwarn kotlinx.coroutines.**
