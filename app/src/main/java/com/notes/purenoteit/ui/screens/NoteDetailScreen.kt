@@ -18,8 +18,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -261,6 +263,7 @@ fun NoteDetailScreen(
     var showEmojiSheet by remember { mutableStateOf(false) }
     var showSlashSheet by remember { mutableStateOf(false) }
     var showTemplateSheet by remember { mutableStateOf(false) }
+    var isTemplateBannerDismissed by rememberSaveable { mutableStateOf(false) }
     var autoVoiceHandled by rememberSaveable { mutableStateOf(false) }
     var autoOcrHandled by rememberSaveable { mutableStateOf(false) }
     var showDrawingSheet by remember { mutableStateOf(false) }
@@ -332,13 +335,19 @@ fun NoteDetailScreen(
         val allText = blocks.joinToString(" ") { it.content + " " + it.toggleBody }
         val existingLinks = Regex("""\[\[(.*?)\]\]""").findAll(allText).map { it.groupValues[1].trim().lowercase() }.toSet()
         val subpageTitles = blocks.filter { it.type == BlockType.SUB_PAGE }.map { it.content.trim().lowercase() }.toSet()
+        val subpageIds = blocks.filter { it.type == BlockType.SUB_PAGE }.mapNotNull { it.subPageNoteId }.toSet()
 
         allNotesForLinking.firstOrNull { noteCandidate ->
             val candidateTitle = noteCandidate.title?.trim() ?: ""
+            val isCandidateSubpage = noteCandidate.id in subpageIds ||
+                    (noteCandidate.richBlocksJson?.contains("\"isSubPage\":true") == true) ||
+                    (noteCandidate.richBlocksJson?.contains("\"parentNoteId\"") == true) ||
+                    subpageTitles.contains(candidateTitle.lowercase())
+
             candidateTitle.length >= 3 &&
             noteCandidate.id != noteId &&
+            !isCandidateSubpage &&
             !existingLinks.contains(candidateTitle.lowercase()) &&
-            !subpageTitles.contains(candidateTitle.lowercase()) &&
             allText.contains(candidateTitle, ignoreCase = true)
         }?.title?.trim()
     }
@@ -1828,70 +1837,88 @@ fun NoteDetailScreen(
                     }
                 }
 
-                // Notion Ready-to-Use Templates Hub Banner (Visible on fresh/empty notes)
-                val isNoteEmpty = noteId == -1 && blocks.all { it.content.isBlank() && it.mediaPath == null }
-                if (isNoteEmpty) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { showTemplateSheet = true },
-                        shape = RoundedCornerShape(16.dp),
-                        color = SoftOrangeLight.copy(alpha = 0.45f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.35f))
-                    ) {
-                        Row(
+                // Notion Ready-to-Use Templates Hub Banner (Visible on fresh/empty notes, dismissible)
+                val isNoteEmpty = noteId == -1 && title.isBlank() && !isTemplateBannerDismissed && blocks.all { it.content.isBlank() && it.mediaPath == null }
+                AnimatedVisibility(
+                    visible = isNoteEmpty,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { showTemplateSheet = true },
+                            shape = RoundedCornerShape(16.dp),
+                            color = SoftOrangeLight.copy(alpha = 0.45f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.35f))
                         ) {
-                            Box(
+                            Row(
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(PureWhite),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "✨", fontSize = 20.sp)
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = stringResource(R.string.template_banner_title),
-                                    style = MaterialTheme.typography.titleSmall.copy(
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(PureWhite),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = "✨", fontSize = 18.sp)
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.template_banner_title),
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = stringResource(R.string.template_banner_desc),
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 11.5.sp
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = VibrantOrange
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.template_use_btn),
+                                        color = PureWhite,
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = stringResource(R.string.template_banner_desc),
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 11.5.sp
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = VibrantOrange
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.template_use_btn),
-                                    color = PureWhite,
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                IconButton(
+                                    onClick = { isTemplateBannerDismissed = true },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.cancel),
+                                        contentDescription = "Kapat",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1906,6 +1933,21 @@ fun NoteDetailScreen(
                     block = block,
                     onContentChange = { newText ->
                         blocks[index] = block.copy(content = newText)
+                        if (block.type == BlockType.SUB_PAGE) {
+                            val childId = block.subPageNoteId
+                            val childNote = if (childId != null) {
+                                allNotesForLinking.find { it.id == childId }
+                            } else {
+                                val trimmed = block.content.trim()
+                                if (trimmed.isNotBlank()) allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) } else null
+                            }
+                            if (childNote != null && childNote.title != newText) {
+                                val updatedTitle = if (newText.isBlank()) "Yeni Alt Sayfa" else newText.trim()
+                                val updatedChild = childNote.copy(title = updatedTitle)
+                                updatedChild.id = childNote.id
+                                noteViewModel.saveNote(updatedChild, contentForLinks = null)
+                            }
+                        }
                     },
                     onCheckedChange = { isChecked ->
                         blocks[index] = block.copy(isChecked = isChecked)

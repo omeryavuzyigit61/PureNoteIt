@@ -3,8 +3,11 @@ package com.notes.purenoteit.ui.components
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -964,6 +967,8 @@ fun NotionBlockRow(
             }
 
             BlockType.MATH -> {
+                var isMathPaletteOpen by rememberSaveable { mutableStateOf(block.content.isBlank()) }
+
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -979,42 +984,81 @@ fun NotionBlockRow(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Text(text = "∑", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = VibrantOrange)
-                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = stringResource(R.string.slash_math_title),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isMathPaletteOpen) VibrantOrange.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.clickable { isMathPaletteOpen = !isMathPaletteOpen }
+                                ) {
+                                    Text(
+                                        text = if (isMathPaletteOpen) "▲ Gizle" else "▼ Terimler (${MathFormulaRenderer.QUICK_MATH_SYMBOLS.size})",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isMathPaletteOpen) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
                             BlockReorderControls()
                         }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        AnimatedVisibility(
+                            visible = isMathPaletteOpen,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
                         ) {
-                            MathFormulaRenderer.QUICK_MATH_SYMBOLS.forEach { (symbol, _) ->
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = SoftOrangeLight,
-                                    border = androidx.compose.foundation.BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.4f)),
-                                    modifier = Modifier.clickable {
-                                        onContentChange(block.content + symbol)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val chunkedSymbols = remember {
+                                    val total = MathFormulaRenderer.QUICK_MATH_SYMBOLS.size
+                                    val perRow = (total + 2) / 3
+                                    MathFormulaRenderer.QUICK_MATH_SYMBOLS.chunked(perRow)
+                                }
+                                chunkedSymbols.forEach { rowSymbols ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        rowSymbols.forEach { (symbol, _) ->
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = SoftOrangeLight,
+                                                border = androidx.compose.foundation.BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.4f)),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable {
+                                                        onContentChange(block.content + symbol)
+                                                    }
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.padding(vertical = 5.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = symbol,
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = VibrantOrange,
+                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
-                                ) {
-                                    Text(
-                                        text = symbol,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = VibrantOrange,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                    )
                                 }
                             }
                         }
