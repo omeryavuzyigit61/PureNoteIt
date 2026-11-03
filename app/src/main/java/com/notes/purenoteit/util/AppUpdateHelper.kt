@@ -48,9 +48,9 @@ object AppUpdateHelper {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val pInfo = getPackageInfo(context)
-            pInfo.versionName ?: "1.0.4"
+            pInfo.versionName ?: "1.0.5"
         } catch (e: Exception) {
-            "1.0.4"
+            "1.0.5"
         }
     }
 
@@ -192,19 +192,21 @@ object AppUpdateHelper {
         return AppUpdateData(
             currentVersionName = curName,
             currentVersionCode = curCode,
-            availableVersionCode = curCode + 1,
-            availableVersionName = "v1.0.5",
+            availableVersionCode = curCode,
+            availableVersionName = "v$curName",
             releaseNotesTr = listOf(
-                "📐 Gelişmiş Matematik Formül Editörü: Kesirli ve köklü ifadeler, 160+ sembol.",
-                "🖼️ Görsel Boyutlandırma: Windows tarzı köşe tutamacı ve oran kilidi.",
-                "🕸️ 2D Bilgi Ağı: Bağlantı kopmaları giderildi, çift yönlü senkronizasyon.",
-                "⚡ Koyu Tema & Başlatma: Açılış ve geçişteki beyaz ekran parlaması tamamen giderildi."
+                "📐 Gelişmiş Matematik Editörü: Kesirli, köklü ifadeler ve 160+ matematik sembolü.",
+                "🌓 3 Seçenekli Tema: Sistem Varsayılanı, Açık ve Koyu tema desteği.",
+                "🖼️ Görsel Boyutlandırma: Windows tarzı köşe tutamacı ve en-boy oran kilidi.",
+                "🕸️ 2D Bilgi Ağı: Sayfa bağlantıları ve çift yönlü senkronizasyon.",
+                "⚡ Açılış & Geçiş: Açılış ekranı renk geçişi ve kontrast iyileştirmeleri."
             ),
             releaseNotesEn = listOf(
-                "📐 Advanced Math Formula Engine: Fractions, roots, 160+ symbols.",
-                "🖼️ Interactive Image Resizer: Corner resize handle & aspect ratio toggle.",
-                "🕸️ 2D Knowledge Graph: Fixed link persistence & bi-directional sync.",
-                "⚡ Dark Theme & Launch: Launch and transition white flash completely eliminated."
+                "📐 Advanced Math Editor: Fractions, roots, and 160+ formula symbols.",
+                "🌓 3-Mode Theme: System Default, Light, and Dark mode support.",
+                "🖼️ Image Resizer: Windows-style corner handle and aspect ratio toggle.",
+                "🕸️ 2D Knowledge Graph: Note linking and bi-directional sync.",
+                "⚡ Launch & Transition: Splash screen smooth transition and contrast optimizations."
             )
         )
     }

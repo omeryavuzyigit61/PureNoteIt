@@ -15,8 +15,8 @@ android {
         applicationId = "com.purenoteit.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.0.4"
+        versionCode = 9
+        versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
