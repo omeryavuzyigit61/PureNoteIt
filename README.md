@@ -28,7 +28,7 @@
     <img src="https://img.shields.io/badge/DI-Dagger%20Hilt-00C853?style=for-the-badge&logo=dagger&logoColor=white" alt="Hilt" />
     <img src="https://img.shields.io/badge/Security-AES--256%20Vault-175DDC?style=for-the-badge&logo=bitwarden&logoColor=white" alt="Security" />
     <img src="https://img.shields.io/badge/Optimization-R8%20DEX%20Obfuscated-blueviolet?style=for-the-badge&logo=googleplay&logoColor=white" alt="R8 Obfuscation" />
-    <img src="https://img.shields.io/badge/Version-1.0.3-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-1.0.4-orange?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
   </p>
 
@@ -245,7 +245,13 @@ flowchart TD
 
 ## 📋 Sürüm Notları / Changelog
 
-### v1.0.3 (En Son Sürüm / Latest)
+### v1.0.4 (En Son Sürüm / Latest)
+- 📐 **Gelişmiş Matematik Formül Motoru & Dikey Kesirler:** `\frac{a}{b}` dikey kesirli ifadeler, karekök/n. kök, integral, limit, matris ve 60+ kategorize matematik sembolü eklendi.
+- 🔄 **Notion/Obsidian Tarzı Formül Önizleme & Düzenleme Modu:** Çift kutu kalabalığı kaldırıldı; formüller doğrudan şık bir sunum kartında gösterilir ve tek dokunuşla düzenleme moduna geçilebilir.
+- 🔗 **Çift Yönlü Alt Sayfa (Subpage) Başlık Senkronizasyonu:** Alt sayfada başlık değiştirilip geri gelindiğinde ana sayfadaki alt sayfa bloğu anında güncellenir ve otomatik kaydedilir.
+- 📱 **Android 15 Edge-to-Edge & Sistem Çubuğu Uyumluluğu:** Google Play Console önerileri doğrultusunda eski durum çubuğu API'leri temizlendi, uçtan uca şeffaf ve çentik dostu ekran yapısına geçildi.
+
+### v1.0.3
 - 🎨 **Koyu Tema Kontrast İyileştirmesi:** "Sesli Dikte", "Fosforlu Vurgu" ve "Ses Kaydı" araç çubuğu butonları koyu temada dinamik renk algılamasıyla kristal netliğinde okunabilir hale getirildi.
 - 🛡️ **Navigasyon Yığını & Kök Sayfa Koruma Kilidi:** Hızlı geri tuşu dokunuşlarında ana sayfanın (`home`) navigasyon yığınından düşmesi engellendi, olası beyaz ekran parlamaları kökünden çözüldü.
 - ⚡ **Tıklama Debounce Koruması:** Geri ve Menü butonlarına 500ms çift dokunma filtresi eklenerek mükerrer sayfa geçişleri kilitlendi.
