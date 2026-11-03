@@ -456,4 +456,16 @@
     <string name="filter_section_categories">Kategoriler</string>
     <string name="filter_section_smart">Akıllı Filtreler</string>
     <string name="filter_section_tags">Etiketler (#)</string>
+
+    <!-- In-App Updates -->
+    <string name="update_dialog_title">Yeni Sürüm Bulundu!</string>
+    <string name="update_dialog_subtitle">PureNoteIt daha güçlü ve yeni özelliklerle güncellendi.</string>
+    <string name="update_whats_new_header">Bu Sürümdeki Yenilikler:</string>
+    <string name="update_now_btn">Şimdi Güncelle</string>
+    <string name="update_later_btn">Daha Sonra</string>
+    <string name="update_check_menu">Güncellemeleri Denetle</string>
+    <string name="update_check_menu_sub">Yeni sürüm ve yenilikleri kontrol et</string>
+    <string name="app_up_to_date_toast">Tebrikler! PureNoteIt en son sürümde (%s).</string>
+    <string name="checking_updates_toast">Güncellemeler kontrol ediliyor...</string>
+    <string name="update_version_chip">Yeni Özellikler Yayında</string>
 </resources>

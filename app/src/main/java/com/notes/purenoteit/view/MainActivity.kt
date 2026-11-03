@@ -9,6 +9,11 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,15 +69,25 @@ class MainActivity : AppCompatActivity() {
             AppCompatDelegate.setApplicationLocales(localeList)
         }
         super.onCreate(savedInstanceState)
+
+        val prefs = SharedPrefencesUtil(applicationContext)
+        val isNightSetting = prefs.getLocal("night", Boolean) as? Boolean
+        val isSystemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val isDarkThemeInitial = isNightSetting ?: isSystemDark
+
+        // Immediately set native window background to eliminate cold-start white flash
+        val winBgColor = if (isDarkThemeInitial) 0xFF1A1A1C.toInt() else 0xFFF8F8FA.toInt()
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(winBgColor))
+
         enableEdgeToEdge(
             statusBarStyle = androidx.activity.SystemBarStyle.auto(
                 android.graphics.Color.TRANSPARENT,
                 android.graphics.Color.TRANSPARENT
-            ),
+            ) { isDarkThemeInitial },
             navigationBarStyle = androidx.activity.SystemBarStyle.auto(
                 android.graphics.Color.TRANSPARENT,
                 android.graphics.Color.TRANSPARENT
-            )
+            ) { isDarkThemeInitial }
         )
 
         activeIntent = intent
@@ -80,8 +95,6 @@ class MainActivity : AppCompatActivity() {
         // Ensure default categories exist and notes are loaded
         categoryViewModel.seedDefaultCategories()
         noteViewModel.getAllNotes()
-
-        val prefs = SharedPrefencesUtil(applicationContext)
 
         setContent {
             var isDarkTheme by remember {
@@ -92,10 +105,18 @@ class MainActivity : AppCompatActivity() {
             var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
 
             PureNoteItTheme(darkTheme = isDarkTheme) {
-                Crossfade(targetState = showSplash, label = "splashTransition") { isSplash ->
-                    if (isSplash) {
-                        AnimatedSplashScreen(onAnimationFinish = { showSplash = false })
-                    } else {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Crossfade(
+                        targetState = showSplash,
+                        animationSpec = tween(300),
+                        label = "splashTransition"
+                    ) { isSplash ->
+                        if (isSplash) {
+                            AnimatedSplashScreen(onAnimationFinish = { showSplash = false })
+                        } else {
                         val navController = rememberNavController()
 
                         LaunchedEffect(activeIntent) {
@@ -238,6 +259,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
     }
 
     override fun onStop() {

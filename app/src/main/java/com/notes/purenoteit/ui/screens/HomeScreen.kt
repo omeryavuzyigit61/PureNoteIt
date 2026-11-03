@@ -134,7 +134,10 @@ import com.notes.purenoteit.ui.components.NotionStreamView
 import com.notes.purenoteit.ui.components.NotionWhiteboardView
 import com.notes.purenoteit.ui.components.TemplateHubSheet
 import com.notes.purenoteit.ui.components.TrashBinSheet
+import com.notes.purenoteit.ui.components.UpdateAvailableDialog
 import com.notes.purenoteit.ui.components.VaultBackupRestoreDialog
+import com.notes.purenoteit.util.AppUpdateData
+import com.notes.purenoteit.util.AppUpdateHelper
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -249,6 +252,25 @@ fun HomeScreen(
     val todayDateStr = remember { SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(Date()) }
     val existingTodayAgendaNote = remember(noteList, todayDateStr) {
         noteList.firstOrNull { it.title?.contains(todayDateStr) == true && it.icon == "📅" }
+    }
+
+    // In-App Update Dialog state
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var updateDialogData by remember { mutableStateOf<AppUpdateData?>(null) }
+    val currentActivity = context as? Activity
+
+    // Check for App Updates in background on startup
+    LaunchedEffect(Unit) {
+        if (currentActivity != null) {
+            AppUpdateHelper.checkForAppUpdate(
+                activity = currentActivity,
+                isManual = false,
+                onUpdateFound = { data ->
+                    updateDialogData = data
+                    showUpdateDialog = true
+                }
+            )
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -630,6 +652,34 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Menu Item: Check for Updates (Güncellemeleri Denetle)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.category,
+                        title = stringResource(R.string.update_check_menu),
+                        subtitle = stringResource(R.string.update_check_menu_sub),
+                        badge = "v${AppUpdateHelper.getCurrentVersionName(context)}",
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            if (currentActivity != null) {
+                                context.showToastShort(context.getString(R.string.checking_updates_toast))
+                                AppUpdateHelper.checkForAppUpdate(
+                                    activity = currentActivity,
+                                    isManual = true,
+                                    onUpdateFound = { data ->
+                                        updateDialogData = data
+                                        showUpdateDialog = true
+                                    },
+                                    onUpToDate = {
+                                        updateDialogData = AppUpdateHelper.getReleaseHighlights(context)
+                                        showUpdateDialog = true
+                                    }
+                                )
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Menu Item: Dark Mode Switch
                     Surface(
                         modifier = Modifier
@@ -688,7 +738,7 @@ fun HomeScreen(
 
                     // Footer
                     Text(
-                        text = "PureNoteIt v1.0.0\nModern & Yumuşak Tasarım",
+                        text = "PureNoteIt v${AppUpdateHelper.getCurrentVersionName(context)}\nModern & Yumuşak Tasarım",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         lineHeight = 16.sp,
@@ -1417,6 +1467,20 @@ fun HomeScreen(
     if (showLanguageSheet) {
         LanguageSelectionSheet(
             onDismiss = { showLanguageSheet = false }
+        )
+    }
+
+    // In-App Update Dialog ("Yeni Sürüm Bulundu!")
+    if (showUpdateDialog && updateDialogData != null) {
+        UpdateAvailableDialog(
+            updateData = updateDialogData!!,
+            onDismiss = { showUpdateDialog = false },
+            onUpdateClick = {
+                showUpdateDialog = false
+                if (currentActivity != null) {
+                    AppUpdateHelper.launchUpdate(currentActivity, updateDialogData!!)
+                }
+            }
         )
     }
 

@@ -456,4 +456,16 @@
     <string name="filter_section_categories">Categories</string>
     <string name="filter_section_smart">Smart Filters</string>
     <string name="filter_section_tags">Hashtags (#)</string>
+
+    <!-- In-App Updates -->
+    <string name="update_dialog_title">New Version Available!</string>
+    <string name="update_dialog_subtitle">PureNoteIt has been updated with powerful new features.</string>
+    <string name="update_whats_new_header">What\'s New in this Version:</string>
+    <string name="update_now_btn">Update Now</string>
+    <string name="update_later_btn">Later</string>
+    <string name="update_check_menu">Check for Updates</string>
+    <string name="update_check_menu_sub">Check for the latest release &amp; features</string>
+    <string name="app_up_to_date_toast">Great! PureNoteIt is up to date (%s).</string>
+    <string name="checking_updates_toast">Checking for updates...</string>
+    <string name="update_version_chip">New Features Live</string>
 </resources>

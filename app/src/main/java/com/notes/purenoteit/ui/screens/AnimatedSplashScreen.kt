@@ -201,11 +201,11 @@ fun AnimatedSplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .alpha(exitAlpha.value)
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
+            modifier = Modifier.alpha(exitAlpha.value),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {

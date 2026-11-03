@@ -89,4 +89,7 @@ dependencies {
 
     // ML Kit Text Recognition (OCR)
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+
+    // Google Play In-App Updates
+    implementation(libs.play.app.update)
 }
