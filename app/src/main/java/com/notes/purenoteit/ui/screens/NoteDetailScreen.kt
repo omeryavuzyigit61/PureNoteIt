@@ -2170,9 +2170,20 @@ fun NoteDetailScreen(
 
     // Link Note Picker Sheet (Paket 1: Çift Yönlü Bağlantı Seçici)
     if (showLinkNotePicker) {
-        val filteredLinkNotes = remember(allNotesForLinking, linkSearchQuery, noteId) {
+        val currentSubpageIds = remember(blocks) {
+            blocks.filter { it.type == BlockType.SUB_PAGE }.mapNotNull { it.subPageNoteId }.toSet()
+        }
+        val currentSubpageTitles = remember(blocks) {
+            blocks.filter { it.type == BlockType.SUB_PAGE }.map { it.content.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+        }
+        val filteredLinkNotes = remember(allNotesForLinking, linkSearchQuery, noteId, currentSubpageIds, currentSubpageTitles) {
             allNotesForLinking
                 .filter { it.id != noteId }
+                .filter { it.status != "TRASH" }
+                .filter { it.id !in currentSubpageIds }
+                .filter { it.richBlocksJson?.contains("\"isSubPage\":true") != true }
+                .filter { it.richBlocksJson?.contains("\"parentNoteId\"") != true }
+                .filter { (it.title?.trim()?.lowercase() ?: "") !in currentSubpageTitles }
                 .filter { linkSearchQuery.isBlank() || it.title?.contains(linkSearchQuery, ignoreCase = true) == true }
         }
 

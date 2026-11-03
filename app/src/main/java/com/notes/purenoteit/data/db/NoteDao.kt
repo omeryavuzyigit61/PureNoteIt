@@ -5,16 +5,21 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
+import androidx.room.Upsert
 import io.reactivex.Completable
 import io.reactivex.Flowable
 import io.reactivex.Single
 
 @Dao
 interface NoteDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     fun upsert(note: NoteData): Completable
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Update
+    fun update(note: NoteData): Completable
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insertNote(note: NoteData): Single<Long>
 
     @Query("SELECT * FROM notes ORDER BY isPinned DESC, date DESC")

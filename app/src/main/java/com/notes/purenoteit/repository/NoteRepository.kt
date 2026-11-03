@@ -8,6 +8,7 @@ import javax.inject.Singleton
 @Singleton
 class NoteRepository @Inject constructor(private val noteDao: NoteDao) {
     fun upsert(item: NoteData) = noteDao.upsert(item)
+    fun update(item: NoteData) = noteDao.update(item)
     fun insertNote(item: NoteData) = noteDao.insertNote(item)
     fun delete(item: NoteData) = noteDao.delete(item)
     fun getNotes() = noteDao.getNotes()

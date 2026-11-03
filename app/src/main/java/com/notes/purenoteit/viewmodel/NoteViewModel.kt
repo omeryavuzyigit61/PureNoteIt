@@ -55,7 +55,7 @@ class NoteViewModel @Inject constructor(
     val streamItems: LiveData<List<StreamItemData>> = _streamItems
 
     fun getAllNotes() {
-        repository.getNotes()
+        repository.getAllNotes()
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe({
@@ -69,7 +69,8 @@ class NoteViewModel @Inject constructor(
     }
 
     fun upsert(item: NoteData) {
-        repository.upsert(item).subscribeOn(Schedulers.io())
+        val action = if (item.id > 0) repository.update(item) else repository.upsert(item)
+        action.subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllNotes()
                 notifyWidgetSync()
@@ -83,7 +84,7 @@ class NoteViewModel @Inject constructor(
 
     fun saveNote(item: NoteData, contentForLinks: String? = null, onSaved: ((Int) -> Unit)? = null) {
         val saveSingle = if (item.id > 0) {
-            repository.upsert(item).toSingleDefault(item.id.toLong())
+            repository.update(item).toSingleDefault(item.id.toLong())
         } else {
             repository.insertNote(item)
         }
@@ -220,7 +221,7 @@ class NoteViewModel @Inject constructor(
             .filter { it.isNotBlank() }
             .toSet()
 
-        repository.getNotes()
+        repository.getAllNotes()
             .subscribeOn(Schedulers.io())
             .flatMapCompletable { allNotes ->
                 val targetLinks = allNotes
