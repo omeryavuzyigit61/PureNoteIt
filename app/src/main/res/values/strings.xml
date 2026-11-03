@@ -468,4 +468,14 @@
     <string name="app_up_to_date_toast">Tebrikler! PureNoteIt en son sürümde (%s).</string>
     <string name="checking_updates_toast">Güncellemeler kontrol ediliyor...</string>
     <string name="update_version_chip">Yeni Özellikler Yayında</string>
+
+    <!-- Theme Selection (3 Mod) -->
+    <string name="theme_system">Sistem</string>
+    <string name="theme_light">Açık</string>
+    <string name="theme_dark">Koyu</string>
+    <string name="theme_mode_title">Görünüm Teması</string>
+    <string name="drawer_release_notes">Sürüm Notları (Yenilikler)</string>
+    <string name="drawer_release_notes_sub">v%s ile gelen tüm özellikler</string>
+    <string name="release_notes_dialog_title">PureNoteIt Yenilikleri</string>
+    <string name="release_notes_dialog_subtitle">v%s sürümünde sizin için hazırlanan tüm özellikler</string>
 </resources>

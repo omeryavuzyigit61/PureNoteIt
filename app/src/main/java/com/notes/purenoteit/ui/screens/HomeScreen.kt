@@ -138,6 +138,7 @@ import com.notes.purenoteit.ui.components.UpdateAvailableDialog
 import com.notes.purenoteit.ui.components.VaultBackupRestoreDialog
 import com.notes.purenoteit.util.AppUpdateData
 import com.notes.purenoteit.util.AppUpdateHelper
+import com.notes.purenoteit.util.ThemeMode
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -184,7 +185,9 @@ fun HomeScreen(
     onNavigateToPasswordSettings: () -> Unit,
     onNavigateToCategorySettings: () -> Unit,
     onToggleDarkTheme: (Boolean) -> Unit,
-    isDarkTheme: Boolean
+    isDarkTheme: Boolean,
+    currentThemeMode: ThemeMode = ThemeMode.SYSTEM,
+    onThemeModeChange: (ThemeMode) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -257,6 +260,7 @@ fun HomeScreen(
     // In-App Update Dialog state
     var showUpdateDialog by remember { mutableStateOf(false) }
     var updateDialogData by remember { mutableStateOf<AppUpdateData?>(null) }
+    var isManualReleaseNotesView by remember { mutableStateOf(false) }
     val currentActivity = context as? Activity
 
     // Check for App Updates in background on startup
@@ -267,6 +271,7 @@ fun HomeScreen(
                 isManual = false,
                 onUpdateFound = { data ->
                     updateDialogData = data
+                    isManualReleaseNotesView = false
                     showUpdateDialog = true
                 }
             )
@@ -652,7 +657,7 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Menu Item: Check for Updates (Güncellemeleri Denetle)
+                    // Menu Item: Check for Updates (Güncellemeleri Denetle - Yalnızca Gerçek Google Play)
                     DrawerMenuTile(
                         iconRes = R.drawable.category,
                         title = stringResource(R.string.update_check_menu),
@@ -667,11 +672,16 @@ fun HomeScreen(
                                     isManual = true,
                                     onUpdateFound = { data ->
                                         updateDialogData = data
+                                        isManualReleaseNotesView = false
                                         showUpdateDialog = true
                                     },
                                     onUpToDate = {
-                                        updateDialogData = AppUpdateHelper.getReleaseHighlights(context)
-                                        showUpdateDialog = true
+                                        context.showToastShort(
+                                            context.getString(
+                                                R.string.app_up_to_date_toast,
+                                                "v" + AppUpdateHelper.getCurrentVersionName(context)
+                                            )
+                                        )
                                     }
                                 )
                             }
@@ -680,57 +690,105 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Menu Item: Dark Mode Switch
+                    // Menu Item: Release Notes (Sürüm Notları / Yenilikler)
+                    DrawerMenuTile(
+                        iconRes = R.drawable.category,
+                        title = stringResource(R.string.drawer_release_notes),
+                        subtitle = stringResource(R.string.drawer_release_notes_sub, AppUpdateHelper.getCurrentVersionName(context)),
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            updateDialogData = AppUpdateHelper.getReleaseHighlights(context)
+                            isManualReleaseNotesView = true
+                            showUpdateDialog = true
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Menu Item: Theme Selection (3 Mod: Sistem, Açık, Koyu)
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { onToggleDarkTheme(!isDarkTheme) },
+                            .clip(RoundedCornerShape(16.dp)),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(horizontal = 14.dp, vertical = 12.dp)
                         ) {
-                            Box(
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(SoftOrangeLight),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.theme),
+                                        contentDescription = null,
+                                        tint = VibrantOrange,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.theme_mode_title),
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = when (currentThemeMode) {
+                                            ThemeMode.SYSTEM -> stringResource(R.string.theme_system) + " (" + (if (isDarkTheme) stringResource(R.string.theme_dark) else stringResource(R.string.theme_light)) + ")"
+                                            ThemeMode.LIGHT -> stringResource(R.string.theme_light)
+                                            ThemeMode.DARK -> stringResource(R.string.theme_dark)
+                                        },
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 3-Option Segmented Selector
+                            Row(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(SoftOrangeLight),
-                                contentAlignment = Alignment.Center
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .padding(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.theme),
-                                    contentDescription = null,
-                                    tint = VibrantOrange,
-                                    modifier = Modifier.size(20.dp)
+                                val modes = listOf(
+                                    Triple(ThemeMode.SYSTEM, "🌓", stringResource(R.string.theme_system)),
+                                    Triple(ThemeMode.LIGHT, "☀️", stringResource(R.string.theme_light)),
+                                    Triple(ThemeMode.DARK, "🌙", stringResource(R.string.theme_dark))
                                 )
+                                for ((mode, emoji, label) in modes) {
+                                    val isSelected = currentThemeMode == mode
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) VibrantOrange else androidx.compose.ui.graphics.Color.Transparent)
+                                            .clickable { onThemeModeChange(mode) }
+                                            .padding(vertical = 6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "$emoji $label",
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = stringResource(R.string.drawer_dark_mode),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (isDarkTheme) stringResource(R.string.dark_theme_active) else stringResource(R.string.light_theme_active),
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                )
-                            }
-                            Switch(
-                                checked = isDarkTheme,
-                                onCheckedChange = { onToggleDarkTheme(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = PureWhite,
-                                    checkedTrackColor = VibrantOrange
-                                )
-                            )
                         }
                     }
 
@@ -1470,10 +1528,11 @@ fun HomeScreen(
         )
     }
 
-    // In-App Update Dialog ("Yeni Sürüm Bulundu!")
+    // In-App Update Dialog ("Yeni Sürüm Bulundu!" veya "Sürüm Notları")
     if (showUpdateDialog && updateDialogData != null) {
         UpdateAvailableDialog(
             updateData = updateDialogData!!,
+            isReleaseNotesOnly = isManualReleaseNotesView,
             onDismiss = { showUpdateDialog = false },
             onUpdateClick = {
                 showUpdateDialog = false

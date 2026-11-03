@@ -36,6 +36,8 @@ import com.notes.purenoteit.ui.theme.PureNoteItTheme
 import com.notes.purenoteit.util.LanguageManager
 import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.SharedPrefencesUtil
+import com.notes.purenoteit.util.ThemeManager
+import com.notes.purenoteit.util.ThemeMode
 import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -70,12 +72,11 @@ class MainActivity : AppCompatActivity() {
         }
         super.onCreate(savedInstanceState)
 
-        val prefs = SharedPrefencesUtil(applicationContext)
-        val isNightSetting = prefs.getLocal("night", Boolean) as? Boolean
-        val isSystemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val isDarkThemeInitial = isNightSetting ?: isSystemDark
+        val currentThemeMode = ThemeManager.getThemeMode(this)
+        ThemeManager.applyTheme(currentThemeMode)
+        val isDarkThemeInitial = ThemeManager.isDarkTheme(this, currentThemeMode)
 
-        // Immediately set native window background to eliminate cold-start white flash
+        // Immediately set native window background to match exact theme color (zero flash)
         val winBgColor = if (isDarkThemeInitial) 0xFF1A1A1C.toInt() else 0xFFF8F8FA.toInt()
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(winBgColor))
 
@@ -97,10 +98,8 @@ class MainActivity : AppCompatActivity() {
         noteViewModel.getAllNotes()
 
         setContent {
-            var isDarkTheme by remember {
-                val saved = prefs.getLocal("night", Boolean) as? Boolean
-                mutableStateOf(saved ?: false)
-            }
+            var themeMode by remember { mutableStateOf(ThemeManager.getThemeMode(this@MainActivity)) }
+            val isDarkTheme = ThemeManager.isDarkTheme(this@MainActivity, themeMode)
 
             var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
 
@@ -169,9 +168,21 @@ class MainActivity : AppCompatActivity() {
                                     onNavigateToCategorySettings = {
                                         navController.navigate("category_settings")
                                     },
+                                    currentThemeMode = themeMode,
+                                    onThemeModeChange = { newMode ->
+                                        themeMode = newMode
+                                        ThemeManager.setThemeMode(this@MainActivity, newMode)
+                                        val dark = ThemeManager.isDarkTheme(this@MainActivity, newMode)
+                                        val winColor = if (dark) 0xFF1A1A1C.toInt() else 0xFFF8F8FA.toInt()
+                                        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(winColor))
+                                    },
                                     onToggleDarkTheme = { newTheme ->
-                                        isDarkTheme = newTheme
-                                        prefs.addLocal("night", newTheme)
+                                        val newMode = if (newTheme) ThemeMode.DARK else ThemeMode.LIGHT
+                                        themeMode = newMode
+                                        ThemeManager.setThemeMode(this@MainActivity, newMode)
+                                        val dark = ThemeManager.isDarkTheme(this@MainActivity, newMode)
+                                        val winColor = if (dark) 0xFF1A1A1C.toInt() else 0xFFF8F8FA.toInt()
+                                        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(winColor))
                                     },
                                     isDarkTheme = isDarkTheme
                                 )

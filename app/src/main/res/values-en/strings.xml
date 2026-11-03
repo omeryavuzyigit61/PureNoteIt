@@ -468,4 +468,14 @@
     <string name="app_up_to_date_toast">Great! PureNoteIt is up to date (%s).</string>
     <string name="checking_updates_toast">Checking for updates...</string>
     <string name="update_version_chip">New Features Live</string>
+
+    <!-- Theme Selection (3 Modes) -->
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_mode_title">Appearance Theme</string>
+    <string name="drawer_release_notes">Release Notes (What\'s New)</string>
+    <string name="drawer_release_notes_sub">All features in v%s</string>
+    <string name="release_notes_dialog_title">PureNoteIt What\'s New</string>
+    <string name="release_notes_dialog_subtitle">All features crafted for you in v%s</string>
 </resources>

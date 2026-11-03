@@ -54,6 +54,7 @@ import com.notes.purenoteit.util.LanguageManager
 @Composable
 fun UpdateAvailableDialog(
     updateData: AppUpdateData,
+    isReleaseNotesOnly: Boolean = false,
     onDismiss: () -> Unit,
     onUpdateClick: () -> Unit
 ) {
@@ -109,7 +110,7 @@ fun UpdateAvailableDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "🚀",
+                            text = if (isReleaseNotesOnly) "✨" else "🚀",
                             fontSize = 32.sp
                         )
                     }
@@ -118,7 +119,7 @@ fun UpdateAvailableDialog(
 
                     // Title
                     Text(
-                        text = stringResource(R.string.update_dialog_title),
+                        text = if (isReleaseNotesOnly) stringResource(R.string.release_notes_dialog_title) else stringResource(R.string.update_dialog_title),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -129,7 +130,7 @@ fun UpdateAvailableDialog(
 
                     // Subtitle
                     Text(
-                        text = stringResource(R.string.update_dialog_subtitle),
+                        text = if (isReleaseNotesOnly) stringResource(R.string.release_notes_dialog_subtitle, updateData.currentVersionName) else stringResource(R.string.update_dialog_subtitle),
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -153,20 +154,22 @@ fun UpdateAvailableDialog(
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "➔",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = VibrantOrange
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = updateData.availableVersionName,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = VibrantOrange
-                        )
+                        if (!isReleaseNotesOnly) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "➔",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = updateData.availableVersionName,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange
+                            )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
@@ -243,45 +246,65 @@ fun UpdateAvailableDialog(
                     Spacer(modifier = Modifier.height(22.dp))
 
                     // Buttons
-                    Button(
-                        onClick = onUpdateClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = VibrantOrange,
-                            contentColor = PureWhite
-                        )
-                    ) {
-                        Text(
-                            text = "⚡ " + stringResource(R.string.update_now_btn),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    if (isReleaseNotesOnly) {
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = VibrantOrange,
+                                contentColor = PureWhite
+                            )
+                        ) {
+                            Text(
+                                text = stringResource(R.string.close),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Button(
+                            onClick = onUpdateClick,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = VibrantOrange,
+                                contentColor = PureWhite
+                            )
+                        ) {
+                            Text(
+                                text = "⚡ " + stringResource(R.string.update_now_btn),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(R.string.update_later_btn),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Normal
-                        )
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            )
+                        ) {
+                            Text(
+                                text = stringResource(R.string.update_later_btn),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
                     }
                 }
             }
