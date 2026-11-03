@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -40,7 +41,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.notes.purenoteit.util.MathCategory
 import com.notes.purenoteit.util.MathFormulaRenderer
+import com.notes.purenoteit.util.MathFormulaView
+import com.notes.purenoteit.util.MathSymbol
 import com.notes.purenoteit.util.SyntaxHighlighter
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -967,7 +971,8 @@ fun NotionBlockRow(
             }
 
             BlockType.MATH -> {
-                var isMathPaletteOpen by rememberSaveable { mutableStateOf(block.content.isBlank()) }
+                var isEditingMath by rememberSaveable { mutableStateOf(block.content.isBlank()) }
+                var selectedCategory by rememberSaveable { mutableStateOf(MathCategory.TEMEL) }
 
                 Surface(
                     modifier = Modifier
@@ -975,12 +980,22 @@ fun NotionBlockRow(
                         .padding(vertical = 6.dp),
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB74D).copy(alpha = 0.5f)),
-                    shadowElevation = 1.dp
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isEditingMath) VibrantOrange.copy(alpha = 0.6f) else Color(0xFFFFB74D).copy(alpha = 0.4f)
+                    ),
+                    shadowElevation = if (isEditingMath) 3.dp else 1.dp
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp)
+                    ) {
+                        // Header Bar
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -988,124 +1003,260 @@ fun NotionBlockRow(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(text = "∑", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = VibrantOrange)
                                 Text(
-                                    text = stringResource(R.string.slash_math_title),
-                                    fontSize = 12.sp,
+                                    text = "∑",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                                Text(
+                                    text = if (isEditingMath) stringResource(R.string.slash_math_title) else "Matematik Formülü",
+                                    fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (isMathPaletteOpen) VibrantOrange.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier.clickable { isMathPaletteOpen = !isMathPaletteOpen }
-                                ) {
-                                    Text(
-                                        text = if (isMathPaletteOpen) "▲ Gizle" else "▼ Terimler (${MathFormulaRenderer.QUICK_MATH_SYMBOLS.size})",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = if (isMathPaletteOpen) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                    )
+
+                                if (isEditingMath) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = VibrantOrange,
+                                        modifier = Modifier.clickable {
+                                            isEditingMath = false
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "Tamam ✓",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = PureWhite,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                } else {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = VibrantOrange.copy(alpha = 0.12f),
+                                        modifier = Modifier.clickable {
+                                            isEditingMath = true
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "Düzenle ✎",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = VibrantOrange,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
                                 }
                             }
                             BlockReorderControls()
                         }
 
-                        AnimatedVisibility(
-                            visible = isMathPaletteOpen,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Column(
+                        if (!isEditingMath && block.content.isNotBlank()) {
+                            // PREVIEW ONLY MODE: Clean equation display with zero text-box redundancy
+                            Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(bottom = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { isEditingMath = true },
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFFFE082).copy(alpha = 0.6f))
                             ) {
-                                val chunkedSymbols = remember {
-                                    val total = MathFormulaRenderer.QUICK_MATH_SYMBOLS.size
-                                    val perRow = (total + 2) / 3
-                                    MathFormulaRenderer.QUICK_MATH_SYMBOLS.chunked(perRow)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 14.dp, horizontal = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    MathFormulaView(
+                                        latex = block.content,
+                                        fontSize = 19.sp,
+                                        isDark = isSystemInDarkTheme()
+                                    )
                                 }
-                                chunkedSymbols.forEach { rowSymbols ->
-                                    Row(
+                            }
+                        } else {
+                            // EDITING MODE: Category tabs, extended symbols palette, input field, and live preview
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // 1. Category Tabs
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    MathCategory.values().forEach { category ->
+                                        val isSelected = category == selectedCategory
+                                        Surface(
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                            modifier = Modifier.clickable { selectedCategory = category }
+                                        ) {
+                                            Text(
+                                                text = category.title,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // 2. Palette Content
+                                if (selectedCategory == MathCategory.SABLONLAR) {
+                                    // Template formulas list
+                                    Column(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        rowSymbols.forEach { (symbol, _) ->
+                                        val templates = MathFormulaRenderer.CATEGORIZED_SYMBOLS[MathCategory.SABLONLAR] ?: emptyList()
+                                        templates.forEach { tmpl ->
                                             Surface(
-                                                shape = RoundedCornerShape(6.dp),
+                                                shape = RoundedCornerShape(8.dp),
                                                 color = SoftOrangeLight,
                                                 border = androidx.compose.foundation.BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.4f)),
                                                 modifier = Modifier
-                                                    .weight(1f)
+                                                    .fillMaxWidth()
                                                     .clickable {
-                                                        onContentChange(block.content + symbol)
+                                                        onContentChange(tmpl.insertText)
                                                     }
                                             ) {
-                                                Box(
-                                                    modifier = Modifier.padding(vertical = 5.dp),
-                                                    contentAlignment = Alignment.Center
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Text(
-                                                        text = symbol,
-                                                        fontSize = 14.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = VibrantOrange,
-                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                        text = tmpl.label,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = VibrantOrange
+                                                    )
+                                                    Text(
+                                                        text = tmpl.insertText,
+                                                        fontSize = 10.sp,
+                                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.weight(1f, fill = false).padding(start = 8.dp)
                                                     )
                                                 }
                                             }
                                         }
                                     }
-                                }
-                            }
-                        }
-
-                        BasicTextField(
-                            value = block.content,
-                            onValueChange = onContentChange,
-                            textStyle = textStyle.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 13.5.sp),
-                            cursorBrush = SolidColor(VibrantOrange),
-                            decorationBox = { inner ->
-                                if (block.content.isEmpty()) {
-                                    Text(
-                                        text = stringResource(R.string.math_input_placeholder),
-                                        style = textStyle.copy(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
-                                    )
-                                }
-                                inner()
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .padding(horizontal = 10.dp, vertical = 8.dp)
-                        )
-
-                        if (block.content.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFFFFF8E1),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFE082))
-                            ) {
-                                Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-                                    Text(
-                                        text = stringResource(R.string.math_preview_title),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFF57F17)
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = MathFormulaRenderer.formatMathFormula(block.content, isDark = false),
-                                        fontSize = 18.sp,
+                                } else {
+                                    // Grid of symbol buttons (5 per row)
+                                    val currentSymbols = MathFormulaRenderer.CATEGORIZED_SYMBOLS[selectedCategory] ?: emptyList()
+                                    val chunked = remember(currentSymbols) {
+                                        val perRow = 5
+                                        currentSymbols.chunked(perRow)
+                                    }
+                                    Column(
                                         modifier = Modifier.fillMaxWidth(),
-                                        textAlign = TextAlign.Center
-                                    )
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        chunked.forEach { rowSymbols ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                rowSymbols.forEach { sym ->
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = SoftOrangeLight,
+                                                        border = androidx.compose.foundation.BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.4f)),
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .clickable {
+                                                                onContentChange(block.content + sym.insertText)
+                                                            }
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier.padding(vertical = 5.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = sym.label,
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = VibrantOrange,
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                repeat(5 - rowSymbols.size) {
+                                                    Spacer(modifier = Modifier.weight(1f))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 3. LaTeX Monospace Text Editor
+                                BasicTextField(
+                                    value = block.content,
+                                    onValueChange = onContentChange,
+                                    textStyle = textStyle.copy(
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontSize = 13.5.sp
+                                    ),
+                                    cursorBrush = SolidColor(VibrantOrange),
+                                    decorationBox = { inner ->
+                                        if (block.content.isEmpty()) {
+                                            Text(
+                                                text = stringResource(R.string.math_input_placeholder),
+                                                style = textStyle.copy(
+                                                    fontSize = 13.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                                )
+                                            )
+                                        }
+                                        inner()
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                                )
+
+                                // 4. Live Rendered Preview (during edit mode)
+                                if (block.content.isNotBlank()) {
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFFFE082).copy(alpha = 0.5f))
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.math_preview_title),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFF57F17)
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            MathFormulaView(
+                                                latex = block.content,
+                                                fontSize = 17.sp,
+                                                isDark = isSystemInDarkTheme()
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

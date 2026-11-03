@@ -296,6 +296,7 @@ fun NoteDetailScreen(
 
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                noteViewModel.getAllNotes()
                 if (isPassword && !SecurityUtil.isVaultUnlocked) {
                     isAccessGranted = false
                     blocks.clear()
@@ -936,19 +937,22 @@ fun NoteDetailScreen(
     LaunchedEffect(allNotesForLinking) {
         if (allNotesForLinking.isNotEmpty() && isInitialLoadCompleted) {
             var blocksModified = false
-            val iterator = blocks.listIterator()
-            while (iterator.hasNext()) {
-                val b = iterator.next()
+            val toRemove = mutableListOf<NoteBlock>()
+            for (i in blocks.indices) {
+                val b = blocks[i]
                 if (b.type == BlockType.SUB_PAGE && b.subPageNoteId != null) {
                     val targetNote = allNotesForLinking.find { it.id == b.subPageNoteId }
                     if (targetNote == null || targetNote.status == "TRASH") {
-                        iterator.remove()
+                        toRemove.add(b)
                         blocksModified = true
                     } else if (targetNote.title != null && targetNote.title!!.isNotBlank() && b.content != targetNote.title) {
-                        b.content = targetNote.title!!
+                        blocks[i] = b.copy(content = targetNote.title!!)
                         blocksModified = true
                     }
                 }
+            }
+            if (toRemove.isNotEmpty()) {
+                blocks.removeAll(toRemove)
             }
             if (blocks.isEmpty()) {
                 blocks.add(NoteBlock())
