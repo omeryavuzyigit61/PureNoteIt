@@ -12,6 +12,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -52,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -1344,29 +1347,188 @@ fun NotionBlockRow(
             }
 
             BlockType.IMAGE -> {
+                val parsedWidth = remember(block.content) {
+                    try {
+                        if (block.content.startsWith("{") && block.content.contains("w")) {
+                            org.json.JSONObject(block.content).optInt("w", 100).coerceIn(30, 100)
+                        } else 100
+                    } catch (e: Exception) { 100 }
+                }
+
+                val parsedHeight = remember(block.content) {
+                    try {
+                        if (block.content.startsWith("{") && block.content.contains("h")) {
+                            org.json.JSONObject(block.content).optDouble("h", 260.0).toFloat().coerceIn(120f, 900f)
+                        } else 260f
+                    } catch (e: Exception) { 260f }
+                }
+
+                val parsedLock = remember(block.content) {
+                    try {
+                        if (block.content.startsWith("{") && block.content.contains("lock")) {
+                            org.json.JSONObject(block.content).optBoolean("lock", true)
+                        } else true
+                    } catch (e: Exception) { true }
+                }
+
+                var currentHeightDp by remember(block.id, parsedHeight) { mutableFloatStateOf(parsedHeight) }
+                var currentWidthPercent by remember(block.id, parsedWidth) { mutableIntStateOf(parsedWidth) }
+                var isRatioLocked by remember(block.id, parsedLock) { mutableStateOf(parsedLock) }
+                var isDraggingResize by remember { mutableStateOf(false) }
+
+                fun persistImageConfig(w: Int, h: Float, lock: Boolean) {
+                    try {
+                        val json = org.json.JSONObject().apply {
+                            put("w", w)
+                            put("h", h.toInt())
+                            put("lock", lock)
+                        }.toString()
+                        onContentChange(json)
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 6.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        model = File(block.mediaPath ?: ""),
-                        contentDescription = stringResource(R.string.block_image_desc),
+                    Surface(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
+                            .fillMaxWidth(currentWidthPercent / 100f)
+                            .height(currentHeightDp.dp)
                             .clip(RoundedCornerShape(14.dp)),
-                        contentScale = ContentScale.Crop
-                    )
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = BorderStroke(
+                            if (isDraggingResize) 2.dp else 1.dp,
+                            if (isDraggingResize) VibrantOrange else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                        ),
+                        shadowElevation = if (isDraggingResize) 4.dp else 1.dp
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AsyncImage(
+                                model = File(block.mediaPath ?: ""),
+                                contentDescription = stringResource(R.string.block_image_desc),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(14.dp)),
+                                contentScale = if (isRatioLocked) ContentScale.Fit else ContentScale.Crop
+                            )
 
-                    BlockReorderControls(
-                        isDarkContainer = true,
-                        controlModifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                    )
+                            // Top Action Overlay: Aspect Ratio Lock Toggle + Size Presets + Reorder Controls
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .align(Alignment.TopCenter)
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = CharcoalGray.copy(alpha = 0.85f),
+                                        modifier = Modifier.clickable {
+                                            isRatioLocked = !isRatioLocked
+                                            persistImageConfig(currentWidthPercent, currentHeightDp, isRatioLocked)
+                                        }
+                                    ) {
+                                        Text(
+                                            text = if (isRatioLocked) "🔒 Ölçeği Koru" else "🔓 Serbest Ölçek",
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isRatioLocked) Color(0xFFFFB74D) else PureWhite,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                        )
+                                    }
+
+                                    listOf(100, 75, 50).forEach { pct ->
+                                        val isSelected = currentWidthPercent == pct
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (isSelected) VibrantOrange else CharcoalGray.copy(alpha = 0.8f),
+                                            modifier = Modifier.clickable {
+                                                currentWidthPercent = pct
+                                                persistImageConfig(pct, currentHeightDp, isRatioLocked)
+                                            }
+                                        ) {
+                                            Text(
+                                                text = "%$pct",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = PureWhite,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                BlockReorderControls(
+                                    isDarkContainer = true,
+                                    controlModifier = Modifier.padding(start = 4.dp)
+                                )
+                            }
+
+                            // Windows-Style Corner Resize Handle (Bottom-Right ↘)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(6.dp)
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isDraggingResize) VibrantOrange else CharcoalGray.copy(alpha = 0.9f)
+                                    )
+                                    .border(1.dp, PureWhite.copy(alpha = 0.7f), CircleShape)
+                                    .pointerInput(block.id) {
+                                        detectDragGestures(
+                                            onDragStart = {
+                                                isDraggingResize = true
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            },
+                                            onDragEnd = {
+                                                isDraggingResize = false
+                                                persistImageConfig(currentWidthPercent, currentHeightDp, isRatioLocked)
+                                            },
+                                            onDragCancel = {
+                                                isDraggingResize = false
+                                                persistImageConfig(currentWidthPercent, currentHeightDp, isRatioLocked)
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                val dy = dragAmount.y
+                                                val dx = dragAmount.x
+                                                if (isRatioLocked) {
+                                                    val delta = (dy + dx) / 2f
+                                                    currentHeightDp = (currentHeightDp + delta).coerceIn(120f, 900f)
+                                                } else {
+                                                    currentHeightDp = (currentHeightDp + dy).coerceIn(120f, 900f)
+                                                    if (dx > 25f && currentWidthPercent < 100) {
+                                                        currentWidthPercent = (currentWidthPercent + 5).coerceAtMost(100)
+                                                    } else if (dx < -25f && currentWidthPercent > 35) {
+                                                        currentWidthPercent = (currentWidthPercent - 5).coerceAtLeast(35)
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "↘",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = PureWhite
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

@@ -48,7 +48,7 @@
     <string name="drawer_stream_view_sub">Quick thought &amp; idea stream</string>
     <string name="drawer_whiteboard">Infinite Whiteboard</string>
     <string name="drawer_whiteboard_sub">Draggable cards and visual diagram</string>
-    <string name="drawer_vault_center">Vault Backup &amp; Restore</string>
+    <string name="drawer_vault_center">Backup &amp; Restore</string>
     <string name="drawer_vault_center_sub">Backup vault and restore data</string>
     <string name="drawer_trash_bin">Trash Bin</string>
     <string name="drawer_language">Language / Dil</string>
@@ -223,7 +223,7 @@
     <string name="trash_restored_toast">\"%1$s\" restored successfully!</string>
 
     <!-- Vault Backup & Restore Dialog -->
-    <string name="vault_title">Vault Backup &amp; Restore</string>
+    <string name="vault_title">Backup &amp; Restore</string>
     <string name="vault_subtitle">Archive and restore all your notes &amp; media</string>
     <string name="vault_export_title">Backup Vault (.purevault)</string>
     <string name="vault_export_backing_up">Preparing Backup Package...</string>

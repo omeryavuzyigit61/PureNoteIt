@@ -284,6 +284,7 @@ fun NoteDetailScreen(
     var showGatekeeperPinDialog by remember { mutableStateOf(false) }
     var gatekeeperPinInput by remember { mutableStateOf("") }
     var gatekeeperSuccessAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var resumeTriggerEpoch by remember { mutableLongStateOf(0L) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, isPassword) {
@@ -297,6 +298,7 @@ fun NoteDetailScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 noteViewModel.getAllNotes()
+                resumeTriggerEpoch = System.currentTimeMillis()
                 if (isPassword && !SecurityUtil.isVaultUnlocked) {
                     isAccessGranted = false
                     blocks.clear()
@@ -934,19 +936,42 @@ fun NoteDetailScreen(
     }
 
     // Sub-page synchronization: auto-clean deleted child notes and sync renamed titles
-    LaunchedEffect(allNotesForLinking) {
+    LaunchedEffect(allNotesForLinking, resumeTriggerEpoch) {
         if (allNotesForLinking.isNotEmpty() && isInitialLoadCompleted) {
             var blocksModified = false
             val toRemove = mutableListOf<NoteBlock>()
             for (i in blocks.indices) {
                 val b = blocks[i]
-                if (b.type == BlockType.SUB_PAGE && b.subPageNoteId != null) {
-                    val targetNote = allNotesForLinking.find { it.id == b.subPageNoteId }
-                    if (targetNote == null || targetNote.status == "TRASH") {
+                if (b.type == BlockType.SUB_PAGE) {
+                    val targetNote = if (b.subPageNoteId != null) {
+                        allNotesForLinking.find { it.id == b.subPageNoteId }
+                    } else {
+                        val trimmed = b.content.trim()
+                        if (trimmed.isNotBlank()) {
+                            allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
+                        } else if (currentNoteId != -1) {
+                            allNotesForLinking.find { it.richBlocksJson?.contains("\"parentNoteId\":$currentNoteId") == true }
+                        } else null
+                    }
+
+                    if (targetNote != null) {
+                        if (targetNote.status == "TRASH") {
+                            toRemove.add(b)
+                            blocksModified = true
+                        } else {
+                            val newTitle = targetNote.title
+                            val needTitleUpdate = !newTitle.isNullOrBlank() && b.content != newTitle
+                            val needIdUpdate = b.subPageNoteId != targetNote.id
+                            if (needTitleUpdate || needIdUpdate) {
+                                blocks[i] = b.copy(
+                                    content = if (needTitleUpdate) newTitle!! else b.content,
+                                    subPageNoteId = targetNote.id
+                                )
+                                blocksModified = true
+                            }
+                        }
+                    } else if (b.subPageNoteId != null) {
                         toRemove.add(b)
-                        blocksModified = true
-                    } else if (targetNote.title != null && targetNote.title!!.isNotBlank() && b.content != targetNote.title) {
-                        blocks[i] = b.copy(content = targetNote.title!!)
                         blocksModified = true
                     }
                 }

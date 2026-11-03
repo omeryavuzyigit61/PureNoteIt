@@ -48,7 +48,7 @@
     <string name="drawer_stream_view_sub">Hızlı düşünce ve fikir akışı</string>
     <string name="drawer_whiteboard">Sonsuz Tuval (Whiteboard)</string>
     <string name="drawer_whiteboard_sub">Sürüklenebilir kartlar ve görsel harita</string>
-    <string name="drawer_vault_center">Kasa Yedekleme &amp; Geri Yükleme</string>
+    <string name="drawer_vault_center">Yedekle ve Geri Yükle</string>
     <string name="drawer_vault_center_sub">Yedek al ve verileri geri yükle</string>
     <string name="drawer_trash_bin">Çöp Kutusu</string>
     <string name="drawer_language">Dil Seçimi / Language</string>
@@ -223,7 +223,7 @@
     <string name="trash_restored_toast">\"%1$s\" başarıyla geri yüklendi!</string>
 
     <!-- Vault Backup & Restore Dialog -->
-    <string name="vault_title">Kasa Yedekleme &amp; Geri Yükleme</string>
+    <string name="vault_title">Yedekle ve Geri Yükle</string>
     <string name="vault_subtitle">Tüm notlarınızı arşivleyin ve geri yükleyin</string>
     <string name="vault_export_title">Kasayı Yedekle (.purevault)</string>
     <string name="vault_export_backing_up">Yedek Paketi Hazırlanıyor...</string>

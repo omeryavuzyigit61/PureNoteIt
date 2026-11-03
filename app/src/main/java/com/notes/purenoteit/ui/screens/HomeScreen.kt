@@ -544,8 +544,6 @@ fun HomeScreen(
                         iconRes = R.drawable.category,
                         title = stringResource(R.string.drawer_template_hub),
                         subtitle = stringResource(R.string.drawer_template_hub_sub),
-                        badge = "PRO",
-                        badgeColor = VibrantOrange,
                         onClick = {
                             scope.launch { drawerState.close() }
                             showTemplateSheet = true
