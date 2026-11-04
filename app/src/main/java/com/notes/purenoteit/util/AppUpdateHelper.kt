@@ -48,9 +48,9 @@ object AppUpdateHelper {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val pInfo = getPackageInfo(context)
-            pInfo.versionName ?: "1.0.6"
+            pInfo.versionName ?: "1.0.7"
         } catch (e: Exception) {
-            "1.0.6"
+            "1.0.7"
         }
     }
 
@@ -64,7 +64,7 @@ object AppUpdateHelper {
                 pInfo.versionCode.toLong()
             }
         } catch (e: Exception) {
-            8L
+            11L
         }
     }
 
@@ -114,18 +114,18 @@ object AppUpdateHelper {
                     currentVersionName = currentVerName,
                     currentVersionCode = currentVerCode,
                     availableVersionCode = availableVerCode,
-                    availableVersionName = "v1.0.5",
+                    availableVersionName = "v1.0.7",
                     releaseNotesTr = listOf(
-                        "📐 Gelişmiş Matematik Formül Editörü: Kesirli ve köklü ifadeler, 160+ sembol.",
-                        "🖼️ Görsel Boyutlandırma: Windows tarzı köşe tutamacı ve oran kilidi.",
-                        "🕸️ 2D Bilgi Ağı: Bağlantı kopmaları giderildi, çift yönlü senkronizasyon.",
-                        "⚡ Koyu Tema & Başlatma: Açılış ve geçişteki beyaz ekran parlaması tamamen giderildi."
+                        "🛡️ 3 Katmanlı Uygulama Güvenlik Kalkanı (RASP, İmza Doğrulama ve XOR Kriptografik Maskeleme).",
+                        "🔗 Akıllı Not Bağlantıları: Başlık değiştiğinde bağlı notlarda otomatik senkronizasyon ve silinen not bağlantılarının otomatik temizlenmesi.",
+                        "☁️ Gelişmiş Kasa & Google Drive Yedekleme: Alt notlar, çizimler, görseller ve ses kayıtları için cihazlar arası %100 veri bütünlüğü.",
+                        "🔒 Kasa & Kategori Kilidi Güçlendirmesi: Üstel bekleme süreli brute-force koruması ve taşınabilir 60.000 iterasyonlu PBKDF2-AES-256 şifreleme."
                     ),
                     releaseNotesEn = listOf(
-                        "📐 Advanced Math Formula Engine: Fractions, roots, 160+ symbols.",
-                        "🖼️ Interactive Image Resizer: Corner resize handle & aspect ratio toggle.",
-                        "🕸️ 2D Knowledge Graph: Fixed link persistence & bi-directional sync.",
-                        "⚡ Dark Theme & Launch: Launch and transition white flash completely eliminated."
+                        "🛡️ 3-Layer Application Security Shield (RASP, Signature Tamper Verification & XOR Secret Masking).",
+                        "🔗 Smart Bi-Directional Note Links: Automatic cascade title sync across linked notes & automatic cleanup on note deletion.",
+                        "☁️ Hardened Vault & Google Drive Backup: 100% cross-device integrity for sub-pages, drawings, images, and audio recordings.",
+                        "🔒 Vault & Category Lock Hardening: Monotonic exponential backoff brute-force defense and 60,000-iteration PBKDF2-AES-256 portable encryption."
                     ),
                     playUpdateInfo = appUpdateInfo
                 )
@@ -195,18 +195,16 @@ object AppUpdateHelper {
             availableVersionCode = curCode,
             availableVersionName = "v$curName",
             releaseNotesTr = listOf(
-                "☁️ Google Drive & Bulut Otomatik Eşitleme: AES-256 E2EE şifreleme ile arka planda sessiz bulut senkronizasyonu.",
-                "📋 Görev Panosu (Kanban): Tek dokunuşla kart durum geçiş okları (◀ ▶), kategori filtre çipleri ve to-do ilerleme çubuğu.",
-                "🕸️ 2D Bilgi Ağı: Çoklu kategori neon renklendirmesi ve akıllı takımyıldızı odak filtresi.",
-                "🎨 Sol Menü (Drawer) İkon & Marka Yenileme: Tüm kopya ikonlar yerine özel Material vektörler ve yalın PureNoteIt kimliği.",
-                "🖼️ Görsel Boyutlandırıcı: Genişletilmiş üst aksiyon barı, yağ gibi pürüzsüz yatay boyutlandırma ve modern köşe tutamaç rozeti."
+                "🛡️ 3 Katmanlı Uygulama Güvenlik Kalkanı (RASP, İmza Doğrulama ve XOR Kriptografik Maskeleme).",
+                "🔗 Akıllı Not Bağlantıları: Başlık değiştiğinde bağlı notlarda otomatik senkronizasyon ve silinen not bağlantılarının otomatik temizlenmesi.",
+                "☁️ Gelişmiş Kasa & Google Drive Yedekleme: Alt notlar, çizimler, görseller ve ses kayıtları için cihazlar arası %100 veri bütünlüğü.",
+                "🔒 Kasa & Kategori Kilidi Güçlendirmesi: Üstel bekleme süreli brute-force koruması ve taşınabilir 60.000 iterasyonlu PBKDF2-AES-256 şifreleme."
             ),
             releaseNotesEn = listOf(
-                "☁️ Google Drive & Cloud Auto-Sync: Seamless background encrypted vault sync with AES-256-GCM (E2EE).",
-                "📋 Task Board (Kanban): 1-tap quick status transition arrows (◀ ▶), category filter chips, and task progress indicators.",
-                "🕸️ 2D Knowledge Graph: Category-based radiant neon coloring and interactive constellation focus filter.",
-                "🎨 Modern Drawer UI & Unified Branding: Replaced repeating generic icons with custom vector drawables.",
-                "🖼️ Fluid Image Resizer: Full-width top action row, ultra-smooth horizontal drag scaling, and modern corner handle."
+                "🛡️ 3-Layer Application Security Shield (RASP, Signature Tamper Verification & XOR Secret Masking).",
+                "🔗 Smart Bi-Directional Note Links: Automatic cascade title sync across linked notes & automatic cleanup on note deletion.",
+                "☁️ Hardened Vault & Google Drive Backup: 100% cross-device integrity for sub-pages, drawings, images, and audio recordings.",
+                "🔒 Vault & Category Lock Hardening: Monotonic exponential backoff brute-force defense and 60,000-iteration PBKDF2-AES-256 portable encryption."
             )
         )
     }
