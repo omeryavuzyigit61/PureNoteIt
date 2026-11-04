@@ -302,6 +302,7 @@ fun NoteDetailScreen(
                 resumeTriggerEpoch = System.currentTimeMillis()
                 if (isPassword && !SecurityUtil.isVaultUnlocked) {
                     isAccessGranted = false
+                    title = "🔒 Korumalı Not"
                     blocks.clear()
                 }
             }
@@ -389,7 +390,8 @@ fun NoteDetailScreen(
     }
 
     fun populateNoteBlocks(note: NoteData) {
-        val rawDesc = if (note.isEncrypted) {
+        title = note.title ?: ""
+        val rawDesc = if (note.isEncrypted || SecurityUtil.isEncryptedPayload(note.description)) {
             SecurityUtil.decrypt(note.description ?: "")
         } else {
             note.description ?: ""
@@ -464,16 +466,21 @@ fun NoteDetailScreen(
 
     val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
 
-    // Load existing note data
-    LaunchedEffect(noteId) {
+    // Load existing note data with managed RxJava Disposable
+    DisposableEffect(noteId) {
+        var disposable: io.reactivex.disposables.Disposable? = null
         if (noteId != -1) {
-            noteViewModel.getNoteById(noteId).subscribe({ note ->
+            disposable = noteViewModel.getNoteById(noteId).subscribe({ note ->
                 loadedNoteRef = note
                 currentNoteId = note.id
                 noteRichBlocksJson = note.richBlocksJson
-                title = note.title ?: ""
                 selectedIcon = note.icon
-                isPassword = note.isPassword ?: false
+                val isCatLocked = categoryList.find { it.id == (note.categoryId ?: 1) }?.isPassword == true
+                val requiresLock = (note.isPassword == true) ||
+                    note.isEncrypted ||
+                    SecurityUtil.isEncryptedPayload(note.description) ||
+                    isCatLocked
+                isPassword = requiresLock
                 isPinned = note.isPinned
                 selectedCategoryId = note.categoryId ?: 1
                 noteStatus = note.status ?: "TODO"
@@ -483,7 +490,8 @@ fun NoteDetailScreen(
                 reminderSound = note.reminderSound ?: "default"
                 isReminderDone = note.isReminderDone
 
-                if (note.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+                if (requiresLock && !SecurityUtil.isVaultUnlocked) {
+                    title = "🔒 Korumalı Not"
                     isAccessGranted = false
                     blocks.clear()
                     requestGatekeeperUnlock {
@@ -495,8 +503,7 @@ fun NoteDetailScreen(
                     populateNoteBlocks(note)
                     isInitialLoadCompleted = true
                 }
-            }, { error ->
-                android.util.Log.e("NoteDetailScreen", "Error loading note $noteId: ${error.message}")
+            }, { _ ->
             })
         } else {
             currentNoteId = -1
@@ -505,21 +512,39 @@ fun NoteDetailScreen(
             blocks.add(NoteBlock())
             isInitialLoadCompleted = true
         }
+        onDispose {
+            disposable?.dispose()
+        }
     }
 
     LaunchedEffect(Unit) {
         categoryViewModel.getAllCategories()
     }
 
-    // Category name resolver with safe fallback
+    // Category name & lock inheritance resolver with safe fallback
     LaunchedEffect(categoryList, selectedCategoryId) {
         if (categoryList.isNotEmpty()) {
             val cat = categoryList.find { it.id == selectedCategoryId }
-            if (cat != null) {
+            val resolvedCat = if (cat != null) {
                 selectedCategoryName = cat.name
+                cat
             } else {
-                selectedCategoryId = categoryList.first().id
-                selectedCategoryName = categoryList.first().name
+                val firstCat = categoryList.first()
+                selectedCategoryId = firstCat.id
+                selectedCategoryName = firstCat.name
+                firstCat
+            }
+            if (resolvedCat.isPassword == true) {
+                isPassword = true
+                if (noteId != -1 && !SecurityUtil.isVaultUnlocked && isAccessGranted) {
+                    title = "🔒 Korumalı Not"
+                    isAccessGranted = false
+                    blocks.clear()
+                    requestGatekeeperUnlock {
+                        loadedNoteRef?.let { populateNoteBlocks(it) }
+                        isInitialLoadCompleted = true
+                    }
+                }
             }
         }
     }
@@ -747,7 +772,6 @@ fun NoteDetailScreen(
         val jsonContent = BlockParser.serialize(blocks)
         val total = blocks.count { it.type == BlockType.TODO }
         val completed = blocks.count { it.type == BlockType.TODO && it.isChecked }
-        val finalContent = if (isPassword) SecurityUtil.encrypt(jsonContent) else jsonContent
         val images = blocks.filter { it.type == BlockType.IMAGE && it.mediaPath != null }.map { it.mediaPath!! }
         val sounds = blocks.filter { it.type == BlockType.AUDIO && it.mediaPath != null }.map { it.mediaPath!! }
 
@@ -759,17 +783,21 @@ fun NoteDetailScreen(
             1
         }
 
+        val isSelectedCategoryLocked = categoryList.find { it.id == validCategoryId }?.isPassword == true
+        val effectiveLocked = isPassword || isSelectedCategoryLocked
+        val finalContent = if (effectiveLocked) SecurityUtil.encrypt(jsonContent) else jsonContent
+
         val note = NoteData(
             title = if (title.isBlank()) "Başlıksız Not" else title.trim(),
             description = finalContent,
             date = if (noteDate > 0) noteDate else System.currentTimeMillis(),
             images = images,
-            isPassword = isPassword,
+            isPassword = effectiveLocked,
             categoryId = validCategoryId,
             sounds = sounds,
             isPinned = isPinned,
             icon = selectedIcon,
-            isEncrypted = isPassword,
+            isEncrypted = effectiveLocked,
             totalTasks = total,
             completedTasks = completed,
             status = targetStatus,

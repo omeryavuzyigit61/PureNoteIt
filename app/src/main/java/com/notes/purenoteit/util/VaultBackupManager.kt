@@ -54,24 +54,29 @@ object VaultBackupManager {
                 val rawNotes = noteRepository.getAllNotes().blockingGet() ?: emptyList()
                 val categories = categoryRepository.getAllCategories().blockingGet() ?: emptyList()
                 val links = knowledgeRepository.getAllLinks().blockingGet() ?: emptyList()
+                val lockedCategoryIds = categories.filter { it.isPassword == true }.map { it.id }.toSet()
 
-                // Convert any hardware-bound ENC_V2 note descriptions into portable AES-256-GCM (ENC:)
-                // so the backup can be safely restored even on a different device.
+                // Convert any hardware-bound ENC_V2 note descriptions into 60k-iteration portable AES-256-GCM (ENC_P2:)
+                // and ensure notes in locked categories are encrypted as well.
                 val portableNotes = rawNotes.map { note ->
                     val desc = note.description
+                    val isNoteOrCategoryLocked = (note.isPassword == true) ||
+                        note.isEncrypted ||
+                        (note.categoryId != null && note.categoryId in lockedCategoryIds)
                     val portableDesc = when {
                         desc != null && desc.startsWith("ENC_V2:") -> {
                             val plain = SecurityUtil.decrypt(desc)
                             SecurityUtil.encryptPortable(plain)
                         }
-                        note.isPassword == true && !desc.isNullOrBlank() && !SecurityUtil.isEncryptedPayload(desc) -> {
+                        isNoteOrCategoryLocked && !desc.isNullOrBlank() && !SecurityUtil.isEncryptedPayload(desc) -> {
                             SecurityUtil.encryptPortable(desc)
                         }
                         else -> desc
                     }
                     note.copy(
                         description = portableDesc,
-                        isEncrypted = note.isEncrypted || (note.isPassword == true)
+                        isPassword = isNoteOrCategoryLocked,
+                        isEncrypted = isNoteOrCategoryLocked
                     ).also { it.id = note.id }
                 }
 
@@ -218,7 +223,7 @@ object VaultBackupManager {
                 // Restore notes via NoteRepository (re-wrapping encrypted notes into hardware AndroidKeyStore ENC_V2)
                 payload.notes.forEach { note ->
                     val desc = note.description
-                    if (desc != null && desc.startsWith("ENC:")) {
+                    if (desc != null && (desc.startsWith("ENC:") || desc.startsWith("ENC_P2:"))) {
                         val plain = SecurityUtil.decrypt(desc)
                         note.description = SecurityUtil.encrypt(plain)
                     }
@@ -248,6 +253,11 @@ object VaultBackupManager {
     private const val KEY_FOLDER_NAME = "auto_sync_folder_name"
     private const val KEY_LAST_SYNC_TIME = "auto_sync_last_time"
     const val AUTO_BACKUP_FILENAME = "PureNoteIt_AutoVault.purevault"
+
+    private val isAutoSyncRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val autoSyncDebounceHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pendingAutoSyncRunnable: Runnable? = null
+    private const val AUTO_SYNC_DEBOUNCE_MS = 3500L
 
     fun isAutoSyncEnabled(context: Context): Boolean {
         val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
@@ -334,7 +344,31 @@ object VaultBackupManager {
     }
 
     /**
-     * Performs a background E2EE auto-backup to Google Drive / Cloud folder.
+     * Debounces rapid auto-sync triggers (e.g. while typing/saving notes) so disk and SAF
+     * streams are only written once after edits settle.
+     */
+    fun scheduleDebouncedAutoSync(
+        context: Context,
+        noteRepository: NoteRepository,
+        categoryRepository: CategoryRepository,
+        knowledgeRepository: KnowledgeRepository
+    ) {
+        if (!isAutoSyncEnabled(context) || getConnectedFolderUri(context) == null) return
+        pendingAutoSyncRunnable?.let { autoSyncDebounceHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            performAutoSync(
+                context = context,
+                noteRepository = noteRepository,
+                categoryRepository = categoryRepository,
+                knowledgeRepository = knowledgeRepository
+            )
+        }
+        pendingAutoSyncRunnable = runnable
+        autoSyncDebounceHandler.postDelayed(runnable, AUTO_SYNC_DEBOUNCE_MS)
+    }
+
+    /**
+     * Performs a single-flight background E2EE auto-backup to Google Drive / Cloud folder.
      */
     fun performAutoSync(
         context: Context,
@@ -349,6 +383,11 @@ object VaultBackupManager {
             return
         }
 
+        if (!isAutoSyncRunning.compareAndSet(false, true)) {
+            onComplete?.invoke(false)
+            return
+        }
+
         createBackup(
             context = context,
             noteRepository = noteRepository,
@@ -356,10 +395,16 @@ object VaultBackupManager {
             knowledgeRepository = knowledgeRepository,
             onSuccess = { backupFile ->
                 Schedulers.io().scheduleDirect {
-                    val success = saveBackupToTreeUri(context, backupFile, treeUri)
-                    if (success) {
-                        val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
-                        sp.edit().putLong(KEY_LAST_SYNC_TIME, System.currentTimeMillis()).apply()
+                    var success = false
+                    try {
+                        success = saveBackupToTreeUri(context, backupFile, treeUri)
+                        if (success) {
+                            val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
+                            sp.edit().putLong(KEY_LAST_SYNC_TIME, System.currentTimeMillis()).apply()
+                        }
+                    } finally {
+                        runCatching { backupFile.delete() }
+                        isAutoSyncRunning.set(false)
                     }
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
                         onComplete?.invoke(success)
@@ -367,6 +412,7 @@ object VaultBackupManager {
                 }
             },
             onError = {
+                isAutoSyncRunning.set(false)
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     onComplete?.invoke(false)
                 }

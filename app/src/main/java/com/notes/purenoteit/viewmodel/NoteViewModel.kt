@@ -330,7 +330,9 @@ class NoteViewModel @Inject constructor(
                 newNote.id = generatedId.toInt()
                 knowledgeRepository.markStreamItemsProcessed(selectedIds, newNote.id)
                     .subscribeOn(Schedulers.io())
+                    .onErrorComplete()
                     .subscribe()
+                    .let { compositeDisposable.add(it) }
                 getAllNotes()
                 notifyWidgetSync()
                 loadStreamItems()
@@ -371,7 +373,7 @@ class NoteViewModel @Inject constructor(
 
     fun triggerAutoSync() {
         if (VaultBackupManager.isAutoSyncEnabled(context)) {
-            VaultBackupManager.performAutoSync(
+            VaultBackupManager.scheduleDebouncedAutoSync(
                 context = context,
                 noteRepository = repository,
                 categoryRepository = categoryRepository,
