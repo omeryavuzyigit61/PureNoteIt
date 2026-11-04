@@ -9,7 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -40,14 +41,17 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -59,6 +63,9 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -126,7 +133,7 @@ private val PALETTE_COLORS = listOf(
  * - Animated Brush Thickness Slider with live physical size preview bubble (2px - 48px)
  * - Ultra HD PNG rendering and block persistence
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun DrawingCanvasSheet(
     existingImagePath: String? = null,
@@ -134,8 +141,14 @@ fun DrawingCanvasSheet(
     onSaveDrawing: (filePath: String) -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Lock sheet drag-to-dismiss so resting a palm or drawing downward never pulls the sheet down
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue -> targetValue != SheetValue.Hidden }
+    )
 
     val baseBitmap = remember(existingImagePath) {
         existingImagePath?.let { path ->
@@ -153,6 +166,13 @@ fun DrawingCanvasSheet(
     var selectedColor by remember { mutableStateOf(PALETTE_COLORS[0]) }
     var strokeThickness by remember { mutableFloatStateOf(8f) }
 
+    // Universal Stylus & Palm Rejection State:
+    // Starts in Hybrid Mode (Finger + Stylus enabled) so users without a stylus can draw immediately.
+    // Automatically locks to Stylus-Only when a hardware Stylus touches the screen, or can be toggled manually.
+    var isPalmRejectionLocked by remember { mutableStateOf(false) }
+    var userManuallyToggledMode by remember { mutableStateOf(false) }
+    var isHardwareEraserActive by remember { mutableStateOf(false) }
+
     var dragStart by remember { mutableStateOf(Offset.Zero) }
     var dragCurrent by remember { mutableStateOf(Offset.Zero) }
     var isDragging by remember { mutableStateOf(false) }
@@ -162,6 +182,13 @@ fun DrawingCanvasSheet(
     var snapTimerJob by remember { mutableStateOf<Job?>(null) }
 
     var canvasSize by remember { mutableStateOf(IntSize(1080, 1080)) }
+
+    val currentToolState by rememberUpdatedState(selectedTool)
+    val currentColorState by rememberUpdatedState(selectedColor)
+    val currentThicknessState by rememberUpdatedState(strokeThickness)
+    val palmRejectionLockedState by rememberUpdatedState(isPalmRejectionLocked)
+    val userManualModeState by rememberUpdatedState(userManuallyToggledMode)
+    val palmContactThresholdPx = with(density) { 46.dp.toPx() }
 
     fun saveDrawingToPng() {
         if (items.isEmpty() && baseBitmap == null) {
@@ -291,23 +318,46 @@ fun DrawingCanvasSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(
+                    state = rememberScrollState(),
+                    enabled = !isDragging && !isPalmRejectionLocked
+                )
                 .padding(14.dp)
         ) {
-            // Header: Title + Actions (Undo, Clear, Save)
+            // Header: Close + Title + Actions (Undo, Clear, Save)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = if (existingImagePath != null) stringResource(R.string.drawing_title_edit) else stringResource(R.string.drawing_title_canvas),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f, fill = false)
-                )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                            .clickable { onDismiss() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "✕",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (existingImagePath != null) stringResource(R.string.drawing_title_edit) else stringResource(R.string.drawing_title_canvas),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -365,7 +415,61 @@ fun DrawingCanvasSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Stylus & Palm Rejection Control Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (isPalmRejectionLocked) VibrantOrange.copy(alpha = 0.12f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isPalmRejectionLocked) VibrantOrange.copy(alpha = 0.45f)
+                        else BorderLight.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .clickable {
+                        isPalmRejectionLocked = !isPalmRejectionLocked
+                        userManuallyToggledMode = true
+                    }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = if (isPalmRejectionLocked) "🖊️ Avuç İçi Kilidi: Açık (Sadece Kalem)" else "👆 Parmak & Kalem Modu (Avuç Filtreli)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPalmRejectionLocked) VibrantOrange else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isPalmRejectionLocked) VibrantOrange else MaterialTheme.colorScheme.surface)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (isPalmRejectionLocked) "Parmak Aç" else "Sadece Kalem",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPalmRejectionLocked) PureWhite else VibrantOrange
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Tool Switcher: Primary Tools (Kalem & Silgi Yan Yana) + Shape Palette
             Row(
@@ -437,101 +541,225 @@ fun DrawingCanvasSheet(
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(selectedTool, strokeThickness, selectedColor) {
-                            detectDragGestures(
-                                onDragStart = { offset ->
-                                    isDragging = true
-                                    dragStart = offset
-                                    dragCurrent = offset
-                                    isSnappedToLine = false
+                        .pointerInput(Unit) {
+                            fun startStroke(offset: Offset, hardwareEraser: Boolean) {
+                                isHardwareEraserActive = hardwareEraser
+                                val activeTool = if (hardwareEraser) DrawingTool.ERASER else currentToolState
+                                isDragging = true
+                                dragStart = offset
+                                dragCurrent = offset
+                                isSnappedToLine = false
 
-                                    if (selectedTool == DrawingTool.PEN || selectedTool == DrawingTool.ERASER) {
-                                        currentPoints.clear()
-                                        currentPoints.add(offset)
+                                if (activeTool == DrawingTool.PEN || activeTool == DrawingTool.ERASER) {
+                                    currentPoints.clear()
+                                    currentPoints.add(offset)
 
-                                        // Start Snap-to-Line Timer (Apple Notes style: 450ms stationary holds snap line)
-                                        if (selectedTool == DrawingTool.PEN) {
-                                            snapTimerJob?.cancel()
-                                            snapTimerJob = scope.launch {
-                                                delay(450L)
-                                                if (isDragging && currentPoints.size > 5) {
-                                                    isSnappedToLine = true
-                                                }
+                                    if (activeTool == DrawingTool.PEN) {
+                                        snapTimerJob?.cancel()
+                                        snapTimerJob = scope.launch {
+                                            delay(450L)
+                                            if (isDragging && currentPoints.size > 5) {
+                                                isSnappedToLine = true
                                             }
                                         }
                                     }
-                                },
-                                onDrag = { change, _ ->
-                                    change.consume()
-                                    dragCurrent = change.position
+                                }
+                            }
 
-                                    if (selectedTool == DrawingTool.PEN || selectedTool == DrawingTool.ERASER) {
-                                        currentPoints.add(change.position)
+                            fun moveStroke(positions: List<Offset>, finalPosition: Offset) {
+                                val activeTool = if (isHardwareEraserActive) DrawingTool.ERASER else currentToolState
+                                dragCurrent = finalPosition
 
-                                        // If finger moves quickly, reset snap timer unless already snapped
-                                        if (!isSnappedToLine && selectedTool == DrawingTool.PEN) {
-                                            snapTimerJob?.cancel()
-                                            snapTimerJob = scope.launch {
-                                                delay(450L)
-                                                if (isDragging && currentPoints.size > 5) {
-                                                    isSnappedToLine = true
-                                                }
+                                if (activeTool == DrawingTool.PEN || activeTool == DrawingTool.ERASER) {
+                                    for (pt in positions) {
+                                        currentPoints.add(pt)
+                                    }
+
+                                    if (!isSnappedToLine && activeTool == DrawingTool.PEN) {
+                                        snapTimerJob?.cancel()
+                                        snapTimerJob = scope.launch {
+                                            delay(450L)
+                                            if (isDragging && currentPoints.size > 5) {
+                                                isSnappedToLine = true
                                             }
                                         }
                                     }
-                                },
-                                onDragEnd = {
-                                    snapTimerJob?.cancel()
+                                }
+                            }
 
-                                    if (selectedTool == DrawingTool.PEN || selectedTool == DrawingTool.ERASER) {
-                                        if (isSnappedToLine && currentPoints.size >= 2) {
-                                            // Commit straight line (start -> current)
-                                            items.add(
-                                                CanvasItem(
-                                                    tool = DrawingTool.LINE,
-                                                    points = emptyList(),
-                                                    start = currentPoints.first(),
-                                                    end = dragCurrent,
-                                                    color = selectedColor,
-                                                    strokeWidth = strokeThickness
-                                                )
-                                            )
-                                        } else if (currentPoints.isNotEmpty()) {
-                                            items.add(
-                                                CanvasItem(
-                                                    tool = selectedTool,
-                                                    points = currentPoints.toList(),
-                                                    color = if (selectedTool == DrawingTool.ERASER) PureWhite else selectedColor,
-                                                    strokeWidth = strokeThickness,
-                                                    isEraser = selectedTool == DrawingTool.ERASER
-                                                )
-                                            )
-                                        }
-                                        currentPoints.clear()
-                                    } else {
-                                        // Commit Geometric Shape
+                            fun finishStroke() {
+                                snapTimerJob?.cancel()
+                                if (!isDragging) return
+                                val activeTool = if (isHardwareEraserActive) DrawingTool.ERASER else currentToolState
+
+                                if (activeTool == DrawingTool.PEN || activeTool == DrawingTool.ERASER) {
+                                    if (isSnappedToLine && currentPoints.size >= 2) {
                                         items.add(
                                             CanvasItem(
-                                                tool = selectedTool,
+                                                tool = DrawingTool.LINE,
                                                 points = emptyList(),
-                                                start = dragStart,
+                                                start = currentPoints.first(),
                                                 end = dragCurrent,
-                                                color = selectedColor,
-                                                strokeWidth = strokeThickness
+                                                color = currentColorState,
+                                                strokeWidth = currentThicknessState
+                                            )
+                                        )
+                                    } else if (currentPoints.isNotEmpty()) {
+                                        val pointsCopy = if (currentPoints.size == 1) {
+                                            listOf(currentPoints[0], Offset(currentPoints[0].x + 0.5f, currentPoints[0].y + 0.5f))
+                                        } else {
+                                            currentPoints.toList()
+                                        }
+                                        items.add(
+                                            CanvasItem(
+                                                tool = activeTool,
+                                                points = pointsCopy,
+                                                color = if (activeTool == DrawingTool.ERASER) PureWhite else currentColorState,
+                                                strokeWidth = currentThicknessState,
+                                                isEraser = activeTool == DrawingTool.ERASER
                                             )
                                         )
                                     }
-
-                                    isDragging = false
-                                    isSnappedToLine = false
-                                },
-                                onDragCancel = {
-                                    snapTimerJob?.cancel()
-                                    isDragging = false
                                     currentPoints.clear()
-                                    isSnappedToLine = false
+                                } else {
+                                    items.add(
+                                        CanvasItem(
+                                            tool = activeTool,
+                                            points = emptyList(),
+                                            start = dragStart,
+                                            end = dragCurrent,
+                                            color = currentColorState,
+                                            strokeWidth = currentThicknessState
+                                        )
+                                    )
                                 }
-                            )
+
+                                isDragging = false
+                                isSnappedToLine = false
+                                isHardwareEraserActive = false
+                            }
+
+                            fun cancelStroke() {
+                                snapTimerJob?.cancel()
+                                isDragging = false
+                                currentPoints.clear()
+                                isSnappedToLine = false
+                                isHardwareEraserActive = false
+                            }
+
+                            awaitEachGesture {
+                                var activePointerId: PointerId? = null
+                                var activePointerIsStylus = false
+
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Main)
+                                    val changes = event.changes
+
+                                    // Always consume all pointer events on the canvas so rejected palm touches
+                                    // never leak up to the ModalBottomSheet or ScrollView.
+                                    changes.forEach { it.consume() }
+
+                                    // 1. Check for Hardware Stylus / Eraser (Universal: S-Pen, Xiaomi, Huawei, Lenovo, USI 2.0)
+                                    val stylusChange = changes.firstOrNull {
+                                        it.type == PointerType.Stylus || it.type == PointerType.Eraser
+                                    }
+
+                                    if (stylusChange != null) {
+                                        // Auto-enable Palm Rejection Lock the first instant a hardware stylus touches the screen
+                                        if (!palmRejectionLockedState && !userManualModeState) {
+                                            isPalmRejectionLocked = true
+                                        }
+
+                                        // If a palm/finger touch accidentally started right before the stylus tip landed,
+                                        // discard the accidental finger trace and switch immediately to the stylus!
+                                        if (activePointerId != null && !activePointerIsStylus) {
+                                            cancelStroke()
+                                            activePointerId = null
+                                        }
+
+                                        if (stylusChange.pressed) {
+                                            if (activePointerId == null) {
+                                                activePointerId = stylusChange.id
+                                                activePointerIsStylus = true
+                                                startStroke(
+                                                    offset = stylusChange.position,
+                                                    hardwareEraser = stylusChange.type == PointerType.Eraser
+                                                )
+                                            } else if (activePointerId == stylusChange.id) {
+                                                val points = buildList {
+                                                    stylusChange.historical.forEach { add(it.position) }
+                                                    add(stylusChange.position)
+                                                }
+                                                moveStroke(points, stylusChange.position)
+                                            }
+                                        } else if (activePointerId == stylusChange.id) {
+                                            // Stylus lifted: commit stroke immediately even if palm is still resting on screen!
+                                            finishStroke()
+                                            activePointerId = null
+                                            activePointerIsStylus = false
+                                        }
+                                    } else if (!palmRejectionLockedState) {
+                                        // 2. Finger & Passive Capacitive Stylus Mode (with Geometric & Anatomical Palm Filtering)
+                                        val pressedTouches = changes.filter { it.pressed && it.type == PointerType.Touch }
+
+                                        // Multi-touch palm cluster detection (3+ simultaneous touch points = resting palm)
+                                        if (pressedTouches.size >= 3) {
+                                            if (isDragging && currentPoints.size <= 8) {
+                                                cancelStroke()
+                                            } else if (isDragging) {
+                                                finishStroke()
+                                            }
+                                            activePointerId = null
+                                            activePointerIsStylus = false
+                                        } else if (activePointerId != null) {
+                                            // If palm landed at the bottom first (<= 6 pts) and passive pen/finger tip landed higher up,
+                                            // switch tracking from the lower wrist touch to the upper pen/finger tip!
+                                            val currentTracked = pressedTouches.firstOrNull { it.id == activePointerId }
+                                            val upperTipCandidate = if (pressedTouches.size == 2 && currentPoints.size <= 6 && currentTracked != null) {
+                                                pressedTouches.firstOrNull {
+                                                    it.id != activePointerId && (currentTracked.position.y - it.position.y) > palmContactThresholdPx
+                                                }
+                                            } else null
+
+                                            if (upperTipCandidate != null) {
+                                                cancelStroke()
+                                                activePointerId = upperTipCandidate.id
+                                                activePointerIsStylus = false
+                                                startStroke(offset = upperTipCandidate.position, hardwareEraser = false)
+                                            } else if (currentTracked != null && currentTracked.pressed) {
+                                                val points = buildList {
+                                                    currentTracked.historical.forEach { add(it.position) }
+                                                    add(currentTracked.position)
+                                                }
+                                                moveStroke(points, currentTracked.position)
+                                            } else {
+                                                finishStroke()
+                                                activePointerId = null
+                                                activePointerIsStylus = false
+                                            }
+                                        } else if (pressedTouches.isNotEmpty()) {
+                                            // Choose the uppermost touch point (pen/finger tip is anatomically above resting wrist)
+                                            val candidate = pressedTouches.minByOrNull { it.position.y }!!
+                                            val isFlatPalmPressure = candidate.pressure > 0.94f && pressedTouches.size >= 2
+                                            if (!isFlatPalmPressure) {
+                                                activePointerId = candidate.id
+                                                activePointerIsStylus = false
+                                                startStroke(offset = candidate.position, hardwareEraser = false)
+                                            }
+                                        }
+                                    }
+
+                                    // Exit gesture loop once all pointers (including any resting palm) have lifted
+                                    if (changes.none { it.pressed }) {
+                                        if (activePointerId != null) {
+                                            finishStroke()
+                                            activePointerId = null
+                                            activePointerIsStylus = false
+                                        }
+                                        break
+                                    }
+                                }
+                            }
                         }
                 ) {
                     // 0. Render existing base bitmap if editing an existing sketch
@@ -623,10 +851,11 @@ fun DrawingCanvasSheet(
 
                     // 2. Real-time Live Drag Drawing
                     if (isDragging) {
-                        val activeColor = if (selectedTool == DrawingTool.ERASER) PureWhite else selectedColor
+                        val effectiveTool = if (isHardwareEraserActive) DrawingTool.ERASER else selectedTool
+                        val activeColor = if (effectiveTool == DrawingTool.ERASER) PureWhite else selectedColor
                         val liveStroke = Stroke(width = strokeThickness, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
-                        when (selectedTool) {
+                        when (effectiveTool) {
                             DrawingTool.PEN -> {
                                 if (isSnappedToLine && currentPoints.isNotEmpty()) {
                                     // Snapped to straight line: dynamic angle and length from start to drag position!

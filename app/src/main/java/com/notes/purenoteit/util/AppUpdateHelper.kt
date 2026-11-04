@@ -78,6 +78,28 @@ object AppUpdateHelper {
     }
 
     /**
+     * Dynamically computes the target semantic version name from the Google Play versionCode delta
+     * so the update dialog never displays a stale or hardcoded past version string.
+     */
+    private fun resolveAvailableVersionName(
+        currentVersionName: String,
+        currentVersionCode: Long,
+        availableVersionCode: Long
+    ): String {
+        val delta = (availableVersionCode - currentVersionCode).coerceAtLeast(1L)
+        val clean = currentVersionName.removePrefix("v").trim()
+        val parts = clean.split(".")
+        return if (parts.size >= 3) {
+            val major = parts[0].toIntOrNull() ?: 1
+            val minor = parts[1].toIntOrNull() ?: 0
+            val patch = (parts[2].toIntOrNull() ?: 0) + delta.toInt()
+            "v$major.$minor.$patch"
+        } else {
+            "v$clean (Build $availableVersionCode)"
+        }
+    }
+
+    /**
      * Checks Google Play Store for in-app updates.
      */
     fun checkForAppUpdate(
@@ -110,11 +132,16 @@ object AppUpdateHelper {
 
             if (availability == UpdateAvailability.UPDATE_AVAILABLE) {
                 Log.d(TAG, "Update available via Google Play! Code: $availableVerCode")
+                val dynamicTargetVersion = resolveAvailableVersionName(
+                    currentVersionName = currentVerName,
+                    currentVersionCode = currentVerCode,
+                    availableVersionCode = availableVerCode
+                )
                 val updateData = AppUpdateData(
                     currentVersionName = currentVerName,
                     currentVersionCode = currentVerCode,
                     availableVersionCode = availableVerCode,
-                    availableVersionName = "v1.0.7",
+                    availableVersionName = dynamicTargetVersion,
                     releaseNotesTr = listOf(
                         "🛡️ 3 Katmanlı Uygulama Güvenlik Kalkanı (RASP, İmza Doğrulama ve XOR Kriptografik Maskeleme).",
                         "🔗 Akıllı Not Bağlantıları: Başlık değiştiğinde bağlı notlarda otomatik senkronizasyon ve silinen not bağlantılarının otomatik temizlenmesi.",

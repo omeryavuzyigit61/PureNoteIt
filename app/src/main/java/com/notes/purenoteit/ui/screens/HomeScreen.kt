@@ -108,6 +108,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -2003,11 +2004,13 @@ private fun NotionRecentCoverCard(
     )
     val colorIndex = kotlin.math.abs((note.id * 31 + (note.categoryId ?: 0)).hashCode()) % coverColorsLight.size
     val coverColor = if (isDark) coverColorsDark[colorIndex] else coverColorsLight[colorIndex]
+    val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.35f)
+    val cardHeight = (132f * fontScale).dp
 
     Surface(
         modifier = modifier
             .width(135.dp)
-            .height(125.dp)
+            .height(cardHeight)
             .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
@@ -2019,11 +2022,11 @@ private fun NotionRecentCoverCard(
         shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Top Cover Banner (40% height)
+            // Top Cover Banner
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(46.dp)
+                    .height(42.dp)
                     .background(coverColor)
             )
 
@@ -2036,8 +2039,8 @@ private fun NotionRecentCoverCard(
                 // Emoji Icon Badge positioned at the boundary
                 Box(
                     modifier = Modifier
-                        .offset(y = (-14).dp)
-                        .size(28.dp)
+                        .offset(y = (-13).dp)
+                        .size(26.dp)
                         .clip(RoundedCornerShape(7.dp))
                         .background(if (isDark) Color(0xFF26262B) else PureWhite)
                         .border(
@@ -2054,52 +2057,71 @@ private fun NotionRecentCoverCard(
                             !note.icon.isNullOrBlank() -> note.icon!!
                             else -> "📄"
                         },
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
 
-                // Title and Date
+                // Title and Date (Bottom row is unweighted so Compose measures it first and never clips it)
                 val isProtectedTitle = note.isPassword == true || note.isEncrypted || cat?.isPassword == true
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 18.dp, bottom = 6.dp),
+                        .fillMaxSize()
+                        .padding(top = 15.dp, bottom = 7.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = when {
-                            isProtectedTitle -> "******"
-                            note.title.isNullOrBlank() -> stringResource(R.string.untitled_note)
-                            else -> note.title!!
-                        },
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) PureWhite else MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 15.sp
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.TopStart
+                    ) {
+                        Text(
+                            text = when {
+                                isProtectedTitle -> "******"
+                                note.title.isNullOrBlank() -> stringResource(R.string.untitled_note)
+                                else -> note.title!!
+                            },
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) PureWhite else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 14.5.sp,
+                            style = TextStyle(
+                                platformStyle = PlatformTextStyle(includeFontPadding = false)
+                            )
+                        )
+                    }
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
                             text = SimpleDateFormat("d MMM", Locale.getDefault()).format(note.date),
                             fontSize = 9.5.sp,
-                            color = if (isDark) PureWhite.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                            color = if (isDark) PureWhite.copy(alpha = 0.55f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                            maxLines = 1,
+                            softWrap = false,
+                            style = TextStyle(
+                                platformStyle = PlatformTextStyle(includeFontPadding = false)
+                            )
                         )
                         if (cat != null) {
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = cat.name,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = VibrantOrange,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                style = TextStyle(
+                                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+                                )
                             )
                         }
                     }
