@@ -52,12 +52,14 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1371,10 +1373,28 @@ fun NotionBlockRow(
                     } catch (e: Exception) { true }
                 }
 
-                var currentHeightDp by remember(block.id, parsedHeight) { mutableFloatStateOf(parsedHeight) }
-                var currentWidthPercent by remember(block.id, parsedWidth) { mutableIntStateOf(parsedWidth) }
-                var isRatioLocked by remember(block.id, parsedLock) { mutableStateOf(parsedLock) }
+                var currentHeightDp by remember(block.id) { mutableFloatStateOf(parsedHeight) }
+                var currentWidthPercent by remember(block.id) { mutableIntStateOf(parsedWidth) }
+                var isRatioLocked by remember(block.id) { mutableStateOf(parsedLock) }
                 var isDraggingResize by remember { mutableStateOf(false) }
+
+                LaunchedEffect(parsedHeight) {
+                    if (!isDraggingResize) {
+                        currentHeightDp = parsedHeight
+                    }
+                }
+                LaunchedEffect(parsedWidth) {
+                    if (!isDraggingResize) {
+                        currentWidthPercent = parsedWidth
+                    }
+                }
+                LaunchedEffect(parsedLock) {
+                    isRatioLocked = parsedLock
+                }
+
+                val currentWidthPercentState by rememberUpdatedState(currentWidthPercent)
+                val currentHeightDpState by rememberUpdatedState(currentHeightDp)
+                val isRatioLockedState by rememberUpdatedState(isRatioLocked)
 
                 fun persistImageConfig(w: Int, h: Float, lock: Boolean) {
                     try {
@@ -1494,17 +1514,17 @@ fun NotionBlockRow(
                                             },
                                             onDragEnd = {
                                                 isDraggingResize = false
-                                                persistImageConfig(currentWidthPercent, currentHeightDp, isRatioLocked)
+                                                persistImageConfig(currentWidthPercentState, currentHeightDpState, isRatioLockedState)
                                             },
                                             onDragCancel = {
                                                 isDraggingResize = false
-                                                persistImageConfig(currentWidthPercent, currentHeightDp, isRatioLocked)
+                                                persistImageConfig(currentWidthPercentState, currentHeightDpState, isRatioLockedState)
                                             },
                                             onDrag = { change, dragAmount ->
                                                 change.consume()
                                                 val dy = dragAmount.y
                                                 val dx = dragAmount.x
-                                                if (isRatioLocked) {
+                                                if (isRatioLockedState) {
                                                     val delta = (dy + dx) / 2f
                                                     currentHeightDp = (currentHeightDp + delta).coerceIn(120f, 900f)
                                                 } else {
