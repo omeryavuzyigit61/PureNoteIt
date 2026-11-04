@@ -29,7 +29,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,6 +70,9 @@ fun ZenReadingModeView(
     onExit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var zenPreviewPath by remember { mutableStateOf<String?>(null) }
+    var zenPreviewIsDrawing by remember { mutableStateOf(false) }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -142,7 +148,14 @@ fun ZenReadingModeView(
             }
 
             items(blocks) { block ->
-                ZenBlockContent(block = block, audioRecorder = audioRecorder)
+                ZenBlockContent(
+                    block = block,
+                    audioRecorder = audioRecorder,
+                    onPreviewMedia = { path, isDrawing ->
+                        zenPreviewPath = path
+                        zenPreviewIsDrawing = isDrawing
+                    }
+                )
             }
 
             item {
@@ -201,13 +214,22 @@ fun ZenReadingModeView(
                 }
             }
         }
+
+        zenPreviewPath?.let { path ->
+            MediaLightboxDialog(
+                imagePath = path,
+                isDrawing = zenPreviewIsDrawing,
+                onDismiss = { zenPreviewPath = null }
+            )
+        }
     }
 }
 
 @Composable
 private fun ZenBlockContent(
     block: NoteBlock,
-    audioRecorder: AudioRecorder
+    audioRecorder: AudioRecorder,
+    onPreviewMedia: (path: String, isDrawing: Boolean) -> Unit
 ) {
     when (block.type) {
         BlockType.HEADING_1 -> {
@@ -338,6 +360,7 @@ private fun ZenBlockContent(
                             .height(240.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .border(1.dp, BorderLight, RoundedCornerShape(16.dp))
+                            .clickable { onPreviewMedia(imgPath, false) }
                     )
                 }
             }
@@ -358,6 +381,7 @@ private fun ZenBlockContent(
                             .clip(RoundedCornerShape(16.dp))
                             .background(Color.White)
                             .border(1.dp, BorderLight, RoundedCornerShape(16.dp))
+                            .clickable { onPreviewMedia(drawingPath, true) }
                     )
                 }
             }

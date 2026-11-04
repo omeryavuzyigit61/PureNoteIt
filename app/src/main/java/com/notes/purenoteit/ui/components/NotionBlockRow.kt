@@ -165,6 +165,7 @@ fun NotionBlockRow(
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
     onEditDrawing: ((String) -> Unit)? = null,
+    onPreviewMedia: ((path: String, isDrawing: Boolean, onEditAction: (() -> Unit)?) -> Unit)? = null,
     onToggleExpand: (() -> Unit)? = null,
     onToggleBodyChange: ((String) -> Unit)? = null,
     onTableChange: ((List<List<String>>) -> Unit)? = null,
@@ -1469,6 +1470,26 @@ fun NotionBlockRow(
                                     )
                                 }
                             }
+
+                            val imageMediaPath = block.mediaPath
+                            if (!imageMediaPath.isNullOrBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = SoftOrangeLight,
+                                    border = BorderStroke(0.8.dp, VibrantOrange.copy(alpha = 0.45f)),
+                                    modifier = Modifier.clickable {
+                                        onPreviewMedia?.invoke(imageMediaPath, false, null)
+                                    }
+                                ) {
+                                    Text(
+                                        text = "🔍 Büyüt",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = VibrantOrange,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
                         }
 
                         BlockReorderControls(
@@ -1503,7 +1524,13 @@ fun NotionBlockRow(
                                     contentDescription = stringResource(R.string.block_image_desc),
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .clip(RoundedCornerShape(14.dp)),
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .clickable {
+                                            val imgPath = block.mediaPath
+                                            if (!imgPath.isNullOrBlank()) {
+                                                onPreviewMedia?.invoke(imgPath, false, null)
+                                            }
+                                        },
                                     contentScale = if (isRatioLocked) ContentScale.Fit else ContentScale.Crop
                                 )
 
@@ -1597,7 +1624,7 @@ fun NotionBlockRow(
                         contentScale = ContentScale.Fit
                     )
 
-                    // Top Action Bar for Drawing: Edit Button + Reorder Controls
+                    // Top Action Bar for Drawing: Read-Only Zoom Button + Edit Button + Reorder Controls
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -1605,6 +1632,36 @@ fun NotionBlockRow(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        if (!drawingPath.isNullOrBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(CharcoalGray.copy(alpha = 0.88f))
+                                    .clickable {
+                                        onPreviewMedia?.invoke(
+                                            drawingPath,
+                                            true,
+                                            if (onEditDrawing != null) ({ onEditDrawing(drawingPath) }) else null
+                                        )
+                                    }
+                                    .padding(horizontal = 9.dp, vertical = 5.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(text = "🔍", fontSize = 11.sp)
+                                    Text(
+                                        text = "Büyüt",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PureWhite
+                                    )
+                                }
+                            }
+                        }
+
                         if (onEditDrawing != null && !drawingPath.isNullOrBlank()) {
                             Box(
                                 modifier = Modifier

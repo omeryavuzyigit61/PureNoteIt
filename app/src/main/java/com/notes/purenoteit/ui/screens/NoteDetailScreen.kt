@@ -123,6 +123,7 @@ import com.notes.purenoteit.reminder.ReminderManager
 import com.notes.purenoteit.ui.components.DrawingCanvasSheet
 import com.notes.purenoteit.ui.components.EmojiPickerSheet
 import com.notes.purenoteit.ui.components.KANBAN_COLUMNS
+import com.notes.purenoteit.ui.components.MediaLightboxDialog
 import com.notes.purenoteit.ui.components.NotionBlockRow
 import com.notes.purenoteit.ui.components.NotionSlashDialog
 import com.notes.purenoteit.ui.components.NotionToolbar
@@ -274,6 +275,9 @@ fun NoteDetailScreen(
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     var editingDrawingPath by remember { mutableStateOf<String?>(null) }
     var editingDrawingBlockIndex by remember { mutableStateOf<Int?>(null) }
+    var lightboxMediaPath by remember { mutableStateOf<String?>(null) }
+    var lightboxIsDrawing by remember { mutableStateOf(false) }
+    var lightboxEditAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var showCategoryMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
@@ -2235,6 +2239,11 @@ fun NoteDetailScreen(
                         editingDrawingBlockIndex = index
                         showDrawingSheet = true
                     },
+                    onPreviewMedia = { path, isDrawingBlock, editAction ->
+                        lightboxMediaPath = path
+                        lightboxIsDrawing = isDrawingBlock
+                        lightboxEditAction = editAction
+                    },
                     onOpenLinkedNote = { targetTitle ->
                         navigateToNoteByTitle(targetTitle)
                     },
@@ -2509,6 +2518,19 @@ fun NoteDetailScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
+
+    // Full-Screen Read-Only Pinch-to-Zoom Lightbox for Images & Drawings
+    lightboxMediaPath?.let { path ->
+        MediaLightboxDialog(
+            imagePath = path,
+            isDrawing = lightboxIsDrawing,
+            onDismiss = {
+                lightboxMediaPath = null
+                lightboxEditAction = null
+            },
+            onSwitchToEdit = lightboxEditAction
+        )
     }
 
     // Drawing Canvas Sheet (Supports both creating new and editing existing drawings)

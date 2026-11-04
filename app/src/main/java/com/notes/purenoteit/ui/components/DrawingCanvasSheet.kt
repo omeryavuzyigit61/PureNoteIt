@@ -182,6 +182,7 @@ fun DrawingCanvasSheet(
     var snapTimerJob by remember { mutableStateOf<Job?>(null) }
 
     var canvasSize by remember { mutableStateOf(IntSize(1080, 1080)) }
+    var previewBitmapState by remember { mutableStateOf<Bitmap?>(null) }
 
     val currentToolState by rememberUpdatedState(selectedTool)
     val currentColorState by rememberUpdatedState(selectedColor)
@@ -190,6 +191,105 @@ fun DrawingCanvasSheet(
     val userManualModeState by rememberUpdatedState(userManuallyToggledMode)
     val palmContactThresholdPx = with(density) { 46.dp.toPx() }
 
+    fun renderCurrentCanvasToBitmap(): Bitmap {
+        val width = canvasSize.width.coerceAtLeast(720)
+        val height = canvasSize.height.coerceAtLeast(720)
+
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        canvas.drawColor(android.graphics.Color.WHITE)
+
+        // Render existing drawing bitmap as the base canvas layer
+        baseBitmap?.let { bmp ->
+            val srcRect = android.graphics.Rect(0, 0, bmp.width, bmp.height)
+            val dstRect = android.graphics.Rect(0, 0, width, height)
+            canvas.drawBitmap(bmp, srcRect, dstRect, null)
+        }
+
+        val paint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
+        for (item in items) {
+            paint.strokeWidth = item.strokeWidth
+            paint.color = if (item.isEraser) android.graphics.Color.WHITE else item.color.toArgb()
+
+            when (item.tool) {
+                DrawingTool.PEN, DrawingTool.ERASER -> {
+                    if (item.points.size >= 2) {
+                        val path = android.graphics.Path()
+                        path.moveTo(item.points[0].x, item.points[0].y)
+                        for (i in 1 until item.points.size) {
+                            path.lineTo(item.points[i].x, item.points[i].y)
+                        }
+                        canvas.drawPath(path, paint)
+                    }
+                }
+                DrawingTool.LINE -> {
+                    canvas.drawLine(item.start.x, item.start.y, item.end.x, item.end.y, paint)
+                }
+                DrawingTool.RECTANGLE -> {
+                    val left = minOf(item.start.x, item.end.x)
+                    val top = minOf(item.start.y, item.end.y)
+                    val right = maxOf(item.start.x, item.end.x)
+                    val bottom = maxOf(item.start.y, item.end.y)
+                    canvas.drawRoundRect(left, top, right, bottom, 12f, 12f, paint)
+                }
+                DrawingTool.CIRCLE -> {
+                    val left = minOf(item.start.x, item.end.x)
+                    val top = minOf(item.start.y, item.end.y)
+                    val right = maxOf(item.start.x, item.end.x)
+                    val bottom = maxOf(item.start.y, item.end.y)
+                    canvas.drawOval(left, top, right, bottom, paint)
+                }
+                DrawingTool.TRIANGLE -> {
+                    val path = android.graphics.Path()
+                    val midX = (item.start.x + item.end.x) / 2f
+                    path.moveTo(midX, minOf(item.start.y, item.end.y))
+                    path.lineTo(item.end.x, maxOf(item.start.y, item.end.y))
+                    path.lineTo(item.start.x, maxOf(item.start.y, item.end.y))
+                    path.close()
+                    canvas.drawPath(path, paint)
+                }
+                DrawingTool.ARROW -> {
+                    canvas.drawLine(item.start.x, item.start.y, item.end.x, item.end.y, paint)
+                    val angle = atan2((item.end.y - item.start.y).toDouble(), (item.end.x - item.start.x).toDouble())
+                    val arrowHeadLen = (item.strokeWidth * 3f).coerceAtLeast(24f)
+                    val x1 = item.end.x - arrowHeadLen * cos(angle - PI / 6).toFloat()
+                    val y1 = item.end.y - arrowHeadLen * sin(angle - PI / 6).toFloat()
+                    val x2 = item.end.x - arrowHeadLen * cos(angle + PI / 6).toFloat()
+                    val y2 = item.end.y - arrowHeadLen * sin(angle + PI / 6).toFloat()
+                    canvas.drawLine(item.end.x, item.end.y, x1, y1, paint)
+                    canvas.drawLine(item.end.x, item.end.y, x2, y2, paint)
+                }
+                DrawingTool.STAR -> {
+                    val centerX = (item.start.x + item.end.x) / 2f
+                    val centerY = (item.start.y + item.end.y) / 2f
+                    val radius = sqrt((item.end.x - item.start.x) * (item.end.x - item.start.x) + (item.end.y - item.start.y) * (item.end.y - item.start.y)) / 2f
+                    if (radius > 5f) {
+                        val path = android.graphics.Path()
+                        val innerRadius = radius * 0.45f
+                        var a = -PI / 2
+                        val step = PI / 5
+                        path.moveTo((centerX + radius * cos(a)).toFloat(), (centerY + radius * sin(a)).toFloat())
+                        for (i in 0 until 5) {
+                            a += step
+                            path.lineTo((centerX + innerRadius * cos(a)).toFloat(), (centerY + innerRadius * sin(a)).toFloat())
+                            a += step
+                            path.lineTo((centerX + radius * cos(a)).toFloat(), (centerY + radius * sin(a)).toFloat())
+                        }
+                        path.close()
+                        canvas.drawPath(path, paint)
+                    }
+                }
+            }
+        }
+        return bitmap
+    }
+
     fun saveDrawingToPng() {
         if (items.isEmpty() && baseBitmap == null) {
             context.showToastShort(context.getString(R.string.drawing_empty_toast))
@@ -197,102 +297,7 @@ fun DrawingCanvasSheet(
         }
 
         try {
-            val width = canvasSize.width.coerceAtLeast(720)
-            val height = canvasSize.height.coerceAtLeast(720)
-
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(bitmap)
-            canvas.drawColor(android.graphics.Color.WHITE)
-
-            // Render existing drawing bitmap as the base canvas layer
-            baseBitmap?.let { bmp ->
-                val srcRect = android.graphics.Rect(0, 0, bmp.width, bmp.height)
-                val dstRect = android.graphics.Rect(0, 0, width, height)
-                canvas.drawBitmap(bmp, srcRect, dstRect, null)
-            }
-
-            val paint = Paint().apply {
-                isAntiAlias = true
-                style = Paint.Style.STROKE
-                strokeCap = Paint.Cap.ROUND
-                strokeJoin = Paint.Join.ROUND
-            }
-
-            for (item in items) {
-                paint.strokeWidth = item.strokeWidth
-                paint.color = if (item.isEraser) android.graphics.Color.WHITE else item.color.toArgb()
-
-                when (item.tool) {
-                    DrawingTool.PEN, DrawingTool.ERASER -> {
-                        if (item.points.size >= 2) {
-                            val path = android.graphics.Path()
-                            path.moveTo(item.points[0].x, item.points[0].y)
-                            for (i in 1 until item.points.size) {
-                                path.lineTo(item.points[i].x, item.points[i].y)
-                            }
-                            canvas.drawPath(path, paint)
-                        }
-                    }
-                    DrawingTool.LINE -> {
-                        canvas.drawLine(item.start.x, item.start.y, item.end.x, item.end.y, paint)
-                    }
-                    DrawingTool.RECTANGLE -> {
-                        val left = minOf(item.start.x, item.end.x)
-                        val top = minOf(item.start.y, item.end.y)
-                        val right = maxOf(item.start.x, item.end.x)
-                        val bottom = maxOf(item.start.y, item.end.y)
-                        canvas.drawRoundRect(left, top, right, bottom, 12f, 12f, paint)
-                    }
-                    DrawingTool.CIRCLE -> {
-                        val left = minOf(item.start.x, item.end.x)
-                        val top = minOf(item.start.y, item.end.y)
-                        val right = maxOf(item.start.x, item.end.x)
-                        val bottom = maxOf(item.start.y, item.end.y)
-                        canvas.drawOval(left, top, right, bottom, paint)
-                    }
-                    DrawingTool.TRIANGLE -> {
-                        val path = android.graphics.Path()
-                        val midX = (item.start.x + item.end.x) / 2f
-                        path.moveTo(midX, minOf(item.start.y, item.end.y))
-                        path.lineTo(item.end.x, maxOf(item.start.y, item.end.y))
-                        path.lineTo(item.start.x, maxOf(item.start.y, item.end.y))
-                        path.close()
-                        canvas.drawPath(path, paint)
-                    }
-                    DrawingTool.ARROW -> {
-                        canvas.drawLine(item.start.x, item.start.y, item.end.x, item.end.y, paint)
-                        val angle = atan2((item.end.y - item.start.y).toDouble(), (item.end.x - item.start.x).toDouble())
-                        val arrowHeadLen = (item.strokeWidth * 3f).coerceAtLeast(24f)
-                        val x1 = item.end.x - arrowHeadLen * cos(angle - PI / 6).toFloat()
-                        val y1 = item.end.y - arrowHeadLen * sin(angle - PI / 6).toFloat()
-                        val x2 = item.end.x - arrowHeadLen * cos(angle + PI / 6).toFloat()
-                        val y2 = item.end.y - arrowHeadLen * sin(angle + PI / 6).toFloat()
-                        canvas.drawLine(item.end.x, item.end.y, x1, y1, paint)
-                        canvas.drawLine(item.end.x, item.end.y, x2, y2, paint)
-                    }
-                    DrawingTool.STAR -> {
-                        val centerX = (item.start.x + item.end.x) / 2f
-                        val centerY = (item.start.y + item.end.y) / 2f
-                        val radius = sqrt((item.end.x - item.start.x) * (item.end.x - item.start.x) + (item.end.y - item.start.y) * (item.end.y - item.start.y)) / 2f
-                        if (radius > 5f) {
-                            val path = android.graphics.Path()
-                            val innerRadius = radius * 0.45f
-                            var a = -PI / 2
-                            val step = PI / 5
-                            path.moveTo((centerX + radius * cos(a)).toFloat(), (centerY + radius * sin(a)).toFloat())
-                            for (i in 0 until 5) {
-                                a += step
-                                path.lineTo((centerX + innerRadius * cos(a)).toFloat(), (centerY + innerRadius * sin(a)).toFloat())
-                                a += step
-                                path.lineTo((centerX + radius * cos(a)).toFloat(), (centerY + radius * sin(a)).toFloat())
-                            }
-                            path.close()
-                            canvas.drawPath(path, paint)
-                        }
-                    }
-                }
-            }
-
+            val bitmap = renderCurrentCanvasToBitmap()
             val dir = File(context.filesDir, "drawings").apply { mkdirs() }
             val file = File(dir, "sketch_${System.currentTimeMillis()}.png")
             FileOutputStream(file).use { out ->
@@ -324,7 +329,7 @@ fun DrawingCanvasSheet(
                 )
                 .padding(14.dp)
         ) {
-            // Header: Close + Title + Actions (Undo, Clear, Save)
+            // Header: Close + Title + Actions (Undo, Inspect/Preview, Clear, Save)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -353,7 +358,7 @@ fun DrawingCanvasSheet(
                     Text(
                         text = if (existingImagePath != null) stringResource(R.string.drawing_title_edit) else stringResource(R.string.drawing_title_canvas),
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
+                        fontSize = 16.sp,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1
                     )
@@ -361,19 +366,45 @@ fun DrawingCanvasSheet(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     // Undo
                     IconButton(
                         onClick = { if (items.isNotEmpty()) items.removeAt(items.lastIndex) },
                         enabled = items.isNotEmpty(),
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(30.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.arrow_left),
                             contentDescription = stringResource(R.string.undo),
                             tint = if (items.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+
+                    // Full-Screen Read-Only Inspect / Zoom Preview Button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(SoftOrangeLight)
+                            .border(0.8.dp, VibrantOrange.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+                            .clickable {
+                                if (items.isEmpty() && baseBitmap == null) {
+                                    context.showToastShort(context.getString(R.string.drawing_empty_toast))
+                                } else {
+                                    previewBitmapState = renderCurrentCanvasToBitmap()
+                                }
+                            }
+                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🔍 İncele",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = VibrantOrange,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
 
@@ -383,14 +414,16 @@ fun DrawingCanvasSheet(
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .clickable { items.clear() }
-                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                            .padding(horizontal = 8.dp, vertical = 5.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = stringResource(R.string.tool_clear),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
 
@@ -400,12 +433,12 @@ fun DrawingCanvasSheet(
                             .clip(RoundedCornerShape(8.dp))
                             .background(VibrantOrange)
                             .clickable { saveDrawingToPng() }
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = if (existingImagePath != null) stringResource(R.string.cat_update_btn) else stringResource(R.string.cat_add_btn_action),
-                            fontSize = 12.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = PureWhite,
                             maxLines = 1,
@@ -1058,6 +1091,15 @@ fun DrawingCanvasSheet(
             }
             Spacer(modifier = Modifier.height(14.dp))
         }
+    }
+
+    // Live Read-Only Full-Screen Zoom Inspection Overlay inside Drawing Studio
+    previewBitmapState?.let { bmp ->
+        MediaLightboxDialog(
+            previewBitmap = bmp,
+            isDrawing = true,
+            onDismiss = { previewBitmapState = null }
+        )
     }
 }
 
