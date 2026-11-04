@@ -35,14 +35,14 @@
 
     <!-- Navigation Drawer -->
     <string name="drawer_title">PureNoteIt</string>
-    <string name="drawer_subtitle">Notion &amp; Vault Architecture</string>
+    <string name="drawer_subtitle">Advanced &amp; Encrypted Notes</string>
     <string name="drawer_category_mgmt">Category Management</string>
     <string name="drawer_category_mgmt_sub">Manage and lock categories</string>
     <string name="drawer_pin_vault">PIN &amp; Vault Lock</string>
-    <string name="drawer_pin_vault_sub">Bitwarden security settings</string>
+    <string name="drawer_pin_vault_sub">Biometric &amp; PIN vault protection</string>
     <string name="drawer_daily_agenda">Daily Agenda</string>
-    <string name="drawer_daily_agenda_sub">Generate automated daily agenda template</string>
-    <string name="drawer_kanban_board">Kanban Task Board</string>
+    <string name="drawer_daily_agenda_sub">Automated daily plan and agenda</string>
+    <string name="drawer_kanban_board">Task Board</string>
     <string name="drawer_kanban_board_sub">To-do, in-progress, and completed tasks</string>
     <string name="drawer_graph_view">2D Knowledge Graph</string>
     <string name="drawer_graph_view_sub">Visual note connection map</string>
@@ -98,7 +98,7 @@
     <!-- Password Settings Screen -->
     <string name="pwd_title_change">Change Security Password</string>
     <string name="pwd_title_set">Set Security Password</string>
-    <string name="pwd_bitwarden_title">Bitwarden-Grade Vault Security</string>
+    <string name="pwd_bitwarden_title">Military-Grade Vault Security</string>
     <string name="pwd_bitwarden_desc">Your locked notes and categories are encrypted with AES-256-GCM. Your vault locks automatically when you exit the app.</string>
     <string name="pwd_current_pin">Current PIN Code</string>
     <string name="pwd_new_pin">New PIN Code (6 Digits)</string>
@@ -143,7 +143,7 @@
     <string name="cat_delete_confirm_msg">Are you sure you want to delete category \"%1$s\"?</string>
     <string name="cat_deleted_toast">Category deleted</string>
 
-    <!-- Notion Toolbar -->
+    <!-- Block Toolbar -->
     <string name="tb_add_block">Add Block</string>
     <string name="tb_voice_dictation">Voice Dictation</string>
     <string name="tb_listening">Listening...</string>
@@ -167,8 +167,8 @@
     <string name="tb_code">Code</string>
     <string name="tb_math">Formula</string>
 
-    <!-- Notion Slash Dialog -->
-    <string name="slash_title">Basic Blocks (Notion Style)</string>
+    <!-- Slash Dialog -->
+    <string name="slash_title">Basic Blocks</string>
     <string name="slash_text_title">Plain Text</string>
     <string name="slash_text_desc">Just start writing with plain text</string>
     <string name="slash_h1_title">Heading 1 (H1)</string>
@@ -310,7 +310,7 @@
     <string name="tool_arrow">➡️ Arrow</string>
     <string name="tool_star">⭐ Star</string>
     <string name="tool_clear">Clear</string>
-    <string name="emoji_picker_title">Choose Page Icon (Notion)</string>
+    <string name="emoji_picker_title">Choose Page Icon</string>
 
     <!-- Note Detail Screen -->
     <string name="note_title_placeholder">Title</string>

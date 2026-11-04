@@ -35,14 +35,14 @@
 
     <!-- Navigation Drawer -->
     <string name="drawer_title">PureNoteIt</string>
-    <string name="drawer_subtitle">Notion &amp; Kasa Mimarisi</string>
+    <string name="drawer_subtitle">Gelişmiş &amp; Şifreli Not Defteri</string>
     <string name="drawer_category_mgmt">Kategori Yönetimi</string>
     <string name="drawer_category_mgmt_sub">Kategorileri yönet ve kilitle</string>
     <string name="drawer_pin_vault">PIN &amp; Kasa Kilidi</string>
-    <string name="drawer_pin_vault_sub">Bitwarden güvenlik ayarları</string>
+    <string name="drawer_pin_vault_sub">Biyometrik ve PIN kasa koruması</string>
     <string name="drawer_daily_agenda">Günün Ajandası</string>
-    <string name="drawer_daily_agenda_sub">Otomatik günlük plan şablonu oluştur</string>
-    <string name="drawer_kanban_board">Kanban Görev Panosu</string>
+    <string name="drawer_daily_agenda_sub">Otomatik günlük plan ve ajanda</string>
+    <string name="drawer_kanban_board">Görev Panosu</string>
     <string name="drawer_kanban_board_sub">Yapılacaklar, devam edenler ve tamamlananlar</string>
     <string name="drawer_graph_view">2D Bilgi Ağı (Graph View)</string>
     <string name="drawer_graph_view_sub">Notlar arası bağlantı haritası</string>
@@ -98,7 +98,7 @@
     <!-- Password Settings Screen -->
     <string name="pwd_title_change">Güvenlik Şifresi Değiştir</string>
     <string name="pwd_title_set">Güvenlik Şifresi Belirle</string>
-    <string name="pwd_bitwarden_title">Bitwarden Düzeyinde Kasa Güvenliği</string>
+    <string name="pwd_bitwarden_title">Askeri Düzeyde Kasa Güvenliği</string>
     <string name="pwd_bitwarden_desc">Kilitli notlarınız ve kategorileriniz AES-256-GCM ile şifrelenir. Uygulamadan çıktığınızda kasanız otomatik olarak kilitlenir.</string>
     <string name="pwd_current_pin">Mevcut PIN Kodu</string>
     <string name="pwd_new_pin">Yeni PIN Kodu (6 Haneli)</string>
@@ -143,7 +143,7 @@
     <string name="cat_delete_confirm_msg">\"%1$s\" kategorisini silmek istediğinizden emin misiniz?</string>
     <string name="cat_deleted_toast">Kategori silindi</string>
 
-    <!-- Notion Toolbar -->
+    <!-- Block Toolbar -->
     <string name="tb_add_block">Blok Ekle</string>
     <string name="tb_voice_dictation">Sesli Dikte</string>
     <string name="tb_listening">Dinleniyor...</string>
@@ -167,8 +167,8 @@
     <string name="tb_code">Kod</string>
     <string name="tb_math">Formül</string>
 
-    <!-- Notion Slash Dialog -->
-    <string name="slash_title">Temel Bloklar (Notion Tarzı)</string>
+    <!-- Slash Dialog -->
+    <string name="slash_title">Temel Bloklar</string>
     <string name="slash_text_title">Düz Metin</string>
     <string name="slash_text_desc">Yazmaya başlamak için basit bir paragraf</string>
     <string name="slash_h1_title">Başlık 1 (H1)</string>
@@ -310,7 +310,7 @@
     <string name="tool_arrow">➡️ Ok</string>
     <string name="tool_star">⭐ Yıldız</string>
     <string name="tool_clear">Temizle</string>
-    <string name="emoji_picker_title">Sayfa Simgesi Seçin (Notion)</string>
+    <string name="emoji_picker_title">Sayfa Simgesi Seçin</string>
 
     <!-- Note Detail Screen -->
     <string name="note_title_placeholder">Başlık</string>

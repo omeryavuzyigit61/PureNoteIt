@@ -528,7 +528,7 @@ fun HomeScreen(
 
                     // Menu Item: Category Management
                     DrawerMenuTile(
-                        iconRes = R.drawable.category,
+                        iconRes = R.drawable.ic_drawer_categories,
                         title = stringResource(R.string.drawer_category_mgmt),
                         subtitle = stringResource(R.string.drawer_category_mgmt_sub),
                         onClick = {
@@ -554,7 +554,7 @@ fun HomeScreen(
 
                     // Menu Item: Daily Agenda Automation (Paket 2)
                     DrawerMenuTile(
-                        iconRes = R.drawable.calendar,
+                        iconRes = R.drawable.ic_drawer_agenda,
                         title = stringResource(R.string.drawer_daily_agenda),
                         subtitle = stringResource(R.string.drawer_daily_agenda_sub),
                         onClick = {
@@ -569,7 +569,7 @@ fun HomeScreen(
 
                     // Menu Item: Templates Hub (Şablon Galerisi)
                     DrawerMenuTile(
-                        iconRes = R.drawable.category,
+                        iconRes = R.drawable.ic_drawer_templates,
                         title = stringResource(R.string.drawer_template_hub),
                         subtitle = stringResource(R.string.drawer_template_hub_sub),
                         onClick = {
@@ -582,7 +582,7 @@ fun HomeScreen(
 
                     // Menu Item: Notion Kanban Board
                     DrawerMenuTile(
-                        iconRes = R.drawable.category_alt,
+                        iconRes = R.drawable.ic_drawer_board,
                         title = stringResource(R.string.drawer_kanban_board),
                         subtitle = stringResource(R.string.drawer_kanban_board_sub),
                         onClick = {
@@ -634,7 +634,7 @@ fun HomeScreen(
 
                     // Menu Item: Vault Backup & Restore Center (Feature 5)
                     DrawerMenuTile(
-                        iconRes = R.drawable.lock,
+                        iconRes = R.drawable.ic_drawer_backup_restore,
                         title = stringResource(R.string.drawer_vault_center),
                         subtitle = stringResource(R.string.drawer_vault_center_sub),
                         onClick = {
@@ -660,7 +660,7 @@ fun HomeScreen(
 
                     // Menu Item: Language Selection (Çoklu Dil)
                     DrawerMenuTile(
-                        iconRes = R.drawable.category,
+                        iconRes = R.drawable.ic_drawer_language,
                         title = stringResource(R.string.drawer_language),
                         subtitle = LanguageManager.getLanguageLabel(context),
                         onClick = {
@@ -673,7 +673,7 @@ fun HomeScreen(
 
                     // Menu Item: Check for Updates (Güncellemeleri Denetle - Yalnızca Gerçek Google Play)
                     DrawerMenuTile(
-                        iconRes = R.drawable.category,
+                        iconRes = R.drawable.ic_drawer_update_check,
                         title = stringResource(R.string.update_check_menu),
                         subtitle = stringResource(R.string.update_check_menu_sub),
                         badge = "v${AppUpdateHelper.getCurrentVersionName(context)}",
@@ -694,7 +694,7 @@ fun HomeScreen(
                                             context.getString(
                                                 R.string.app_up_to_date_toast,
                                                 "v" + AppUpdateHelper.getCurrentVersionName(context)
-                                            )
+                                             )
                                         )
                                     }
                                 )
@@ -706,7 +706,7 @@ fun HomeScreen(
 
                     // Menu Item: Release Notes (Sürüm Notları / Yenilikler)
                     DrawerMenuTile(
-                        iconRes = R.drawable.category,
+                        iconRes = R.drawable.ic_drawer_release_notes,
                         title = stringResource(R.string.drawer_release_notes),
                         subtitle = stringResource(R.string.drawer_release_notes_sub, AppUpdateHelper.getCurrentVersionName(context)),
                         onClick = {
