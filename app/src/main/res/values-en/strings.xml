@@ -42,6 +42,8 @@
     <string name="drawer_pin_vault_sub">Bitwarden security settings</string>
     <string name="drawer_daily_agenda">Daily Agenda</string>
     <string name="drawer_daily_agenda_sub">Generate automated daily agenda template</string>
+    <string name="drawer_kanban_board">Kanban Task Board</string>
+    <string name="drawer_kanban_board_sub">To-do, in-progress, and completed tasks</string>
     <string name="drawer_graph_view">2D Knowledge Graph</string>
     <string name="drawer_graph_view_sub">Visual note connection map</string>
     <string name="drawer_stream_view">Timeline Stream</string>

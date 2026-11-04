@@ -162,6 +162,9 @@ class MainActivity : AppCompatActivity() {
                                     onNavigateToAddNoteWithDate = { noteId, date ->
                                         navController.navigate("note_detail/$noteId?initialDate=$date")
                                     },
+                                    onNavigateToAddNoteWithStatus = { status ->
+                                        navController.navigate("note_detail/-1?initialStatus=$status")
+                                    },
                                     onNavigateToPasswordSettings = {
                                         navController.navigate("password_settings")
                                     },
@@ -189,7 +192,7 @@ class MainActivity : AppCompatActivity() {
                             }
 
                             composable(
-                                route = "note_detail/{noteId}?initialDate={initialDate}&autoVoice={autoVoice}&autoOcr={autoOcr}",
+                                route = "note_detail/{noteId}?initialDate={initialDate}&autoVoice={autoVoice}&autoOcr={autoOcr}&initialStatus={initialStatus}",
                                 arguments = listOf(
                                     navArgument("noteId") {
                                         type = NavType.IntType
@@ -206,6 +209,10 @@ class MainActivity : AppCompatActivity() {
                                     navArgument("autoOcr") {
                                         type = NavType.BoolType
                                         defaultValue = false
+                                    },
+                                    navArgument("initialStatus") {
+                                        type = NavType.StringType
+                                        defaultValue = "TODO"
                                     }
                                 )
                             ) { backStackEntry ->
@@ -213,10 +220,12 @@ class MainActivity : AppCompatActivity() {
                                 val initialDate = backStackEntry.arguments?.getLong("initialDate") ?: -1L
                                 val autoVoice = backStackEntry.arguments?.getBoolean("autoVoice") ?: false
                                 val autoOcr = backStackEntry.arguments?.getBoolean("autoOcr") ?: false
+                                val initialStatus = backStackEntry.arguments?.getString("initialStatus") ?: "TODO"
 
                                 NoteDetailScreen(
                                     noteId = noteId,
                                     initialDate = initialDate,
+                                    initialStatus = initialStatus,
                                     autoVoice = autoVoice,
                                     autoOcr = autoOcr,
                                     noteViewModel = noteViewModel,

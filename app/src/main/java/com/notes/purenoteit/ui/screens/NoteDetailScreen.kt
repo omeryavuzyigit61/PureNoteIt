@@ -156,6 +156,7 @@ import java.util.Locale
 fun NoteDetailScreen(
     noteId: Int,
     initialDate: Long = -1L,
+    initialStatus: String = "TODO",
     autoVoice: Boolean = false,
     autoOcr: Boolean = false,
     noteViewModel: NoteViewModel,
@@ -201,7 +202,7 @@ fun NoteDetailScreen(
     var isPinned by remember { mutableStateOf(false) }
     var selectedCategoryId by remember { mutableStateOf(1) }
     var selectedCategoryName by remember { mutableStateOf("Not") }
-    var noteStatus by remember { mutableStateOf("TODO") }
+    var noteStatus by remember { mutableStateOf(initialStatus) }
     var noteDate by remember { mutableStateOf(if (initialDate > 0) initialDate else System.currentTimeMillis()) }
 
     var reminderTime by remember { mutableStateOf<Long?>(null) }

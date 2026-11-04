@@ -182,6 +182,7 @@ fun HomeScreen(
     categoryViewModel: CategoryViewModel,
     onNavigateToAddNote: (noteId: Int) -> Unit,
     onNavigateToAddNoteWithDate: (noteId: Int, initialDate: Long) -> Unit = { id, _ -> onNavigateToAddNote(id) },
+    onNavigateToAddNoteWithStatus: (status: String) -> Unit = { _ -> onNavigateToAddNote(-1) },
     onNavigateToPasswordSettings: () -> Unit,
     onNavigateToCategorySettings: () -> Unit,
     onToggleDarkTheme: (Boolean) -> Unit,
@@ -574,6 +575,19 @@ fun HomeScreen(
                         onClick = {
                             scope.launch { drawerState.close() }
                             showTemplateSheet = true
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Menu Item: Notion Kanban Board
+                    DrawerMenuTile(
+                        iconRes = R.drawable.category_alt,
+                        title = stringResource(R.string.drawer_kanban_board),
+                        subtitle = stringResource(R.string.drawer_kanban_board_sub),
+                        onClick = {
+                            currentViewMode = NotionViewMode.BOARD
+                            scope.launch { drawerState.close() }
                         }
                     )
 
@@ -1065,7 +1079,7 @@ fun HomeScreen(
                             noteViewModel.updateNoteStatus(note, newStatus)
                         },
                         onAddNewNoteWithStatus = { status ->
-                            onNavigateToAddNote(-1)
+                            onNavigateToAddNoteWithStatus(status)
                         },
                         modifier = Modifier.padding(paddingValues)
                     )

@@ -217,6 +217,23 @@ private fun KanbanColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 60.dp)
             ) {
+                if (notes.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = stringResource(R.string.kanban_empty),
+                                fontSize = 12.5.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                            )
+                        }
+                    }
+                }
+
                 items(notes, key = { it.id }) { note ->
                     KanbanNoteCard(
                         note = note,
@@ -252,7 +269,7 @@ private fun KanbanColumn(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "+ " + stringResource(R.string.drawer_daily_agenda).take(0) + stringResource(R.string.no_notes_found_sub),
+                                text = "+ " + stringResource(R.string.create_new_note),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)

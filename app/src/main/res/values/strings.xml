@@ -42,6 +42,8 @@
     <string name="drawer_pin_vault_sub">Bitwarden güvenlik ayarları</string>
     <string name="drawer_daily_agenda">Günün Ajandası</string>
     <string name="drawer_daily_agenda_sub">Otomatik günlük plan şablonu oluştur</string>
+    <string name="drawer_kanban_board">Kanban Görev Panosu</string>
+    <string name="drawer_kanban_board_sub">Yapılacaklar, devam edenler ve tamamlananlar</string>
     <string name="drawer_graph_view">2D Bilgi Ağı (Graph View)</string>
     <string name="drawer_graph_view_sub">Notlar arası bağlantı haritası</string>
     <string name="drawer_stream_view">Zaman Tüneli (Stream View)</string>
