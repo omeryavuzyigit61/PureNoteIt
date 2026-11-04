@@ -9,6 +9,9 @@ import com.google.gson.Gson
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.data.db.NoteLinkData
+import com.notes.purenoteit.data.db.StreamItemData
+import com.notes.purenoteit.model.BlockParser
+import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.repository.CategoryRepository
 import com.notes.purenoteit.repository.KnowledgeRepository
 import com.notes.purenoteit.repository.NoteRepository
@@ -28,7 +31,8 @@ data class VaultBackupPayload(
     val backupDate: Long = System.currentTimeMillis(),
     val notes: List<NoteData>,
     val categories: List<CategoryData>,
-    val links: List<NoteLinkData>
+    val links: List<NoteLinkData>,
+    val streamItems: List<StreamItemData>? = emptyList()
 )
 
 object VaultBackupManager {
@@ -36,6 +40,50 @@ object VaultBackupManager {
     private val gson = Gson()
     private const val MAX_ARCHIVE_ENTRIES = 2000
     private const val MAX_SINGLE_FILE_BYTES = 100L * 1024L * 1024L // 100 MB per media file limit
+
+    /**
+     * Remaps absolute media paths (drawings, images, audio recordings) from a previous device
+     * or user profile into the current device's [currentFilesDir] so media never breaks after restore.
+     */
+    private fun normalizeMediaPath(rawPath: String?, currentFilesDir: File): String? {
+        if (rawPath.isNullOrBlank()) return null
+        val normalized = rawPath.replace("\\", "/")
+
+        val filesMarker = "/files/"
+        val markerIdx = normalized.indexOf(filesMarker)
+        if (markerIdx != -1) {
+            val relSuffix = normalized.substring(markerIdx + filesMarker.length).trimStart('/')
+            if (relSuffix.isNotBlank()) {
+                val remapped = File(currentFilesDir, relSuffix)
+                if (remapped.exists()) return remapped.absolutePath
+            }
+        }
+
+        if (normalized.startsWith("media/")) {
+            val relSuffix = normalized.removePrefix("media/").trimStart('/')
+            val remapped = File(currentFilesDir, relSuffix)
+            if (remapped.exists()) return remapped.absolutePath
+        }
+
+        val directFile = File(rawPath)
+        if (directFile.exists()) return directFile.absolutePath
+
+        val fileName = directFile.name
+        if (fileName.isNotBlank()) {
+            val subDirs = listOf("drawings", "shared_images", "recordings", "")
+            for (sub in subDirs) {
+                val candidate = if (sub.isEmpty()) File(currentFilesDir, fileName) else File(File(currentFilesDir, sub), fileName)
+                if (candidate.exists()) return candidate.absolutePath
+            }
+        }
+
+        return if (markerIdx != -1) {
+            val relSuffix = normalized.substring(markerIdx + filesMarker.length).trimStart('/')
+            File(currentFilesDir, relSuffix).absolutePath
+        } else {
+            rawPath
+        }
+    }
 
     /**
      * Creates a compressed, AES-256-GCM encrypted .purevault archive containing all notes,
@@ -54,6 +102,9 @@ object VaultBackupManager {
                 val rawNotes = noteRepository.getAllNotes().blockingGet() ?: emptyList()
                 val categories = categoryRepository.getAllCategories().blockingGet() ?: emptyList()
                 val links = knowledgeRepository.getAllLinks().blockingGet() ?: emptyList()
+                val streamItems = runCatching {
+                    knowledgeRepository.getAllStreamItems().blockingGet()
+                }.getOrDefault(emptyList())
                 val lockedCategoryIds = categories.filter { it.isPassword == true }.map { it.id }.toSet()
 
                 // Convert any hardware-bound ENC_V2 note descriptions into 60k-iteration portable AES-256-GCM (ENC_P2:)
@@ -83,7 +134,8 @@ object VaultBackupManager {
                 val payload = VaultBackupPayload(
                     notes = portableNotes,
                     categories = categories,
-                    links = links
+                    links = links,
+                    streamItems = streamItems
                 )
                 val rawJsonString = gson.toJson(payload)
                 // Encrypt the entire manifest with AES-256-GCM so plaintext metadata never leaks in transit
@@ -215,24 +267,147 @@ object VaultBackupManager {
 
                 val payload = gson.fromJson(jsonContent, VaultBackupPayload::class.java)
 
-                // Restore categories via CategoryRepository
+                // 1. Restore categories via CategoryRepository and guarantee a valid fallback category for ForeignKey integrity
                 payload.categories.forEach { cat ->
                     categoryRepository.categoryUpsert(cat).onErrorComplete().blockingAwait()
                 }
+                var currentCategories = runCatching {
+                    categoryRepository.getAllCategories().blockingGet()
+                }.getOrDefault(emptyList())
+                if (currentCategories.isEmpty()) {
+                    val defaultCat = CategoryData(name = "Genel", isPassword = false).also { it.id = 1 }
+                    categoryRepository.categoryUpsert(defaultCat).onErrorComplete().blockingAwait()
+                    currentCategories = runCatching {
+                        categoryRepository.getAllCategories().blockingGet()
+                    }.getOrDefault(listOf(defaultCat))
+                }
+                val validCategoryIds = currentCategories.map { it.id }.toSet()
+                val fallbackCategoryId = currentCategories.firstOrNull()?.id ?: 1
+                val lockedCategoryIds = currentCategories.filter { it.isPassword == true }.map { it.id }.toSet()
 
-                // Restore notes via NoteRepository (re-wrapping encrypted notes into hardware AndroidKeyStore ENC_V2)
+                val noteIdsInBackup = payload.notes.map { it.id }.toSet()
+                val activeTitleToId = payload.notes
+                    .filter { it.status != "TRASH" && !it.title.isNullOrBlank() }
+                    .associate { it.title!!.trim().lowercase() to it.id }
+
+                val reconstructedLinks = mutableListOf<NoteLinkData>()
+                val wikiRegex = Regex("""\[\[(.*?)\]\]""")
+
+                // 2. Restore notes (normalizing drawing, image & audio paths, sub-page references, and re-wrapping encryption)
                 payload.notes.forEach { note ->
-                    val desc = note.description
-                    if (desc != null && (desc.startsWith("ENC:") || desc.startsWith("ENC_P2:"))) {
-                        val plain = SecurityUtil.decrypt(desc)
-                        note.description = SecurityUtil.encrypt(plain)
+                    if (note.categoryId == null || note.categoryId !in validCategoryIds) {
+                        note.categoryId = fallbackCategoryId
                     }
+
+                    val rawDesc = note.description
+                    val wasEncrypted = (note.isPassword == true) ||
+                        note.isEncrypted ||
+                        (note.categoryId in lockedCategoryIds) ||
+                        SecurityUtil.isEncryptedPayload(rawDesc)
+
+                    val plainDesc = if (!rawDesc.isNullOrBlank() && SecurityUtil.isEncryptedPayload(rawDesc)) {
+                        SecurityUtil.decrypt(rawDesc)
+                    } else {
+                        rawDesc ?: ""
+                    }
+
+                    if (plainDesc.isNotBlank()) {
+                        val blocks = BlockParser.parse(plainDesc).toMutableList()
+                        var blocksUpdated = false
+                        for (idx in blocks.indices) {
+                            var blk = blocks[idx]
+                            var blkChanged = false
+
+                            if (!blk.mediaPath.isNullOrBlank()) {
+                                val remapped = normalizeMediaPath(blk.mediaPath, filesDir)
+                                if (remapped != blk.mediaPath) {
+                                    blk = blk.copy(mediaPath = remapped)
+                                    blkChanged = true
+                                }
+                            }
+
+                            if (blk.type == BlockType.SUB_PAGE) {
+                                val currentSubId = blk.subPageNoteId
+                                val resolvedSubId = if (currentSubId != null && currentSubId in noteIdsInBackup) {
+                                    currentSubId
+                                } else {
+                                    activeTitleToId[blk.content.trim().lowercase()]
+                                }
+                                if (resolvedSubId != null && resolvedSubId != currentSubId) {
+                                    blk = blk.copy(subPageNoteId = resolvedSubId)
+                                    blkChanged = true
+                                }
+                                if (resolvedSubId != null && note.status != "TRASH") {
+                                    reconstructedLinks.add(
+                                        NoteLinkData(
+                                            sourceNoteId = note.id,
+                                            targetNoteId = resolvedSubId,
+                                            linkText = blk.content.trim().ifBlank { "Alt Sayfa" }
+                                        )
+                                    )
+                                }
+                            }
+
+                            if (note.status != "TRASH") {
+                                val textToScan = blk.content + " " + blk.toggleBody
+                                if (textToScan.contains("[[")) {
+                                    wikiRegex.findAll(textToScan).forEach { match ->
+                                        val linkTitle = match.groupValues[1].trim()
+                                        val targetId = activeTitleToId[linkTitle.lowercase()]
+                                        if (targetId != null && targetId != note.id) {
+                                            reconstructedLinks.add(
+                                                NoteLinkData(
+                                                    sourceNoteId = note.id,
+                                                    targetNoteId = targetId,
+                                                    linkText = linkTitle
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (blkChanged) {
+                                blocks[idx] = blk
+                                blocksUpdated = true
+                            }
+                        }
+
+                        val finalPlain = if (blocksUpdated) BlockParser.serialize(blocks) else plainDesc
+                        note.description = if (wasEncrypted) SecurityUtil.encrypt(finalPlain) else finalPlain
+                    }
+
+                    note.isPassword = wasEncrypted
+                    note.isEncrypted = wasEncrypted
+                    note.images = note.images?.mapNotNull { normalizeMediaPath(it, filesDir) }
+                    note.sounds = note.sounds?.mapNotNull { normalizeMediaPath(it, filesDir) }
+
                     noteRepository.upsert(note).onErrorComplete().blockingAwait()
                 }
 
-                // Restore note links via KnowledgeRepository
-                if (payload.links.isNotEmpty()) {
-                    knowledgeRepository.insertAllLinks(payload.links).onErrorComplete().blockingAwait()
+                // 3. Restore and verify note links via KnowledgeRepository
+                val allExistingNoteIds = runCatching {
+                    noteRepository.getAllNotes().blockingGet()?.map { it.id }?.toSet()
+                }.getOrNull() ?: noteIdsInBackup
+
+                val mergedLinks = (payload.links + reconstructedLinks)
+                    .filter { it.sourceNoteId in allExistingNoteIds && it.targetNoteId in allExistingNoteIds }
+                    .distinctBy { Triple(it.sourceNoteId, it.targetNoteId, it.linkText.trim().lowercase()) }
+
+                if (mergedLinks.isNotEmpty()) {
+                    knowledgeRepository.insertAllLinks(mergedLinks).onErrorComplete().blockingAwait()
+                }
+
+                // 4. Restore Quick Thought Stream items with normalized media paths
+                val streamList = payload.streamItems
+                if (!streamList.isNullOrEmpty()) {
+                    val normalizedStream = streamList.map { item ->
+                        item.copy(
+                            audioPath = normalizeMediaPath(item.audioPath, filesDir),
+                            imagePath = normalizeMediaPath(item.imagePath, filesDir)
+                        ).also { it.id = item.id }
+                    }
+                    knowledgeRepository.insertAllStreamItems(normalizedStream).onErrorComplete().blockingAwait()
                 }
 
                 android.os.Handler(android.os.Looper.getMainLooper()).post {

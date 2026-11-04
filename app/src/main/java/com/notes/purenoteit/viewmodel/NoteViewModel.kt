@@ -70,11 +70,21 @@ class NoteViewModel @Inject constructor(
     }
 
     fun upsert(item: NoteData) {
-        val action = if (item.id > 0) repository.update(item) else repository.upsert(item)
-        action.subscribeOn(Schedulers.io())
+        io.reactivex.Completable.fromAction {
+            if (item.id > 0) {
+                repository.update(item).blockingAwait()
+                if (item.status == "TRASH") {
+                    purgeDeletedNoteReferencesSync(item.id, item.title)
+                }
+            } else {
+                repository.upsert(item).blockingAwait()
+            }
+        }.subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllNotes()
+                getAllLinks()
                 notifyWidgetSync()
+                triggerAutoSync()
                 Log.i("NoteViewModel", "Note upserted successfully")
             }, { error ->
                 Log.i("NoteViewModel", "Error upserting note: ${error.message}")
@@ -100,11 +110,18 @@ class NoteViewModel @Inject constructor(
             }
             item.id = actualId
 
-            propagateTitleChangeToLinkedNotesSync(
-                targetNoteId = actualId,
-                newRawTitle = item.title ?: "",
-                previousRawTitle = previousTitle
-            )
+            if (item.status == "TRASH") {
+                purgeDeletedNoteReferencesSync(
+                    deletedNoteId = actualId,
+                    deletedRawTitle = item.title ?: previousTitle
+                )
+            } else {
+                propagateTitleChangeToLinkedNotesSync(
+                    targetNoteId = actualId,
+                    newRawTitle = item.title ?: "",
+                    previousRawTitle = previousTitle
+                )
+            }
             actualId
         }
             .subscribeOn(Schedulers.io())
@@ -113,7 +130,7 @@ class NoteViewModel @Inject constructor(
                 getAllNotes()
                 getAllLinks()
                 notifyWidgetSync()
-                if (!contentForLinks.isNullOrBlank()) {
+                if (item.status != "TRASH" && !contentForLinks.isNullOrBlank()) {
                     syncNoteLinks(actualId, contentForLinks)
                 }
                 triggerAutoSync()
@@ -227,10 +244,123 @@ class NoteViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Removes all [[WikiLink]] tags, SUB_PAGE blocks, and note_links entries referencing a deleted
+     * or trashed note so that source notes never retain dead links or spawn duplicate notes.
+     */
+    private fun purgeDeletedNoteReferencesSync(
+        deletedNoteId: Int,
+        deletedRawTitle: String?
+    ) {
+        try {
+            val backlinkRows = runCatching {
+                knowledgeRepository.getBacklinks(deletedNoteId).blockingGet()
+            }.getOrDefault(emptyList())
+
+            val titlesToRemove = buildSet {
+                deletedRawTitle?.trim()?.takeIf { it.isNotBlank() }?.let { add(it) }
+                backlinkRows.forEach { row ->
+                    val lt = row.linkText.trim()
+                    if (lt.isNotBlank()) add(lt)
+                }
+            }
+
+            val allNotes = runCatching {
+                repository.getAllNotes().blockingGet()
+            }.getOrDefault(emptyList())
+
+            for (candidate in allNotes) {
+                if (candidate.id == deletedNoteId) continue
+                val wasEncrypted = candidate.isEncrypted ||
+                    (candidate.isPassword == true) ||
+                    SecurityUtil.isEncryptedPayload(candidate.description)
+                val rawDesc = if (wasEncrypted && !candidate.description.isNullOrBlank()) {
+                    SecurityUtil.decrypt(candidate.description!!)
+                } else {
+                    candidate.description ?: ""
+                }
+                if (rawDesc.isBlank()) continue
+
+                val parsedBlocks = BlockParser.parse(rawDesc).toMutableList()
+                val blocksToRemove = mutableListOf<NoteBlock>()
+                var noteModified = false
+
+                for (idx in parsedBlocks.indices) {
+                    var block = parsedBlocks[idx]
+                    var blockChanged = false
+
+                    if (block.type == BlockType.SUB_PAGE) {
+                        val matchesId = block.subPageNoteId == deletedNoteId
+                        val matchesTitle = titlesToRemove.any {
+                            block.content.trim().equals(it, ignoreCase = true)
+                        }
+                        if (matchesId || matchesTitle) {
+                            blocksToRemove.add(block)
+                            noteModified = true
+                            continue
+                        }
+                    }
+
+                    for (deadTitle in titlesToRemove) {
+                        val pattern = Regex("""\[\[\s*${Regex.escape(deadTitle)}\s*\]\]\s*""", RegexOption.IGNORE_CASE)
+                        if (pattern.containsMatchIn(block.content)) {
+                            val cleanedContent = pattern.replace(block.content, "").trimEnd()
+                            block = block.copy(content = cleanedContent)
+                            blockChanged = true
+                        }
+                        if (pattern.containsMatchIn(block.toggleBody)) {
+                            val cleanedBody = pattern.replace(block.toggleBody, "").trimEnd()
+                            block = block.copy(toggleBody = cleanedBody)
+                            blockChanged = true
+                        }
+                    }
+
+                    if (blockChanged) {
+                        if (block.type == BlockType.PARAGRAPH &&
+                            block.content.isBlank() &&
+                            block.toggleBody.isBlank() &&
+                            block.mediaPath == null
+                        ) {
+                            blocksToRemove.add(block)
+                        } else {
+                            parsedBlocks[idx] = block
+                        }
+                        noteModified = true
+                    }
+                }
+
+                if (blocksToRemove.isNotEmpty()) {
+                    parsedBlocks.removeAll(blocksToRemove)
+                    if (parsedBlocks.isEmpty()) {
+                        parsedBlocks.add(NoteBlock())
+                    }
+                }
+
+                if (noteModified) {
+                    val serialized = BlockParser.serialize(parsedBlocks)
+                    val finalDesc = if (wasEncrypted) SecurityUtil.encrypt(serialized) else serialized
+                    val updatedCandidate = candidate.copy(description = finalDesc).also {
+                        it.id = candidate.id
+                    }
+                    runCatching { repository.update(updatedCandidate).blockingAwait() }
+                }
+            }
+
+            runCatching {
+                knowledgeRepository.deleteLinksForNote(deletedNoteId).blockingAwait()
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     fun delete(item: NoteData) {
-        repository.delete(item).subscribeOn(Schedulers.io())
+        io.reactivex.Completable.fromAction {
+            purgeDeletedNoteReferencesSync(item.id, item.title)
+            repository.delete(item).blockingAwait()
+        }.subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllNotes()
+                getAllLinks()
                 notifyWidgetSync()
                 triggerAutoSync()
             }, {
@@ -241,9 +371,15 @@ class NoteViewModel @Inject constructor(
     }
 
     fun deleteNoteById(id: Int) {
-        repository.deleteNoteById(id).subscribeOn(Schedulers.io())
+        io.reactivex.Completable.fromAction {
+            val existingTitle = runCatching { repository.getNoteById(id).blockingGet()?.title }.getOrNull()
+                ?: _noteList.value?.find { it.id == id }?.title
+            purgeDeletedNoteReferencesSync(id, existingTitle)
+            repository.deleteNoteById(id).blockingAwait()
+        }.subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllNotes()
+                getAllLinks()
                 notifyWidgetSync()
                 triggerAutoSync()
                 Log.i("NoteViewModel", "Note deleted successfully")
@@ -501,6 +637,7 @@ class NoteViewModel @Inject constructor(
             onSuccess = { notesCount, catsCount ->
                 getAllNotes()
                 getAllLinks()
+                loadStreamItems()
                 notifyWidgetSync()
                 onSuccess(notesCount, catsCount)
             },

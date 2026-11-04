@@ -13,6 +13,9 @@ interface StreamItemDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(item: StreamItemData): Single<Long>
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertAll(items: List<StreamItemData>): Completable
+
     @Delete
     fun delete(item: StreamItemData): Completable
 

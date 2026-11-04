@@ -915,6 +915,14 @@ fun NoteDetailScreen(
                         onNavigateToNote?.invoke(existingTarget.id)
                     }
                 }
+            } else if (block.subPageNoteId != null) {
+                // Target sub-page was deleted; remove the dead block instead of creating a duplicate note
+                blocks.remove(block)
+                if (blocks.isEmpty()) {
+                    blocks.add(NoteBlock())
+                }
+                performSilentAutoSave()
+                context.showToastShort("Alt sayfa silinmiş, bağlantı kaldırıldı")
             } else {
                 val childTitle = if (block.content.isBlank()) "Yeni Alt Sayfa" else block.content.trim()
                 val newChild = NoteData(
@@ -983,10 +991,7 @@ fun NoteDetailScreen(
                     }
                 }
             }
-        }
-
-        performSilentAutoSave {
-            if (found != null) {
+            performSilentAutoSave {
                 val isTargetCatLocked = categoryList.find { it.id == (found.categoryId ?: 1) }?.isPassword == true
                 if ((found.isPassword == true || found.isEncrypted || isTargetCatLocked) && !SecurityUtil.isVaultUnlocked) {
                     requestGatekeeperUnlock {
@@ -995,20 +1000,45 @@ fun NoteDetailScreen(
                 } else {
                     onNavigateToNote?.invoke(found.id)
                 }
-            } else {
-                val newNote = NoteData(
-                    title = trimmed,
-                    description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
-                    date = System.currentTimeMillis(),
-                    categoryId = selectedCategoryId,
-                    icon = "📄"
-                )
-                noteViewModel.saveNote(newNote, contentForLinks = null) { newId ->
-                    knownLinkTargets[trimmedLower] = newId
-                    context.showToastShort(context.getString(R.string.subpage_created_toast, trimmed))
-                    onNavigateToNote?.invoke(newId)
+            }
+        } else {
+            // Never create a new note when clicking a dead or non-existent [[WikiLink]].
+            // Clean up the dead link from the current note and notify the user.
+            knownLinkTargets.remove(trimmedLower)
+            val deadPattern = Regex("""\[\[\s*${Regex.escape(trimmed)}\s*\]\]\s*""", RegexOption.IGNORE_CASE)
+            val emptyBlocksToRemove = mutableListOf<NoteBlock>()
+            for (idx in blocks.indices) {
+                val blk = blocks[idx]
+                var updated = blk
+                var changed = false
+                if (deadPattern.containsMatchIn(blk.content)) {
+                    updated = updated.copy(content = deadPattern.replace(blk.content, "").trimEnd())
+                    changed = true
+                }
+                if (deadPattern.containsMatchIn(blk.toggleBody)) {
+                    updated = updated.copy(toggleBody = deadPattern.replace(blk.toggleBody, "").trimEnd())
+                    changed = true
+                }
+                if (changed) {
+                    if (updated.type == BlockType.PARAGRAPH &&
+                        updated.content.isBlank() &&
+                        updated.toggleBody.isBlank() &&
+                        updated.mediaPath == null
+                    ) {
+                        emptyBlocksToRemove.add(blk)
+                    } else {
+                        blocks[idx] = updated
+                    }
                 }
             }
+            if (emptyBlocksToRemove.isNotEmpty()) {
+                blocks.removeAll(emptyBlocksToRemove)
+                if (blocks.isEmpty()) {
+                    blocks.add(NoteBlock())
+                }
+            }
+            performSilentAutoSave()
+            context.showToastShort("Bağlanan not silinmiş veya mevcut değil, bağlantı kaldırıldı")
         }
     }
 
@@ -1065,7 +1095,7 @@ fun NoteDetailScreen(
                     }
                 }
 
-                // Sync [[WikiLink]] text in block content and toggleBody if target note was renamed
+                // Sync [[WikiLink]] text in block content and toggleBody: update if renamed, remove if deleted/trashed
                 val combinedText = b.content + " " + b.toggleBody
                 if (combinedText.contains("[[")) {
                     val matches = wikiRegex.findAll(combinedText).map { it.groupValues[1].trim() }.filter { it.isNotBlank() }.toSet()
@@ -1078,28 +1108,63 @@ fun NoteDetailScreen(
                             ?: allLinks.find { it.linkText.trim().lowercase() == lower }?.targetNoteId
                         if (targetId != null) {
                             val targetNote = allNotesForLinking.find { it.id == targetId && it.status != "TRASH" }
-                            val latestTitle = targetNote?.title?.trim()
-                            if (!latestTitle.isNullOrBlank() && latestTitle != rawLink) {
-                                val replaceRegex = Regex("""\[\[\s*${Regex.escape(rawLink)}\s*\]\]""", RegexOption.IGNORE_CASE)
-                                if (replaceRegex.containsMatchIn(updatedBlock.content)) {
-                                    updatedBlock = updatedBlock.copy(content = replaceRegex.replace(updatedBlock.content, "[[$latestTitle]]"))
+                            if (targetNote == null) {
+                                // Target note was deleted or moved to Trash -> remove [[rawLink]]
+                                val removeRegex = Regex("""\[\[\s*${Regex.escape(rawLink)}\s*\]\]\s*""", RegexOption.IGNORE_CASE)
+                                if (removeRegex.containsMatchIn(updatedBlock.content)) {
+                                    updatedBlock = updatedBlock.copy(content = removeRegex.replace(updatedBlock.content, "").trimEnd())
                                     textChanged = true
                                 }
-                                if (replaceRegex.containsMatchIn(updatedBlock.toggleBody)) {
-                                    updatedBlock = updatedBlock.copy(toggleBody = replaceRegex.replace(updatedBlock.toggleBody, "[[$latestTitle]]"))
+                                if (removeRegex.containsMatchIn(updatedBlock.toggleBody)) {
+                                    updatedBlock = updatedBlock.copy(toggleBody = removeRegex.replace(updatedBlock.toggleBody, "").trimEnd())
                                     textChanged = true
                                 }
-                                knownLinkTargets[latestTitle.lowercase()] = targetId
+                                knownLinkTargets.remove(lower)
+                            } else {
+                                val latestTitle = targetNote.title?.trim()
+                                if (!latestTitle.isNullOrBlank() && latestTitle != rawLink) {
+                                    val replaceRegex = Regex("""\[\[\s*${Regex.escape(rawLink)}\s*\]\]""", RegexOption.IGNORE_CASE)
+                                    if (replaceRegex.containsMatchIn(updatedBlock.content)) {
+                                        updatedBlock = updatedBlock.copy(content = replaceRegex.replace(updatedBlock.content, "[[$latestTitle]]"))
+                                        textChanged = true
+                                    }
+                                    if (replaceRegex.containsMatchIn(updatedBlock.toggleBody)) {
+                                        updatedBlock = updatedBlock.copy(toggleBody = replaceRegex.replace(updatedBlock.toggleBody, "[[$latestTitle]]"))
+                                        textChanged = true
+                                    }
+                                    knownLinkTargets[latestTitle.lowercase()] = targetId
+                                }
                             }
                         } else {
-                            // Record known ID when current title matches
-                            allNotesForLinking.find { it.status != "TRASH" && it.title?.trim().equals(rawLink, ignoreCase = true) }?.let { matchedNote ->
-                                knownLinkTargets[lower] = matchedNote.id
+                            val activeMatch = allNotesForLinking.find {
+                                it.status != "TRASH" && it.title?.trim().equals(rawLink, ignoreCase = true)
+                            }
+                            if (activeMatch != null) {
+                                knownLinkTargets[lower] = activeMatch.id
+                            } else {
+                                // Note does not exist in active notes (was deleted or trashed) -> remove dead [[rawLink]]
+                                val removeRegex = Regex("""\[\[\s*${Regex.escape(rawLink)}\s*\]\]\s*""", RegexOption.IGNORE_CASE)
+                                if (removeRegex.containsMatchIn(updatedBlock.content)) {
+                                    updatedBlock = updatedBlock.copy(content = removeRegex.replace(updatedBlock.content, "").trimEnd())
+                                    textChanged = true
+                                }
+                                if (removeRegex.containsMatchIn(updatedBlock.toggleBody)) {
+                                    updatedBlock = updatedBlock.copy(toggleBody = removeRegex.replace(updatedBlock.toggleBody, "").trimEnd())
+                                    textChanged = true
+                                }
                             }
                         }
                     }
                     if (textChanged) {
-                        blocks[i] = updatedBlock
+                        if (updatedBlock.type == BlockType.PARAGRAPH &&
+                            updatedBlock.content.isBlank() &&
+                            updatedBlock.toggleBody.isBlank() &&
+                            updatedBlock.mediaPath == null
+                        ) {
+                            toRemove.add(b)
+                        } else {
+                            blocks[i] = updatedBlock
+                        }
                         blocksModified = true
                     }
                 }

@@ -21,6 +21,7 @@ class KnowledgeRepository @Inject constructor(
     fun insertLink(link: NoteLinkData): Single<Long> = noteLinkDao.insert(link)
     fun insertAllLinks(links: List<NoteLinkData>): Completable = noteLinkDao.insertAll(links)
     fun deleteLinksFromSource(noteId: Int): Completable = noteLinkDao.deleteLinksFromSource(noteId)
+    fun deleteLinksForNote(noteId: Int): Completable = noteLinkDao.deleteLinksForNote(noteId)
     fun getOutgoingLinks(noteId: Int): Single<List<NoteLinkData>> = noteLinkDao.getOutgoingLinks(noteId)
     fun getBacklinks(noteId: Int): Single<List<NoteLinkData>> = noteLinkDao.getBacklinks(noteId)
     fun updateTargetLinkText(targetNoteId: Int, newTitle: String): Completable =
@@ -38,6 +39,7 @@ class KnowledgeRepository @Inject constructor(
 
     // --- Quick Inbox Stream ---
     fun insertStreamItem(item: StreamItemData): Single<Long> = streamItemDao.insert(item)
+    fun insertAllStreamItems(items: List<StreamItemData>): Completable = streamItemDao.insertAll(items)
     fun deleteStreamItem(item: StreamItemData): Completable = streamItemDao.delete(item)
     fun getAllStreamItems(): Single<List<StreamItemData>> = streamItemDao.getAllItems()
     fun getUnprocessedStreamItems(): Single<List<StreamItemData>> = streamItemDao.getUnprocessedItems()

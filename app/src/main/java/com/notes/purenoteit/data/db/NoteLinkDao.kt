@@ -22,6 +22,9 @@ interface NoteLinkDao {
     @Query("DELETE FROM note_links WHERE sourceNoteId = :noteId")
     fun deleteLinksFromSource(noteId: Int): Completable
 
+    @Query("DELETE FROM note_links WHERE sourceNoteId = :noteId OR targetNoteId = :noteId")
+    fun deleteLinksForNote(noteId: Int): Completable
+
     @Query("SELECT * FROM note_links WHERE sourceNoteId = :sourceNoteId")
     fun getOutgoingLinks(sourceNoteId: Int): Single<List<NoteLinkData>>
 

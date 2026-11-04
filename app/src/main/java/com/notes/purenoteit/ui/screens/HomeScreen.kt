@@ -334,7 +334,12 @@ fun HomeScreen(
     val subpageIds = remember(activeNotes) {
         activeNotes.flatMap { note ->
             try {
-                val blocks = BlockParser.parse(note.description ?: "")
+                val rawDesc = if (SecurityUtil.isEncryptedPayload(note.description)) {
+                    SecurityUtil.decrypt(note.description ?: "")
+                } else {
+                    note.description ?: ""
+                }
+                val blocks = BlockParser.parse(rawDesc)
                 blocks.filter { it.type == BlockType.SUB_PAGE }.mapNotNull { it.subPageNoteId }
             } catch (e: Exception) {
                 emptyList()
@@ -344,7 +349,12 @@ fun HomeScreen(
     val subpageTitles = remember(activeNotes) {
         activeNotes.flatMap { note ->
             try {
-                val blocks = BlockParser.parse(note.description ?: "")
+                val rawDesc = if (SecurityUtil.isEncryptedPayload(note.description)) {
+                    SecurityUtil.decrypt(note.description ?: "")
+                } else {
+                    note.description ?: ""
+                }
+                val blocks = BlockParser.parse(rawDesc)
                 blocks.filter { it.type == BlockType.SUB_PAGE && it.content.isNotBlank() }
                     .map { it.content.trim().lowercase() }
             } catch (e: Exception) {
