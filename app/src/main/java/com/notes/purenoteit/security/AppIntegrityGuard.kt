@@ -3,15 +3,19 @@ package com.notes.purenoteit.security
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.content.pm.Signature
 import android.os.Build
 import android.os.Debug
 import com.notes.purenoteit.util.SecurityUtil
 import java.io.BufferedReader
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileReader
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.MessageDigest
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 
 enum class IntegrityStatus {
     SECURE,
@@ -28,35 +32,20 @@ data class IntegrityCheckResult(
 
 /**
  * Runtime Application Self-Protection (RASP) & App Integrity Engine.
- * Safeguards PureNoteIt against:
- * 1. Unauthorized APK re-signing / cloning (Signature Tamper Check)
- * 2. Active memory inspection (Anti-Debug via JDWP & Linux TracerPid)
- * 3. Dynamic memory hooking & runtime tampering (Anti-Frida & Anti-Xposed)
+ *
+ * Implements 3 real-time defenses with XOR-masked strings:
+ * 1. Package, Container & X.509 / SHA-256 Certificate Tamper Check
+ * 2. Anti-Debug via JDWP & Linux /proc/self/status TracerPid
+ * 3. Anti-Hooking via /proc/self/maps memory scan & off-main-thread Frida TCP port probe
  */
 object AppIntegrityGuard {
 
-    private val SUSPICIOUS_LIBRARIES = listOf(
-        "frida",
-        "gadget",
-        "xposed",
-        "substrate",
-        "edxposed",
-        "lsposed",
-        "sandhook"
-    )
-
-    private val GENERIC_DEBUG_SIGNATURE_TOKENS = listOf(
-        "androiddebugkey",
-        "cn=android debug",
-        "ou=android",
-        "testkey"
-    )
-
     /**
-     * Executes a comprehensive, low-overhead RASP integrity scan.
+     * Synchronous, zero-network RASP check safe to execute on the main thread
+     * in Activity.onCreate() BEFORE any database or ViewModel initialization.
      */
-    fun checkAppIntegrity(context: Context): IntegrityCheckResult {
-        // 1. Anti-Debug Check
+    fun checkAppIntegritySync(context: Context): IntegrityCheckResult {
+        // 1. Anti-Debug Check (JDWP + TracerPid)
         if (isDebuggerActive(context)) {
             SecurityUtil.lockVault()
             return IntegrityCheckResult(
@@ -66,8 +55,8 @@ object AppIntegrityGuard {
             )
         }
 
-        // 2. Anti-Hooking (Frida / Xposed) Check
-        if (isHookingFrameworkDetected(context)) {
+        // 2. Memory Map Anti-Hooking Check (Frida / Xposed / LSPosed / Substrate)
+        if (isMemoryMapHooked()) {
             SecurityUtil.lockVault()
             return IntegrityCheckResult(
                 isSafe = false,
@@ -76,13 +65,13 @@ object AppIntegrityGuard {
             )
         }
 
-        // 3. App Signature & Package Tamper Check
-        if (!isSignatureAuthentic(context)) {
+        // 3. Package Identity, Container & X.509 / SHA-256 Signature Check
+        if (!isSignatureAndPackageAuthentic(context)) {
             SecurityUtil.lockVault()
             return IntegrityCheckResult(
                 isSafe = false,
                 status = IntegrityStatus.SIGNATURE_TAMPERED,
-                message = "Uygulama imza bütünlüğü bozulmuş veya sahte bir paket tespit edildi."
+                message = "Uygulama imza bütünlüğü bozulmuş veya sahte/klon bir paket tespit edildi."
             )
         }
 
@@ -90,26 +79,42 @@ object AppIntegrityGuard {
     }
 
     /**
-     * Detects attached Java debuggers, release debug flags, or Linux ptrace debuggers.
+     * Must be invoked from a background IO thread (Dispatchers.IO) so that Android does not
+     * throw NetworkOnMainThreadException when probing the local Frida server port (27042).
+     */
+    fun isLocalHookingPortOpen(context: Context): Boolean {
+        if (isAppDebuggable(context)) return false
+        return try {
+            val host = ObfuscatedSecrets.decode(ObfuscatedSecrets.LOCALHOST)
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(host, 27042), 50)
+                SecurityUtil.lockVault()
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Detects attached Java debuggers or Linux ptrace debuggers via /proc/self/status.
      */
     private fun isDebuggerActive(context: Context): Boolean {
-        // Direct framework debugger check
         if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) {
             return true
         }
 
-        // Check if app is explicitly marked debuggable
         val isDebuggable = isAppDebuggable(context)
-
-        // Check Linux TracerPid in /proc/self/status (detects gdb / lldb / strace)
         try {
-            val statusFile = File("/proc/self/status")
+            val statusPath = ObfuscatedSecrets.decode(ObfuscatedSecrets.PROC_STATUS)
+            val tracerPrefix = ObfuscatedSecrets.decode(ObfuscatedSecrets.TRACER_PID)
+            val statusFile = File(statusPath)
             if (statusFile.exists() && statusFile.canRead()) {
                 BufferedReader(FileReader(statusFile)).use { reader ->
                     var line = reader.readLine()
                     while (line != null) {
-                        if (line.startsWith("TracerPid:")) {
-                            val pid = line.substring(10).trim().toIntOrNull() ?: 0
+                        if (line.startsWith(tracerPrefix)) {
+                            val pid = line.substring(tracerPrefix.length).trim().toIntOrNull() ?: 0
                             if (pid > 0 && !isDebuggable) {
                                 return true
                             }
@@ -120,26 +125,28 @@ object AppIntegrityGuard {
                 }
             }
         } catch (_: Exception) {
-            // Best-effort check; do not crash if inaccessible on restricted SELinux
         }
 
         return false
     }
 
     /**
-     * Inspects /proc/self/maps and local TCP socket ports for Frida / Xposed hooking agents.
+     * Scans /proc/self/maps for injected hooking shared libraries using XOR-decoded tokens.
      */
-    private fun isHookingFrameworkDetected(context: Context): Boolean {
-        // A. Scan loaded memory maps for injected hooking shared libraries
+    private fun isMemoryMapHooked(): Boolean {
         try {
-            val mapsFile = File("/proc/self/maps")
+            val mapsPath = ObfuscatedSecrets.decode(ObfuscatedSecrets.PROC_MAPS)
+            val mapsFile = File(mapsPath)
             if (mapsFile.exists() && mapsFile.canRead()) {
+                val decodedTokens = ObfuscatedSecrets.SUSPICIOUS_TOKENS.map {
+                    ObfuscatedSecrets.decode(it)
+                }
                 BufferedReader(FileReader(mapsFile)).use { reader ->
                     var line = reader.readLine()
                     while (line != null) {
                         val lower = line.lowercase()
-                        for (suspicious in SUSPICIOUS_LIBRARIES) {
-                            if (lower.contains(suspicious)) {
+                        for (token in decodedTokens) {
+                            if (lower.contains(token)) {
                                 return true
                             }
                         }
@@ -148,53 +155,71 @@ object AppIntegrityGuard {
                 }
             }
         } catch (_: Exception) {
-            // Ignore restricted access
         }
-
-        // B. Quick non-blocking socket check for default Frida server on localhost
-        if (!isAppDebuggable(context)) {
-            try {
-                Socket().use { socket ->
-                    socket.connect(InetSocketAddress("127.0.0.1", 27042), 40)
-                    return true // Port is open, Frida server is listening!
-                }
-            } catch (_: Exception) {
-                // Connection refused or timed out -> Normal behavior
-            }
-        }
-
         return false
     }
 
     /**
-     * Validates that the APK signature is legitimate and not tampered by third-party repackagers.
+     * Validates:
+     * 1. Package name matches com.purenoteit.app (blocks package-renamed clones)
+     * 2. App data directory belongs to com.purenoteit.app (blocks VirtualXposed / DualSpace containers)
+     * 3. Real X.509 certificate Subject/Issuer DN & SHA-256 fingerprint are authentic and not signed
+     *    by debug, AOSP testkey, APKTool, LuckyPatcher, MT Manager, or NP Manager certificates.
      */
-    private fun isSignatureAuthentic(context: Context): Boolean {
-        // In local development debug mode, skip release signature validation
+    private fun isSignatureAndPackageAuthentic(context: Context): Boolean {
+        val expectedPkg = ObfuscatedSecrets.decode(ObfuscatedSecrets.EXPECTED_PKG)
+        if (context.packageName != expectedPkg || context.applicationInfo.packageName != expectedPkg) {
+            return false
+        }
+
+        // Verify internal data path is not hosted inside a virtual cloning container
+        val dataPath = context.filesDir.absolutePath
+        if (!dataPath.contains(expectedPkg)) {
+            return false
+        }
+
+        // Skip release certificate inspection during local Android Studio debug builds
         if (isAppDebuggable(context)) return true
 
         return try {
-            val certs = getAppCertificates(context)
-            if (certs.isEmpty()) return false
+            val rawSignatures = getRawSignatures(context)
+            if (rawSignatures.isEmpty()) return false
 
-            // Reject packages signed with generic AOSP test keys in release builds
-            for (certStr in certs) {
-                val lower = certStr.lowercase()
-                for (token in GENERIC_DEBUG_SIGNATURE_TOKENS) {
-                    if (lower.contains(token)) {
-                        return false // Tampered / re-signed with debug key!
+            val certType = ObfuscatedSecrets.decode(ObfuscatedSecrets.CERT_X509)
+            val certFactory = CertificateFactory.getInstance(certType)
+            val bannedDnTokens = ObfuscatedSecrets.TAMPER_CERT_TOKENS.map {
+                ObfuscatedSecrets.decode(it)
+            }
+            val aospTestKeyHash = ObfuscatedSecrets.decode(ObfuscatedSecrets.AOSP_TESTKEY_SHA256)
+
+            for (sig in rawSignatures) {
+                val certBytes = sig.toByteArray()
+                val certHash = sha256(certBytes)
+                if (certHash.equals(aospTestKeyHash, ignoreCase = true)) {
+                    return false
+                }
+
+                val x509 = ByteArrayInputStream(certBytes).use { stream ->
+                    certFactory.generateCertificate(stream) as? X509Certificate
+                } ?: return false
+
+                val subjectDn = x509.subjectX500Principal.name.lowercase()
+                val issuerDn = x509.issuerX500Principal.name.lowercase()
+
+                for (banned in bannedDnTokens) {
+                    if (subjectDn.contains(banned) || issuerDn.contains(banned)) {
+                        return false
                     }
                 }
             }
             true
-        } catch (e: Exception) {
-            // Default to safe in case of unexpected platform errors
+        } catch (_: Exception) {
             true
         }
     }
 
-    private fun getAppCertificates(context: Context): List<String> {
-        val result = mutableListOf<String>()
+    private fun getRawSignatures(context: Context): List<Signature> {
+        val result = mutableListOf<Signature>()
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val sigInfo = context.packageManager.getPackageInfo(
@@ -206,9 +231,7 @@ object AppIntegrityGuard {
                 } else {
                     sigInfo?.signingCertificateHistory
                 }
-                signatures?.forEach { sig ->
-                    result.add(sig.toCharsString())
-                }
+                signatures?.let { result.addAll(it) }
             } else {
                 @Suppress("DEPRECATION")
                 val pInfo = context.packageManager.getPackageInfo(
@@ -216,9 +239,7 @@ object AppIntegrityGuard {
                     PackageManager.GET_SIGNATURES
                 )
                 @Suppress("DEPRECATION")
-                pInfo.signatures?.forEach { sig ->
-                    result.add(sig.toCharsString())
-                }
+                pInfo.signatures?.let { result.addAll(it) }
             }
         } catch (_: Exception) {
         }
@@ -226,7 +247,8 @@ object AppIntegrityGuard {
     }
 
     private fun sha256(bytes: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256")
+        val algo = ObfuscatedSecrets.decode(ObfuscatedSecrets.HASH_SHA256)
+        val digest = MessageDigest.getInstance(algo)
         return digest.digest(bytes).joinToString("") { "%02X".format(it) }
     }
 

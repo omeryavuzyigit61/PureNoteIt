@@ -45,11 +45,12 @@ import com.notes.purenoteit.viewmodel.NoteViewModel
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.notes.purenoteit.R
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -102,21 +103,38 @@ class MainActivity : AppCompatActivity() {
 
         activeIntent = intent
 
-        // Ensure default categories exist and notes are loaded
-        categoryViewModel.seedDefaultCategories()
-        noteViewModel.getAllNotes()
+        // Synchronous RASP gate BEFORE database initialization
+        val initialIntegrity = AppIntegrityGuard.checkAppIntegritySync(this)
+        if (initialIntegrity.isSafe) {
+            categoryViewModel.seedDefaultCategories()
+            noteViewModel.getAllNotes()
+        }
 
         setContent {
             var themeMode by remember { mutableStateOf(ThemeManager.getThemeMode(this@MainActivity)) }
             val isDarkTheme = ThemeManager.isDarkTheme(this@MainActivity, themeMode)
 
             var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
-            var integrityViolation by remember { mutableStateOf<String?>(null) }
+            var integrityViolation by remember {
+                mutableStateOf(if (!initialIntegrity.isSafe) initialIntegrity.message else null)
+            }
 
             LaunchedEffect(Unit) {
-                val check = AppIntegrityGuard.checkAppIntegrity(this@MainActivity)
-                if (!check.isSafe) {
-                    integrityViolation = check.message
+                if (integrityViolation == null) {
+                    val portOpen = withContext(Dispatchers.IO) {
+                        AppIntegrityGuard.isLocalHookingPortOpen(this@MainActivity)
+                    }
+                    if (portOpen) {
+                        integrityViolation = "Bellek dinleme portu (Frida) tespit edildi. Kasa kilitlendi."
+                    }
+                }
+            }
+
+            LaunchedEffect(integrityViolation) {
+                if (integrityViolation != null) {
+                    SecurityUtil.lockVault()
+                    delay(2500)
+                    finishAffinity()
                 }
             }
 
@@ -125,11 +143,34 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Crossfade(
-                        targetState = showSplash,
-                        animationSpec = tween(300),
-                        label = "splashTransition"
-                    ) { isSplash ->
+                    if (integrityViolation != null) {
+                        AlertDialog(
+                            onDismissRequest = {},
+                            title = {
+                                Text(
+                                    text = "Güvenlik Uyarısı",
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            },
+                            text = {
+                                Text(
+                                    text = integrityViolation ?: "Uygulama bütünlüğü doğrulanamadı. Güvenlik nedeniyle uygulama kapatılıyor.",
+                                    fontSize = 14.sp
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { finishAffinity() }) {
+                                    Text(text = "Kapat", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        )
+                    } else {
+                        Crossfade(
+                            targetState = showSplash,
+                            animationSpec = tween(300),
+                            label = "splashTransition"
+                        ) { isSplash ->
                         if (isSplash) {
                             AnimatedSplashScreen(onAnimationFinish = { showSplash = false })
                         } else {
@@ -293,35 +334,12 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
-
-                    if (integrityViolation != null) {
-                        AlertDialog(
-                            onDismissRequest = {},
-                            title = {
-                                Text(
-                                    text = "Güvenlik Uyarısı",
-                                    fontWeight = FontWeight.Bold,
-                                    color = VibrantOrange
-                                )
-                            },
-                            text = {
-                                Text(
-                                    text = integrityViolation ?: "Uygulama bütünlüğü doğrulanamadı. Güvenlik nedeniyle uygulama kapatılıyor.",
-                                    fontSize = 14.sp
-                                )
-                            },
-                            confirmButton = {
-                                TextButton(onClick = { finishAffinity() }) {
-                                    Text(text = "Kapat", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        )
+                    }
                     }
                 }
             }
         }
     }
-}
 
     override fun onStop() {
         super.onStop()

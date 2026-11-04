@@ -11,7 +11,6 @@ import android.os.PersistableBundle
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import android.util.Log
 import com.notes.purenoteit.security.ObfuscatedSecrets
 import com.notes.purenoteit.util.Constants.SHARED_PREFENCES_KEY
 import java.security.KeyStore
@@ -38,9 +37,9 @@ object SecurityUtil {
     private const val MAX_FAILED_ATTEMPTS = 5
     private const val LOCKOUT_DURATION_MS = 30_000L
 
-    // Legacy PIN Keys (Kept strictly for transparent migration)
-    private const val KEY_PIN_HASH = "pin_hash_key"
-    private const val KEY_LEGACY_PIN = "password_key"
+    // Legacy PIN Keys (XOR Obfuscated, kept strictly for transparent migration)
+    private val KEY_PIN_HASH by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.KEY_PIN_HASH_LEGACY) }
+    private val KEY_LEGACY_PIN by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.KEY_LEGACY_PIN) }
     private val APP_SALT by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.APP_SALT) }
     private val AES_KEY_SALT by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.AES_KEY_SALT) }
 
@@ -150,8 +149,7 @@ object SecurityUtil {
                     recordFailedAttempt(context)
                 }
                 valid
-            } catch (e: Exception) {
-                Log.e("SecurityUtil", "PBKDF2 PIN verification failed: ${e.message}")
+            } catch (_: Exception) {
                 false
             }
         }
@@ -232,8 +230,7 @@ object SecurityUtil {
                 .build()
             keyGenerator.init(keyGenSpec)
             keyGenerator.generateKey()
-        } catch (e: Exception) {
-            Log.w("SecurityUtil", "Hardware Keystore unavailable, falling back to PBKDF2 key: ${e.message}")
+        } catch (_: Exception) {
             null
         }
     }
@@ -268,8 +265,7 @@ object SecurityUtil {
 
                 return "ENC_V2:" + Base64.encodeToString(combined, Base64.NO_WRAP)
             }
-        } catch (e: Exception) {
-            Log.w("SecurityUtil", "Hardware encryption fallback triggered: ${e.message}")
+        } catch (_: Exception) {
         }
 
         // 2. Fallback to software AES-256-GCM (ENC:) for cross-device backup portability / JVM tests
@@ -295,8 +291,7 @@ object SecurityUtil {
             System.arraycopy(cipherText, 0, combined, iv.size, cipherText.size)
 
             "ENC:" + Base64.encodeToString(combined, Base64.NO_WRAP)
-        } catch (e: Exception) {
-            Log.e("SecurityUtil", "Portable encryption failed: ${e.message}")
+        } catch (_: Exception) {
             plainText
         }
     }
@@ -323,8 +318,7 @@ object SecurityUtil {
 
                 val original = cipher.doFinal(cipherText)
                 String(original, Charsets.UTF_8)
-            } catch (e: Exception) {
-                Log.e("SecurityUtil", "Hardware V2 decryption failed: ${e.message}")
+            } catch (_: Exception) {
                 encryptedText
             }
         }
@@ -348,13 +342,12 @@ object SecurityUtil {
 
             val original = cipher.doFinal(cipherText)
             String(original, Charsets.UTF_8)
-        } catch (e: Exception) {
-            Log.e("SecurityUtil", "Decryption failed: ${e.message}")
+        } catch (_: Exception) {
             encryptedText
         }
     }
 
-    // --- Bitwarden Clipboard Auto-Clear with Android 13+ Sensitive Flag ---
+    // --- Clipboard Auto-Clear with Android 13+ Sensitive Flag ---
 
     fun copyToClipboardWithAutoClear(
         context: Context,
@@ -379,9 +372,7 @@ object SecurityUtil {
                 } else {
                     clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
                 }
-                Log.i("SecurityUtil", "Clipboard auto-cleared securely")
-            } catch (e: Exception) {
-                Log.e("SecurityUtil", "Clipboard clear failed: ${e.message}")
+            } catch (_: Exception) {
             }
         }, timeoutSeconds * 1000)
     }
