@@ -55,22 +55,24 @@ class NoteViewModel @Inject constructor(
     private val _streamItems = MutableLiveData<List<StreamItemData>>()
     val streamItems: LiveData<List<StreamItemData>> = _streamItems
 
-    private var hasHealedOrphanSubPages = false
+    private var hasExecutedStartupMaintenance = false
 
     fun getAllNotes() {
         Single.fromCallable {
             val initialList = repository.getAllNotes().blockingGet()
-            if (!hasHealedOrphanSubPages) {
-                hasHealedOrphanSubPages = true
-                val healed = healOrphanedSubPagesSync(initialList)
-                if (healed) {
-                    repository.getAllNotes().blockingGet()
-                } else {
-                    initialList
+            var currentList = initialList
+            if (!hasExecutedStartupMaintenance) {
+                hasExecutedStartupMaintenance = true
+                val trashPurged = purgeAllTrashNotesOnUpgradeSync(currentList)
+                if (trashPurged) {
+                    currentList = repository.getAllNotes().blockingGet()
                 }
-            } else {
-                initialList
+                val healed = healOrphanedSubPagesSync(currentList)
+                if (healed) {
+                    currentList = repository.getAllNotes().blockingGet()
+                }
             }
+            currentList
         }
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
@@ -519,6 +521,33 @@ class NoteViewModel @Inject constructor(
         } catch (_: Exception) {
         }
         return anyModified
+    }
+
+    /**
+     * One-time maintenance pass executed on all devices receiving this update:
+     * Permanently purges all notes currently in the Trash bin and cleanly eliminates all
+     * references, backlinks, and child sub-page pointers so no corrupted/bugged notes
+     * can ever be restored.
+     */
+    private fun purgeAllTrashNotesOnUpgradeSync(notes: List<NoteData>): Boolean {
+        val prefs = context.getSharedPreferences("purenoteit_maintenance_prefs", Context.MODE_PRIVATE)
+        val alreadyPurged = prefs.getBoolean("has_purged_trash_subpage_fix_v1", false)
+        if (alreadyPurged) return false
+
+        var anyDeleted = false
+        try {
+            val trashedNotes = notes.filter { it.status == "TRASH" }
+            for (note in trashedNotes) {
+                purgeDeletedNoteReferencesSync(note.id, note.title)
+                repository.deleteNoteById(note.id).blockingAwait()
+                anyDeleted = true
+            }
+            prefs.edit().putBoolean("has_purged_trash_subpage_fix_v1", true).apply()
+            Log.i("NoteViewModel", "Successfully purged ${trashedNotes.size} trashed notes during update maintenance.")
+        } catch (e: Exception) {
+            Log.e("NoteViewModel", "Error purging trash notes on update: ${e.message}")
+        }
+        return anyDeleted
     }
 
     fun delete(item: NoteData) {
