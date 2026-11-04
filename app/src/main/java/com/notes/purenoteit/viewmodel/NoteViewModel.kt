@@ -195,16 +195,24 @@ class NoteViewModel @Inject constructor(
                     var blockChanged = false
 
                     if (block.type == BlockType.SUB_PAGE) {
-                        val matchesId = block.subPageNoteId == targetNoteId
-                        val matchesOldTitle = oldTitles.any {
-                            block.content.trim().equals(it, ignoreCase = true)
+                        val isMatch = if (block.subPageNoteId != null) {
+                            block.subPageNoteId == targetNoteId
+                        } else {
+                            oldTitles.any {
+                                block.content.trim().equals(it, ignoreCase = true)
+                            }
                         }
-                        if (matchesId || matchesOldTitle) {
+                        if (isMatch) {
                             if (block.content != newTitle || block.subPageNoteId != targetNoteId) {
                                 block = block.copy(content = newTitle, subPageNoteId = targetNoteId)
                                 blockChanged = true
                             }
                         }
+                        if (blockChanged) {
+                            parsedBlocks[idx] = block
+                            noteModified = true
+                        }
+                        continue
                     }
 
                     for (oldT in oldTitles) {
@@ -290,15 +298,20 @@ class NoteViewModel @Inject constructor(
                     var blockChanged = false
 
                     if (block.type == BlockType.SUB_PAGE) {
-                        val matchesId = block.subPageNoteId == deletedNoteId
-                        val matchesTitle = titlesToRemove.any {
-                            block.content.trim().equals(it, ignoreCase = true)
+                        val isMatch = if (block.subPageNoteId != null) {
+                            block.subPageNoteId == deletedNoteId
+                        } else {
+                            block.content.isNotBlank() &&
+                                !block.content.trim().equals("Yeni Alt Sayfa", ignoreCase = true) &&
+                                titlesToRemove.any {
+                                    block.content.trim().equals(it, ignoreCase = true)
+                                }
                         }
-                        if (matchesId || matchesTitle) {
+                        if (isMatch) {
                             blocksToRemove.add(block)
                             noteModified = true
-                            continue
                         }
+                        continue
                     }
 
                     for (deadTitle in titlesToRemove) {

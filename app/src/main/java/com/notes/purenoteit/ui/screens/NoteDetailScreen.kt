@@ -829,10 +829,29 @@ fun NoteDetailScreen(
         return note
     }
 
+    val pendingSubPageBlockIds = remember { mutableStateListOf<String>() }
+    var openWhenReadyBlockId by remember { mutableStateOf<String?>(null) }
+    var lastParentSubPageEditTime by remember { mutableLongStateOf(0L) }
+
+    fun syncSubPageTitlesToChildren() {
+        for (blk in blocks) {
+            if (blk.type == BlockType.SUB_PAGE) {
+                val childId = blk.subPageNoteId ?: continue
+                val childNote = allNotesForLinking.find { it.id == childId && it.status != "TRASH" } ?: continue
+                val desiredTitle = if (blk.content.isBlank()) "Yeni Alt Sayfa" else blk.content.trim()
+                if (childNote.title != desiredTitle) {
+                    val updatedChild = childNote.copy(title = desiredTitle).also { it.id = childNote.id }
+                    noteViewModel.saveNote(updatedChild, contentForLinks = null)
+                }
+            }
+        }
+    }
+
     fun performSilentAutoSave(onDone: ((Int) -> Unit)? = null) {
         if (isPassword && !isAccessGranted) return
         if (!hasContent && currentNoteId == -1) return
 
+        syncSubPageTitlesToChildren()
         val note = buildNoteDataObject()
         val allContentText = title + " " + blocks.joinToString(" ") { block ->
             if (block.type == BlockType.SUB_PAGE && block.content.isNotBlank()) {
@@ -849,6 +868,7 @@ fun NoteDetailScreen(
 
     fun saveNote(andClose: Boolean = true) {
         if (isPassword && !isAccessGranted) return
+        syncSubPageTitlesToChildren()
         val note = buildNoteDataObject()
         val allContentText = title + " " + blocks.joinToString(" ") { block ->
             if (block.type == BlockType.SUB_PAGE && block.content.isNotBlank()) {
@@ -892,25 +912,94 @@ fun NoteDetailScreen(
         }
     }
 
+    fun addSubPageBlock() {
+        recordUndoState()
+        val newBlock = NoteBlock(type = BlockType.SUB_PAGE, content = "")
+        val blockId = newBlock.id
+        pendingSubPageBlockIds.add(blockId)
+        blocks.add(newBlock)
+
+        val createChildForParent: (Int) -> Unit = { savedParentId ->
+            val currentBlock = blocks.find { it.id == blockId }
+            if (currentBlock == null) {
+                pendingSubPageBlockIds.remove(blockId)
+            } else {
+                val initialTitle = if (currentBlock.content.isNotBlank()) {
+                    currentBlock.content.trim()
+                } else {
+                    "Yeni Alt Sayfa"
+                }
+                val newChild = NoteData(
+                    title = initialTitle,
+                    description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
+                    date = System.currentTimeMillis(),
+                    categoryId = selectedCategoryId,
+                    icon = "📄",
+                    richBlocksJson = "{\"isSubPage\":true,\"parentNoteId\":$savedParentId}"
+                )
+                noteViewModel.saveNote(newChild, contentForLinks = null) { newChildId ->
+                    pendingSubPageBlockIds.remove(blockId)
+                    val idx = blocks.indexOfFirst { it.id == blockId }
+                    if (idx != -1) {
+                        val latest = blocks[idx]
+                        val shouldOpenImmediately = openWhenReadyBlockId == blockId
+                        blocks[idx] = latest.copy(
+                            subPageNoteId = newChildId,
+                            content = if (shouldOpenImmediately && latest.content.isBlank()) initialTitle else latest.content
+                        )
+                        performSilentAutoSave {
+                            if (shouldOpenImmediately) {
+                                openWhenReadyBlockId = null
+                                context.showToastShort(context.getString(R.string.subpage_created_toast, initialTitle))
+                                onNavigateToNote?.invoke(newChildId)
+                            }
+                        }
+                    } else {
+                        if (openWhenReadyBlockId == blockId) {
+                            openWhenReadyBlockId = null
+                        }
+                        noteViewModel.deleteNoteById(newChildId)
+                    }
+                }
+            }
+        }
+
+        if (currentNoteId != -1) {
+            createChildForParent(currentNoteId)
+        } else {
+            performSilentAutoSave { savedParentId ->
+                createChildForParent(savedParentId)
+            }
+        }
+    }
+
     fun navigateToSubPage(block: NoteBlock) {
         if (isPassword && !isAccessGranted) return
 
+        val blockIndex = blocks.indexOfFirst { it.id == block.id }
+        val latestBlock = if (blockIndex != -1) blocks[blockIndex] else block
+
+        if (latestBlock.subPageNoteId == null && latestBlock.id in pendingSubPageBlockIds) {
+            openWhenReadyBlockId = latestBlock.id
+            return
+        }
+
         performSilentAutoSave { savedParentId ->
-            val existingTarget = if (block.subPageNoteId != null) {
-                allNotesForLinking.find { it.id == block.subPageNoteId && it.status != "TRASH" }
-            } else {
-                val trimmed = block.content.trim()
-                if (trimmed.isNotBlank()) {
-                    allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) && it.status != "TRASH" }
-                } else null
-            }
+            val subId = latestBlock.subPageNoteId
+            val existingTarget = if (subId != null) {
+                allNotesForLinking.find { it.id == subId && it.status != "TRASH" }
+            } else null
 
             if (existingTarget != null) {
-                block.subPageNoteId = existingTarget.id
-                if (block.content.isBlank()) {
-                    block.content = existingTarget.title ?: "Alt Sayfa"
+                val desiredTitle = if (latestBlock.content.isBlank()) {
+                    existingTarget.title?.takeIf { it.isNotBlank() } ?: "Yeni Alt Sayfa"
+                } else {
+                    latestBlock.content.trim()
                 }
-                performSilentAutoSave {
+                if (latestBlock.content.isBlank() && blockIndex != -1) {
+                    blocks[blockIndex] = blocks[blockIndex].copy(content = desiredTitle)
+                }
+                val navigateAction = {
                     if (existingTarget.isPassword == true && !SecurityUtil.isVaultUnlocked) {
                         requestGatekeeperUnlock {
                             onNavigateToNote?.invoke(existingTarget.id)
@@ -919,16 +1008,24 @@ fun NoteDetailScreen(
                         onNavigateToNote?.invoke(existingTarget.id)
                     }
                 }
-            } else if (block.subPageNoteId != null) {
+                if (existingTarget.title != desiredTitle) {
+                    val updatedChild = existingTarget.copy(title = desiredTitle).also { it.id = existingTarget.id }
+                    noteViewModel.saveNote(updatedChild, contentForLinks = null) {
+                        performSilentAutoSave { navigateAction() }
+                    }
+                } else {
+                    performSilentAutoSave { navigateAction() }
+                }
+            } else if (subId != null) {
                 // Target sub-page was deleted; remove the dead block instead of creating a duplicate note
-                blocks.remove(block)
+                blocks.removeAll { it.id == latestBlock.id }
                 if (blocks.isEmpty()) {
                     blocks.add(NoteBlock())
                 }
                 performSilentAutoSave()
                 context.showToastShort("Alt sayfa silinmiş, bağlantı kaldırıldı")
             } else {
-                val childTitle = if (block.content.isBlank()) "Yeni Alt Sayfa" else block.content.trim()
+                val childTitle = if (latestBlock.content.isBlank()) "Yeni Alt Sayfa" else latestBlock.content.trim()
                 val newChild = NoteData(
                     title = childTitle,
                     description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
@@ -938,9 +1035,13 @@ fun NoteDetailScreen(
                     richBlocksJson = "{\"isSubPage\":true,\"parentNoteId\":$savedParentId}"
                 )
                 noteViewModel.saveNote(newChild, contentForLinks = null) { newChildId ->
-                    block.subPageNoteId = newChildId
-                    if (block.content.isBlank()) {
-                        block.content = childTitle
+                    val currentIdx = blocks.indexOfFirst { it.id == latestBlock.id }
+                    if (currentIdx != -1) {
+                        val cur = blocks[currentIdx]
+                        blocks[currentIdx] = cur.copy(
+                            subPageNoteId = newChildId,
+                            content = if (cur.content.isBlank()) childTitle else cur.content
+                        )
                     }
                     performSilentAutoSave {
                         context.showToastShort(context.getString(R.string.subpage_created_toast, childTitle))
@@ -1065,37 +1166,25 @@ fun NoteDetailScreen(
             for (i in blocks.indices) {
                 var b = blocks[i]
                 if (b.type == BlockType.SUB_PAGE) {
-                    val targetNote = if (b.subPageNoteId != null) {
-                        allNotesForLinking.find { it.id == b.subPageNoteId }
-                    } else {
-                        val trimmed = b.content.trim()
-                        if (trimmed.isNotBlank()) {
-                            allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
-                        } else if (currentNoteId != -1) {
-                            allNotesForLinking.find { it.richBlocksJson?.contains("\"parentNoteId\":$currentNoteId") == true }
-                        } else null
-                    }
-
-                    if (targetNote != null) {
-                        if (targetNote.status == "TRASH") {
+                    val subId = b.subPageNoteId
+                    if (subId != null) {
+                        val targetNote = allNotesForLinking.find { it.id == subId }
+                        if (targetNote == null || targetNote.status == "TRASH") {
                             toRemove.add(b)
                             blocksModified = true
                         } else {
                             val newTitle = targetNote.title
-                            val needTitleUpdate = !newTitle.isNullOrBlank() && b.content != newTitle
-                            val needIdUpdate = b.subPageNoteId != targetNote.id
-                            if (needTitleUpdate || needIdUpdate) {
-                                b = b.copy(
-                                    content = if (needTitleUpdate) newTitle!! else b.content,
-                                    subPageNoteId = targetNote.id
-                                )
+                            val isRecentlyEditedInParent = (System.currentTimeMillis() - lastParentSubPageEditTime) < 1500L
+                            val needTitleUpdate = !isRecentlyEditedInParent &&
+                                !newTitle.isNullOrBlank() &&
+                                b.content != newTitle &&
+                                !(b.content.isEmpty() && newTitle == "Yeni Alt Sayfa")
+                            if (needTitleUpdate) {
+                                b = b.copy(content = newTitle!!)
                                 blocks[i] = b
                                 blocksModified = true
                             }
                         }
-                    } else if (b.subPageNoteId != null) {
-                        toRemove.add(b)
-                        blocksModified = true
                     }
                 }
 
@@ -1761,8 +1850,12 @@ fun NoteDetailScreen(
 
                 NotionToolbar(
                     onAddBlock = { type ->
-                        recordUndoState()
-                        blocks.add(NoteBlock(type = type, content = ""))
+                        if (type == BlockType.SUB_PAGE) {
+                            addSubPageBlock()
+                        } else {
+                            recordUndoState()
+                            blocks.add(NoteBlock(type = type, content = ""))
+                        }
                     },
                     onPickImage = {
                         pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -2160,19 +2253,7 @@ fun NoteDetailScreen(
                     onContentChange = { newText ->
                         blocks[index] = block.copy(content = newText)
                         if (block.type == BlockType.SUB_PAGE) {
-                            val childId = block.subPageNoteId
-                            val childNote = if (childId != null) {
-                                allNotesForLinking.find { it.id == childId }
-                            } else {
-                                val trimmed = block.content.trim()
-                                if (trimmed.isNotBlank()) allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) } else null
-                            }
-                            if (childNote != null && childNote.title != newText) {
-                                val updatedTitle = if (newText.isBlank()) "Yeni Alt Sayfa" else newText.trim()
-                                val updatedChild = childNote.copy(title = updatedTitle)
-                                updatedChild.id = childNote.id
-                                noteViewModel.saveNote(updatedChild, contentForLinks = null)
-                            }
+                            lastParentSubPageEditTime = System.currentTimeMillis()
                         }
                     },
                     onCheckedChange = { isChecked ->
@@ -2200,17 +2281,13 @@ fun NoteDetailScreen(
                         recordUndoState()
                         val blockToDelete = blocks.getOrNull(index)
                         if (blockToDelete?.type == BlockType.SUB_PAGE) {
+                            pendingSubPageBlockIds.remove(blockToDelete.id)
+                            if (openWhenReadyBlockId == blockToDelete.id) {
+                                openWhenReadyBlockId = null
+                            }
                             val childId = blockToDelete.subPageNoteId
                             if (childId != null) {
                                 noteViewModel.deleteNoteById(childId)
-                            } else {
-                                val trimmed = blockToDelete.content.trim()
-                                if (trimmed.isNotBlank()) {
-                                    val matched = allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
-                                    if (matched != null) {
-                                        noteViewModel.deleteNoteById(matched.id)
-                                    }
-                                }
                             }
                         }
                         if (blocks.size > 1) {
@@ -2334,12 +2411,15 @@ fun NoteDetailScreen(
         NotionSlashDialog(
             onDismiss = { showSlashSheet = false },
             onSelectBlock = { type ->
-                recordUndoState()
                 if (type == BlockType.DRAWING) {
+                    recordUndoState()
                     editingDrawingPath = null
                     editingDrawingBlockIndex = null
                     showDrawingSheet = true
+                } else if (type == BlockType.SUB_PAGE) {
+                    addSubPageBlock()
                 } else {
+                    recordUndoState()
                     blocks.add(NoteBlock(type = type, content = ""))
                 }
             },
