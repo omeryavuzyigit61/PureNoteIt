@@ -27,12 +27,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.notes.purenoteit.reminder.AlarmSoundPlayer
+import com.notes.purenoteit.security.AppIntegrityGuard
 import com.notes.purenoteit.ui.screens.AnimatedSplashScreen
 import com.notes.purenoteit.ui.screens.CategoryManagementScreen
 import com.notes.purenoteit.ui.screens.HomeScreen
 import com.notes.purenoteit.ui.screens.NoteDetailScreen
 import com.notes.purenoteit.ui.screens.PasswordSettingScreen
 import com.notes.purenoteit.ui.theme.PureNoteItTheme
+import com.notes.purenoteit.ui.theme.VibrantOrange
 import com.notes.purenoteit.util.LanguageManager
 import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.SharedPrefencesUtil
@@ -40,6 +42,13 @@ import com.notes.purenoteit.util.ThemeManager
 import com.notes.purenoteit.util.ThemeMode
 import com.notes.purenoteit.viewmodel.CategoryViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.notes.purenoteit.R
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -102,6 +111,14 @@ class MainActivity : AppCompatActivity() {
             val isDarkTheme = ThemeManager.isDarkTheme(this@MainActivity, themeMode)
 
             var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
+            var integrityViolation by remember { mutableStateOf<String?>(null) }
+
+            LaunchedEffect(Unit) {
+                val check = AppIntegrityGuard.checkAppIntegrity(this@MainActivity)
+                if (!check.isSafe) {
+                    integrityViolation = check.message
+                }
+            }
 
             PureNoteItTheme(darkTheme = isDarkTheme) {
                 Surface(
@@ -276,15 +293,39 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
+
+                    if (integrityViolation != null) {
+                        AlertDialog(
+                            onDismissRequest = {},
+                            title = {
+                                Text(
+                                    text = "Güvenlik Uyarısı",
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            },
+                            text = {
+                                Text(
+                                    text = integrityViolation ?: "Uygulama bütünlüğü doğrulanamadı. Güvenlik nedeniyle uygulama kapatılıyor.",
+                                    fontSize = 14.sp
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { finishAffinity() }) {
+                                    Text(text = "Kapat", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
     }
-    }
+}
 
     override fun onStop() {
         super.onStop()
-        // Bitwarden Vault Timeout: Lock session when app is backgrounded
+        // Vault Timeout: Lock session when app is backgrounded
         SecurityUtil.lockVault()
     }
 }

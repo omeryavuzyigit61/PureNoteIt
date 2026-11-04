@@ -12,6 +12,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
+import com.notes.purenoteit.security.ObfuscatedSecrets
 import com.notes.purenoteit.util.Constants.SHARED_PREFENCES_KEY
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -25,31 +26,31 @@ import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 object SecurityUtil {
-    // V2 PBKDF2-HMAC-SHA256 Salted PIN Storage Keys
-    private const val KEY_PIN_HASH_V2 = "pin_hash_v2_pbkdf2"
-    private const val KEY_PIN_SALT_V2 = "pin_salt_v2_random"
+    // V2 PBKDF2-HMAC-SHA256 Salted PIN Storage Keys (XOR Obfuscated)
+    private val KEY_PIN_HASH_V2 by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.KEY_PIN_HASH_V2) }
+    private val KEY_PIN_SALT_V2 by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.KEY_PIN_SALT_V2) }
     private const val PBKDF2_ITERATIONS = 60_000
     private const val PBKDF2_KEY_BITS = 256
 
-    // Brute-Force Rate Limiting Keys
-    private const val KEY_FAILED_ATTEMPTS = "pin_failed_attempts"
-    private const val KEY_LOCKOUT_UNTIL_MS = "pin_lockout_until_ms"
+    // Brute-Force Rate Limiting Keys (XOR Obfuscated)
+    private val KEY_FAILED_ATTEMPTS by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.KEY_FAILED_ATTEMPTS) }
+    private val KEY_LOCKOUT_UNTIL_MS by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.KEY_LOCKOUT_UNTIL_MS) }
     private const val MAX_FAILED_ATTEMPTS = 5
     private const val LOCKOUT_DURATION_MS = 30_000L
 
     // Legacy PIN Keys (Kept strictly for transparent migration)
     private const val KEY_PIN_HASH = "pin_hash_key"
     private const val KEY_LEGACY_PIN = "password_key"
-    private const val APP_SALT = "PureNoteIt_Secure_Salt_2026"
-    private const val AES_KEY_SALT = "PureNoteIt_AES_Salt_V2_2026"
+    private val APP_SALT by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.APP_SALT) }
+    private val AES_KEY_SALT by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.AES_KEY_SALT) }
 
-    // Hardware AndroidKeyStore Constants
-    private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-    private const val KEYSTORE_ALIAS = "PureNoteIt_Master_AES256_Key"
+    // Hardware AndroidKeyStore Constants (XOR Obfuscated)
+    private val ANDROID_KEYSTORE by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.ANDROID_KEYSTORE) }
+    private val KEYSTORE_ALIAS by lazy { ObfuscatedSecrets.decode(ObfuscatedSecrets.KEYSTORE_ALIAS) }
     private const val GCM_TAG_LENGTH = 128
     private const val GCM_IV_LENGTH = 12
 
-    // Bitwarden Session Vault Lock
+    // Vault Session Lock State
     @Volatile
     var isVaultUnlocked: Boolean = false
         private set

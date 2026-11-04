@@ -36,3 +36,15 @@
 
 # 7. Coroutines
 -dontwarn kotlinx.coroutines.**
+
+# 8. RASP & Security Engine
+-keep class com.notes.purenoteit.security.** { *; }
+
+# Strip all android.util.Log calls in release builds for maximum stealth
+-assumenosideeffects class android.util.Log {
+    public static boolean isLoggable(java.lang.String, int);
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+    public static int w(...);
+}
