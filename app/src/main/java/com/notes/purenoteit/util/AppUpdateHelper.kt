@@ -48,9 +48,9 @@ object AppUpdateHelper {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val pInfo = getPackageInfo(context)
-            pInfo.versionName ?: "1.0.7"
+            pInfo.versionName ?: "1.0.8"
         } catch (e: Exception) {
-            "1.0.7"
+            "1.0.8"
         }
     }
 
@@ -143,16 +143,16 @@ object AppUpdateHelper {
                     availableVersionCode = availableVerCode,
                     availableVersionName = dynamicTargetVersion,
                     releaseNotesTr = listOf(
-                        "🛡️ 3 Katmanlı Uygulama Güvenlik Kalkanı (RASP, İmza Doğrulama ve XOR Kriptografik Maskeleme).",
-                        "🔗 Akıllı Not Bağlantıları: Başlık değiştiğinde bağlı notlarda otomatik senkronizasyon ve silinen not bağlantılarının otomatik temizlenmesi.",
-                        "☁️ Gelişmiş Kasa & Google Drive Yedekleme: Alt notlar, çizimler, görseller ve ses kayıtları için cihazlar arası %100 veri bütünlüğü.",
-                        "🔒 Kasa & Kategori Kilidi Güçlendirmesi: Üstel bekleme süreli brute-force koruması ve taşınabilir 60.000 iterasyonlu PBKDF2-AES-256 şifreleme."
+                        "📄 Alt Sayfa Mimarisi & Hiyerarşik İzolasyon: Alt sayfaların anında benzersiz kimlikle bağlanması, çift yönlü senkronizasyon ve kalıcı silme.",
+                        "🖼️ Tam Ekran Büyüteç (Lightbox) & Çizim Önizleme: Görseller ve el yazısı çizimler için tam ekran pinch-to-zoom ve düzenleme desteği.",
+                        "✍️ Evrensel Stylus & Avuç İçi Engelleme: Kalemle çizim yaparken istenmeyen avuç içi dokunuşlarının engellenmesi.",
+                        "🗑️ Güvenli Çöp Kutusu & Geri Yükleme: Çizim temizleme ve not silme onay pencereleri ile çöp kutusu bütünlüğü."
                     ),
                     releaseNotesEn = listOf(
-                        "🛡️ 3-Layer Application Security Shield (RASP, Signature Tamper Verification & XOR Secret Masking).",
-                        "🔗 Smart Bi-Directional Note Links: Automatic cascade title sync across linked notes & automatic cleanup on note deletion.",
-                        "☁️ Hardened Vault & Google Drive Backup: 100% cross-device integrity for sub-pages, drawings, images, and audio recordings.",
-                        "🔒 Vault & Category Lock Hardening: Monotonic exponential backoff brute-force defense and 60,000-iteration PBKDF2-AES-256 portable encryption."
+                        "📄 Sub-Page Architecture & Hierarchy Isolation: Instant unique subPage ID binding, bi-directional sync, and isolated permanent deletion.",
+                        "🖼️ Full-Screen Lightbox & Drawing Preview: Read-only pinch-to-zoom and seamless edit transition for images and drawings.",
+                        "✍️ Universal Stylus & Palm Rejection: Anatomical palm contact rejection and multi-touch cluster filtering for digital pens.",
+                        "🗑️ Trash Confirmation & Safe Recovery: Clear canvas confirmation and trash deletion dialog with enhanced recovery integrity."
                     ),
                     playUpdateInfo = appUpdateInfo
                 )
@@ -222,16 +222,16 @@ object AppUpdateHelper {
             availableVersionCode = curCode,
             availableVersionName = "v$curName",
             releaseNotesTr = listOf(
-                "🛡️ 3 Katmanlı Uygulama Güvenlik Kalkanı (RASP, İmza Doğrulama ve XOR Kriptografik Maskeleme).",
-                "🔗 Akıllı Not Bağlantıları: Başlık değiştiğinde bağlı notlarda otomatik senkronizasyon ve silinen not bağlantılarının otomatik temizlenmesi.",
-                "☁️ Gelişmiş Kasa & Google Drive Yedekleme: Alt notlar, çizimler, görseller ve ses kayıtları için cihazlar arası %100 veri bütünlüğü.",
-                "🔒 Kasa & Kategori Kilidi Güçlendirmesi: Üstel bekleme süreli brute-force koruması ve taşınabilir 60.000 iterasyonlu PBKDF2-AES-256 şifreleme."
+                "📄 Alt Sayfa Mimarisi & Hiyerarşik İzolasyon: Alt sayfaların anında benzersiz kimlikle bağlanması, çift yönlü senkronizasyon ve kalıcı silme.",
+                "🖼️ Tam Ekran Büyüteç (Lightbox) & Çizim Önizleme: Görseller ve el yazısı çizimler için tam ekran pinch-to-zoom ve düzenleme desteği.",
+                "✍️ Evrensel Stylus & Avuç İçi Engelleme: Kalemle çizim yaparken istenmeyen avuç içi dokunuşlarının engellenmesi.",
+                "🗑️ Güvenli Çöp Kutusu & Geri Yükleme: Çizim temizleme ve not silme onay pencereleri ile çöp kutusu bütünlüğü."
             ),
             releaseNotesEn = listOf(
-                "🛡️ 3-Layer Application Security Shield (RASP, Signature Tamper Verification & XOR Secret Masking).",
-                "🔗 Smart Bi-Directional Note Links: Automatic cascade title sync across linked notes & automatic cleanup on note deletion.",
-                "☁️ Hardened Vault & Google Drive Backup: 100% cross-device integrity for sub-pages, drawings, images, and audio recordings.",
-                "🔒 Vault & Category Lock Hardening: Monotonic exponential backoff brute-force defense and 60,000-iteration PBKDF2-AES-256 portable encryption."
+                "📄 Sub-Page Architecture & Hierarchy Isolation: Instant unique subPage ID binding, bi-directional sync, and isolated permanent deletion.",
+                "🖼️ Full-Screen Lightbox & Drawing Preview: Read-only pinch-to-zoom and seamless edit transition for images and drawings.",
+                "✍️ Universal Stylus & Palm Rejection: Anatomical palm contact rejection and multi-touch cluster filtering for digital pens.",
+                "🗑️ Trash Confirmation & Safe Recovery: Clear canvas confirmation and trash deletion dialog with enhanced recovery integrity."
             )
         )
     }
