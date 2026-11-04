@@ -356,7 +356,7 @@ fun HomeScreen(
                     note.description ?: ""
                 }
                 val blocks = BlockParser.parse(rawDesc)
-                blocks.filter { it.type == BlockType.SUB_PAGE && it.content.isNotBlank() }
+                blocks.filter { it.type == BlockType.SUB_PAGE && it.subPageNoteId == null && it.content.isNotBlank() }
                     .map { it.content.trim().lowercase() }
             } catch (e: Exception) {
                 emptyList()
@@ -394,11 +394,11 @@ fun HomeScreen(
                 val text = (note.title ?: "") + " " + (note.description ?: "")
                 text.contains(selectedHashtag!!, ignoreCase = true)
             }
-            // Notion Hiyerarşik Gizleme: Alt sayfalar ana ekranda gizlenir; arama yapıldığında ise doğrudan bulunur!
-            val isSubpageByMetadata = note.richBlocksJson?.contains("\"isSubPage\":true") == true || note.richBlocksJson?.contains("\"parentNoteId\"") == true
+            // Notion Hiyerarşik Gizleme: Yalnızca aktif bir üst notun içinde gerçekten referansı bulunan alt sayfalar gizlenir;
+            // yetim kalmış hiçbir alt sayfa gizlenmez ve arama yapıldığında tüm alt sayfalar doğrudan bulunur!
             val isSubpageById = note.id in subpageIds
             val isSubpageByTitle = note.title?.trim()?.lowercase() in subpageTitles
-            val isSubpage = isSubpageByMetadata || isSubpageById || isSubpageByTitle
+            val isSubpage = isSubpageById || isSubpageByTitle
             val matchesSubpageHierarchy = if (searchQuery.isBlank()) !isSubpage else true
 
             val matchesSmartFilter = when (selectedSmartFilter) {

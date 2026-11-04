@@ -55,8 +55,23 @@ class NoteViewModel @Inject constructor(
     private val _streamItems = MutableLiveData<List<StreamItemData>>()
     val streamItems: LiveData<List<StreamItemData>> = _streamItems
 
+    private var hasHealedOrphanSubPages = false
+
     fun getAllNotes() {
-        repository.getAllNotes()
+        Single.fromCallable {
+            val initialList = repository.getAllNotes().blockingGet()
+            if (!hasHealedOrphanSubPages) {
+                hasHealedOrphanSubPages = true
+                val healed = healOrphanedSubPagesSync(initialList)
+                if (healed) {
+                    repository.getAllNotes().blockingGet()
+                } else {
+                    initialList
+                }
+            } else {
+                initialList
+            }
+        }
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe({
@@ -72,9 +87,12 @@ class NoteViewModel @Inject constructor(
     fun upsert(item: NoteData) {
         io.reactivex.Completable.fromAction {
             if (item.id > 0) {
+                val previousStatus = runCatching { repository.getNoteById(item.id).blockingGet()?.status }.getOrNull()
                 repository.update(item).blockingAwait()
                 if (item.status == "TRASH") {
                     purgeDeletedNoteReferencesSync(item.id, item.title)
+                } else if (previousStatus == "TRASH") {
+                    restoreSubPageToParentSync(item)
                 }
             } else {
                 repository.upsert(item).blockingAwait()
@@ -95,12 +113,14 @@ class NoteViewModel @Inject constructor(
 
     fun saveNote(item: NoteData, contentForLinks: String? = null, onSaved: ((Int) -> Unit)? = null) {
         Single.fromCallable {
-            val previousTitle = if (item.id > 0) {
-                runCatching { repository.getNoteById(item.id).blockingGet()?.title }.getOrNull()
-                    ?: _noteList.value?.find { it.id == item.id }?.title
+            val previousNote = if (item.id > 0) {
+                runCatching { repository.getNoteById(item.id).blockingGet() }.getOrNull()
+                    ?: _noteList.value?.find { it.id == item.id }
             } else {
                 null
             }
+            val previousTitle = previousNote?.title
+            val previousStatus = previousNote?.status
 
             val actualId = if (item.id > 0) {
                 repository.update(item).blockingAwait()
@@ -116,6 +136,9 @@ class NoteViewModel @Inject constructor(
                     deletedRawTitle = item.title ?: previousTitle
                 )
             } else {
+                if (previousStatus == "TRASH") {
+                    restoreSubPageToParentSync(item)
+                }
                 propagateTitleChangeToLinkedNotesSync(
                     targetNoteId = actualId,
                     newRawTitle = item.title ?: "",
@@ -364,6 +387,134 @@ class NoteViewModel @Inject constructor(
             }
         } catch (_: Exception) {
         }
+    }
+
+    /**
+     * Re-attaches a sub-page restored from Trash back into its parent note as a SUB_PAGE block,
+     * or promotes it to a standalone root note if its parent note was deleted or is in Trash.
+     */
+    private fun restoreSubPageToParentSync(restoredNote: NoteData): Boolean {
+        return try {
+            val richJson = restoredNote.richBlocksJson ?: return false
+            if (!richJson.contains("\"isSubPage\":true") && !richJson.contains("\"parentNoteId\"")) {
+                return false
+            }
+            val parentIdMatch = Regex(""""parentNoteId"\s*:\s*(\d+)""").find(richJson)
+            val parentId = parentIdMatch?.groupValues?.getOrNull(1)?.toIntOrNull()
+
+            val parentNote = if (parentId != null && parentId > 0) {
+                runCatching { repository.getNoteById(parentId).blockingGet() }.getOrNull()
+            } else {
+                null
+            }
+
+            if (parentNote != null && parentNote.status != "TRASH") {
+                val wasEncrypted = parentNote.isEncrypted ||
+                    (parentNote.isPassword == true) ||
+                    SecurityUtil.isEncryptedPayload(parentNote.description)
+                val rawDesc = if (wasEncrypted && !parentNote.description.isNullOrBlank()) {
+                    SecurityUtil.decrypt(parentNote.description!!)
+                } else {
+                    parentNote.description ?: ""
+                }
+
+                val parsedBlocks = if (rawDesc.isBlank()) {
+                    mutableListOf()
+                } else {
+                    BlockParser.parse(rawDesc).toMutableList()
+                }
+
+                val restoredTitle = restoredNote.title?.trim()?.takeIf { it.isNotBlank() } ?: "Yeni Alt Sayfa"
+                val existingIdx = parsedBlocks.indexOfFirst {
+                    it.type == BlockType.SUB_PAGE && it.subPageNoteId == restoredNote.id
+                }
+
+                var parentModified = false
+                if (existingIdx == -1) {
+                    parsedBlocks.add(
+                        NoteBlock(
+                            type = BlockType.SUB_PAGE,
+                            content = restoredTitle,
+                            subPageNoteId = restoredNote.id
+                        )
+                    )
+                    parentModified = true
+                } else if (parsedBlocks[existingIdx].content != restoredTitle) {
+                    parsedBlocks[existingIdx] = parsedBlocks[existingIdx].copy(content = restoredTitle)
+                    parentModified = true
+                }
+
+                if (parentModified) {
+                    val serialized = BlockParser.serialize(parsedBlocks)
+                    val finalDesc = if (wasEncrypted) SecurityUtil.encrypt(serialized) else serialized
+                    val updatedParent = parentNote.copy(description = finalDesc).also {
+                        it.id = parentNote.id
+                    }
+                    runCatching { repository.update(updatedParent).blockingAwait() }
+                }
+
+                runCatching {
+                    val existingLinks = knowledgeRepository.getOutgoingLinks(parentNote.id).blockingGet()
+                    if (existingLinks.none { it.targetNoteId == restoredNote.id }) {
+                        val newLink = NoteLinkData(
+                            sourceNoteId = parentNote.id,
+                            targetNoteId = restoredNote.id,
+                            linkText = restoredTitle
+                        )
+                        knowledgeRepository.insertAllLinks(listOf(newLink)).blockingAwait()
+                    }
+                }
+                parentModified
+            } else {
+                // Parent note no longer exists or is in TRASH -> promote restored sub-page to standalone root note
+                val promoted = restoredNote.copy(richBlocksJson = null).also {
+                    it.id = restoredNote.id
+                }
+                runCatching { repository.update(promoted).blockingAwait() }
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * One-time startup self-healing pass for any sub-page that was restored from Trash previously
+     * and lost its SUB_PAGE block inside its parent note.
+     */
+    private fun healOrphanedSubPagesSync(notes: List<NoteData>): Boolean {
+        var anyModified = false
+        try {
+            val activeNotes = notes.filter { it.status != "TRASH" }
+            val referencedSubPageIds = activeNotes.flatMap { note ->
+                runCatching {
+                    val wasEncrypted = note.isEncrypted ||
+                        (note.isPassword == true) ||
+                        SecurityUtil.isEncryptedPayload(note.description)
+                    val rawDesc = if (wasEncrypted && !note.description.isNullOrBlank()) {
+                        SecurityUtil.decrypt(note.description!!)
+                    } else {
+                        note.description ?: ""
+                    }
+                    if (rawDesc.isBlank()) emptyList()
+                    else BlockParser.parse(rawDesc)
+                        .filter { it.type == BlockType.SUB_PAGE }
+                        .mapNotNull { it.subPageNoteId }
+                }.getOrDefault(emptyList())
+            }.toSet()
+
+            for (candidate in activeNotes) {
+                val richJson = candidate.richBlocksJson ?: continue
+                val isSubPageMeta = richJson.contains("\"isSubPage\":true") || richJson.contains("\"parentNoteId\"")
+                if (isSubPageMeta && candidate.id !in referencedSubPageIds) {
+                    if (restoreSubPageToParentSync(candidate)) {
+                        anyModified = true
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        return anyModified
     }
 
     fun delete(item: NoteData) {
