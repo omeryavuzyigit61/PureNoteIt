@@ -15,6 +15,7 @@ import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.repository.CategoryRepository
 import com.notes.purenoteit.repository.KnowledgeRepository
 import com.notes.purenoteit.repository.NoteRepository
+import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.VaultBackupManager
 import com.notes.purenoteit.widget.PureNoteWidgetProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -83,19 +84,34 @@ class NoteViewModel @Inject constructor(
     }
 
     fun saveNote(item: NoteData, contentForLinks: String? = null, onSaved: ((Int) -> Unit)? = null) {
-        val saveSingle = if (item.id > 0) {
-            repository.update(item).toSingleDefault(item.id.toLong())
-        } else {
-            repository.insertNote(item)
-        }
+        Single.fromCallable {
+            val previousTitle = if (item.id > 0) {
+                runCatching { repository.getNoteById(item.id).blockingGet()?.title }.getOrNull()
+                    ?: _noteList.value?.find { it.id == item.id }?.title
+            } else {
+                null
+            }
 
-        saveSingle
+            val actualId = if (item.id > 0) {
+                repository.update(item).blockingAwait()
+                item.id
+            } else {
+                repository.insertNote(item).blockingGet().toInt()
+            }
+            item.id = actualId
+
+            propagateTitleChangeToLinkedNotesSync(
+                targetNoteId = actualId,
+                newRawTitle = item.title ?: "",
+                previousRawTitle = previousTitle
+            )
+            actualId
+        }
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ generatedId ->
-                val actualId = generatedId.toInt()
-                item.id = actualId
+            .subscribe({ actualId ->
                 getAllNotes()
+                getAllLinks()
                 notifyWidgetSync()
                 if (!contentForLinks.isNullOrBlank()) {
                     syncNoteLinks(actualId, contentForLinks)
@@ -105,6 +121,110 @@ class NoteViewModel @Inject constructor(
             }, { error ->
                 Log.e("NoteViewModel", "Error saving note: ${error.message}")
             }).let { compositeDisposable.add(it) }
+    }
+
+    /**
+     * Propagates title changes of [targetNoteId] across all notes that link to it via [[WikiLink]]
+     * or SUB_PAGE blocks, and updates the linkText column in note_links so links never break.
+     */
+    private fun propagateTitleChangeToLinkedNotesSync(
+        targetNoteId: Int,
+        newRawTitle: String,
+        previousRawTitle: String?
+    ) {
+        val newTitle = newRawTitle.trim()
+        if (newTitle.isBlank()) return
+
+        try {
+            val backlinkRows = runCatching {
+                knowledgeRepository.getBacklinks(targetNoteId).blockingGet()
+            }.getOrDefault(emptyList())
+
+            val oldTitles = buildSet {
+                previousRawTitle?.trim()?.takeIf {
+                    it.isNotBlank() && !it.equals(newTitle, ignoreCase = true)
+                }?.let { add(it) }
+                backlinkRows.forEach { row ->
+                    val lt = row.linkText.trim()
+                    if (lt.isNotBlank() && !lt.equals(newTitle, ignoreCase = true)) {
+                        add(lt)
+                    }
+                }
+            }
+
+            if (oldTitles.isEmpty() && backlinkRows.isEmpty()) return
+
+            val allNotes = runCatching {
+                repository.getAllNotes().blockingGet()
+            }.getOrDefault(emptyList())
+
+            for (candidate in allNotes) {
+                if (candidate.id == targetNoteId) continue
+                val wasEncrypted = candidate.isEncrypted ||
+                    (candidate.isPassword == true) ||
+                    SecurityUtil.isEncryptedPayload(candidate.description)
+                val rawDesc = if (wasEncrypted && !candidate.description.isNullOrBlank()) {
+                    SecurityUtil.decrypt(candidate.description!!)
+                } else {
+                    candidate.description ?: ""
+                }
+                if (rawDesc.isBlank()) continue
+
+                val parsedBlocks = BlockParser.parse(rawDesc).toMutableList()
+                var noteModified = false
+
+                for (idx in parsedBlocks.indices) {
+                    var block = parsedBlocks[idx]
+                    var blockChanged = false
+
+                    if (block.type == BlockType.SUB_PAGE) {
+                        val matchesId = block.subPageNoteId == targetNoteId
+                        val matchesOldTitle = oldTitles.any {
+                            block.content.trim().equals(it, ignoreCase = true)
+                        }
+                        if (matchesId || matchesOldTitle) {
+                            if (block.content != newTitle || block.subPageNoteId != targetNoteId) {
+                                block = block.copy(content = newTitle, subPageNoteId = targetNoteId)
+                                blockChanged = true
+                            }
+                        }
+                    }
+
+                    for (oldT in oldTitles) {
+                        val pattern = Regex("""\[\[\s*${Regex.escape(oldT)}\s*\]\]""", RegexOption.IGNORE_CASE)
+                        if (pattern.containsMatchIn(block.content)) {
+                            block = block.copy(content = pattern.replace(block.content, "[[$newTitle]]"))
+                            blockChanged = true
+                        }
+                        if (pattern.containsMatchIn(block.toggleBody)) {
+                            block = block.copy(toggleBody = pattern.replace(block.toggleBody, "[[$newTitle]]"))
+                            blockChanged = true
+                        }
+                    }
+
+                    if (blockChanged) {
+                        parsedBlocks[idx] = block
+                        noteModified = true
+                    }
+                }
+
+                if (noteModified) {
+                    val serialized = BlockParser.serialize(parsedBlocks)
+                    val finalDesc = if (wasEncrypted) SecurityUtil.encrypt(serialized) else serialized
+                    val updatedCandidate = candidate.copy(description = finalDesc).also {
+                        it.id = candidate.id
+                    }
+                    runCatching { repository.update(updatedCandidate).blockingAwait() }
+                }
+            }
+
+            if (backlinkRows.isNotEmpty() || oldTitles.isNotEmpty()) {
+                runCatching {
+                    knowledgeRepository.updateTargetLinkText(targetNoteId, newTitle).blockingAwait()
+                }
+            }
+        } catch (_: Exception) {
+        }
     }
 
     fun delete(item: NoteData) {
@@ -227,15 +347,32 @@ class NoteViewModel @Inject constructor(
         repository.getAllNotes()
             .subscribeOn(Schedulers.io())
             .flatMapCompletable { allNotes ->
-                val targetLinks = allNotes
-                    .filter { it.id != sourceNoteId && it.title?.trim()?.lowercase() in matchedTitles }
-                    .map { target ->
-                        NoteLinkData(
+                val existingOutgoing = runCatching {
+                    knowledgeRepository.getOutgoingLinks(sourceNoteId).blockingGet()
+                }.getOrDefault(emptyList())
+
+                val resolvedTargets = mutableMapOf<Int, NoteLinkData>()
+                for (matchedLower in matchedTitles) {
+                    val byCurrentTitle = allNotes.find {
+                        it.id != sourceNoteId &&
+                            it.status != "TRASH" &&
+                            it.title?.trim()?.lowercase() == matchedLower
+                    }
+                    val targetNote = byCurrentTitle ?: existingOutgoing.find {
+                        it.linkText.trim().lowercase() == matchedLower
+                    }?.let { oldLink ->
+                        allNotes.find { it.id == oldLink.targetNoteId && it.status != "TRASH" }
+                    }
+
+                    if (targetNote != null) {
+                        resolvedTargets[targetNote.id] = NoteLinkData(
                             sourceNoteId = sourceNoteId,
-                            targetNoteId = target.id,
-                            linkText = target.title ?: ""
+                            targetNoteId = targetNote.id,
+                            linkText = targetNote.title?.trim() ?: matchedLower
                         )
                     }
+                }
+                val targetLinks = resolvedTargets.values.toList()
 
                 knowledgeRepository.deleteLinksFromSource(sourceNoteId)
                     .andThen(

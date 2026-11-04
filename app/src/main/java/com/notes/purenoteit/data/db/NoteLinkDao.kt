@@ -28,6 +28,9 @@ interface NoteLinkDao {
     @Query("SELECT * FROM note_links WHERE targetNoteId = :targetNoteId")
     fun getBacklinks(targetNoteId: Int): Single<List<NoteLinkData>>
 
+    @Query("UPDATE note_links SET linkText = :newTitle WHERE targetNoteId = :targetNoteId")
+    fun updateTargetLinkText(targetNoteId: Int, newTitle: String): Completable
+
     @Query("SELECT * FROM note_links")
     fun getAllLinks(): Single<List<NoteLinkData>>
 }

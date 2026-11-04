@@ -23,6 +23,8 @@ class KnowledgeRepository @Inject constructor(
     fun deleteLinksFromSource(noteId: Int): Completable = noteLinkDao.deleteLinksFromSource(noteId)
     fun getOutgoingLinks(noteId: Int): Single<List<NoteLinkData>> = noteLinkDao.getOutgoingLinks(noteId)
     fun getBacklinks(noteId: Int): Single<List<NoteLinkData>> = noteLinkDao.getBacklinks(noteId)
+    fun updateTargetLinkText(targetNoteId: Int, newTitle: String): Completable =
+        noteLinkDao.updateTargetLinkText(targetNoteId, newTitle)
     fun getAllLinks(): Single<List<NoteLinkData>> = noteLinkDao.getAllLinks()
 
     // --- Automation Rules ---

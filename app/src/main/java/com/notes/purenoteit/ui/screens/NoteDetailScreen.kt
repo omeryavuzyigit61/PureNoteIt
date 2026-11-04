@@ -299,6 +299,7 @@ fun NoteDetailScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 noteViewModel.getAllNotes()
+                noteViewModel.getAllLinks()
                 resumeTriggerEpoch = System.currentTimeMillis()
                 if (isPassword && !SecurityUtil.isVaultUnlocked) {
                     isAccessGranted = false
@@ -317,6 +318,16 @@ fun NoteDetailScreen(
     var showLinkNotePicker by remember { mutableStateOf(false) }
     var linkSearchQuery by remember { mutableStateOf("") }
     val allNotesForLinking by noteViewModel.noteList.observeAsState(emptyList())
+    val allLinks by noteViewModel.allLinks.observeAsState(emptyList())
+    val knownLinkTargets = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
+
+    LaunchedEffect(allLinks, currentNoteId) {
+        if (currentNoteId != -1) {
+            allLinks.filter { it.sourceNoteId == currentNoteId }.forEach { link ->
+                knownLinkTargets[link.linkText.trim().lowercase()] = link.targetNoteId
+            }
+        }
+    }
 
     // Zen Mode & Stats states (Feature 4 & 2)
     var isZenMode by remember { mutableStateOf(false) }
@@ -519,6 +530,7 @@ fun NoteDetailScreen(
 
     LaunchedEffect(Unit) {
         categoryViewModel.getAllCategories()
+        noteViewModel.getAllLinks()
     }
 
     // Category name & lock inheritance resolver with safe fallback
@@ -929,10 +941,54 @@ fun NoteDetailScreen(
 
     fun navigateToNoteByTitle(targetTitle: String) {
         val trimmed = if (targetTitle.isBlank()) "Yeni Alt Sayfa" else targetTitle.trim()
-        val found = allNotesForLinking.find { it.title?.trim().equals(trimmed, ignoreCase = true) }
+        val trimmedLower = trimmed.lowercase()
+
+        // 1. Resolve by Note ID first so renamed target notes never spawn duplicate notes
+        val linkedTargetId = knownLinkTargets[trimmedLower]
+            ?: allLinks.find {
+                it.sourceNoteId == currentNoteId && it.linkText.trim().lowercase() == trimmedLower
+            }?.targetNoteId
+            ?: allLinks.find {
+                it.linkText.trim().lowercase() == trimmedLower
+            }?.targetNoteId
+
+        val foundById = linkedTargetId?.let { id ->
+            allNotesForLinking.find { it.id == id && it.status != "TRASH" }
+        }
+
+        // 2. Fallback to exact title match
+        val found = foundById ?: allNotesForLinking.find {
+            it.status != "TRASH" && it.title?.trim().equals(trimmed, ignoreCase = true)
+        }
+
+        if (found != null) {
+            val latestTitle = found.title?.trim()
+            if (!latestTitle.isNullOrBlank()) {
+                knownLinkTargets[latestTitle.lowercase()] = found.id
+                if (!latestTitle.equals(trimmed, ignoreCase = true)) {
+                    val pattern = Regex("""\[\[\s*${Regex.escape(trimmed)}\s*\]\]""", RegexOption.IGNORE_CASE)
+                    for (idx in blocks.indices) {
+                        val blk = blocks[idx]
+                        var updated = blk
+                        var changed = false
+                        if (pattern.containsMatchIn(blk.content)) {
+                            updated = updated.copy(content = pattern.replace(blk.content, "[[$latestTitle]]"))
+                            changed = true
+                        }
+                        if (pattern.containsMatchIn(blk.toggleBody)) {
+                            updated = updated.copy(toggleBody = pattern.replace(blk.toggleBody, "[[$latestTitle]]"))
+                            changed = true
+                        }
+                        if (changed) blocks[idx] = updated
+                    }
+                }
+            }
+        }
+
         performSilentAutoSave {
             if (found != null) {
-                if (found.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+                val isTargetCatLocked = categoryList.find { it.id == (found.categoryId ?: 1) }?.isPassword == true
+                if ((found.isPassword == true || found.isEncrypted || isTargetCatLocked) && !SecurityUtil.isVaultUnlocked) {
                     requestGatekeeperUnlock {
                         onNavigateToNote?.invoke(found.id)
                     }
@@ -948,6 +1004,7 @@ fun NoteDetailScreen(
                     icon = "📄"
                 )
                 noteViewModel.saveNote(newNote, contentForLinks = null) { newId ->
+                    knownLinkTargets[trimmedLower] = newId
                     context.showToastShort(context.getString(R.string.subpage_created_toast, trimmed))
                     onNavigateToNote?.invoke(newId)
                 }
@@ -964,13 +1021,15 @@ fun NoteDetailScreen(
         }
     }
 
-    // Sub-page synchronization: auto-clean deleted child notes and sync renamed titles
-    LaunchedEffect(allNotesForLinking, resumeTriggerEpoch) {
+    // Sub-page & [[WikiLink]] synchronization: auto-clean deleted child notes and sync renamed titles
+    LaunchedEffect(allNotesForLinking, allLinks, resumeTriggerEpoch) {
         if (allNotesForLinking.isNotEmpty() && isInitialLoadCompleted) {
             var blocksModified = false
             val toRemove = mutableListOf<NoteBlock>()
+            val wikiRegex = Regex("""\[\[(.*?)\]\]""")
+
             for (i in blocks.indices) {
-                val b = blocks[i]
+                var b = blocks[i]
                 if (b.type == BlockType.SUB_PAGE) {
                     val targetNote = if (b.subPageNoteId != null) {
                         allNotesForLinking.find { it.id == b.subPageNoteId }
@@ -992,15 +1051,55 @@ fun NoteDetailScreen(
                             val needTitleUpdate = !newTitle.isNullOrBlank() && b.content != newTitle
                             val needIdUpdate = b.subPageNoteId != targetNote.id
                             if (needTitleUpdate || needIdUpdate) {
-                                blocks[i] = b.copy(
+                                b = b.copy(
                                     content = if (needTitleUpdate) newTitle!! else b.content,
                                     subPageNoteId = targetNote.id
                                 )
+                                blocks[i] = b
                                 blocksModified = true
                             }
                         }
                     } else if (b.subPageNoteId != null) {
                         toRemove.add(b)
+                        blocksModified = true
+                    }
+                }
+
+                // Sync [[WikiLink]] text in block content and toggleBody if target note was renamed
+                val combinedText = b.content + " " + b.toggleBody
+                if (combinedText.contains("[[")) {
+                    val matches = wikiRegex.findAll(combinedText).map { it.groupValues[1].trim() }.filter { it.isNotBlank() }.toSet()
+                    var updatedBlock = b
+                    var textChanged = false
+                    for (rawLink in matches) {
+                        val lower = rawLink.lowercase()
+                        val targetId = knownLinkTargets[lower]
+                            ?: allLinks.find { it.sourceNoteId == currentNoteId && it.linkText.trim().lowercase() == lower }?.targetNoteId
+                            ?: allLinks.find { it.linkText.trim().lowercase() == lower }?.targetNoteId
+                        if (targetId != null) {
+                            val targetNote = allNotesForLinking.find { it.id == targetId && it.status != "TRASH" }
+                            val latestTitle = targetNote?.title?.trim()
+                            if (!latestTitle.isNullOrBlank() && latestTitle != rawLink) {
+                                val replaceRegex = Regex("""\[\[\s*${Regex.escape(rawLink)}\s*\]\]""", RegexOption.IGNORE_CASE)
+                                if (replaceRegex.containsMatchIn(updatedBlock.content)) {
+                                    updatedBlock = updatedBlock.copy(content = replaceRegex.replace(updatedBlock.content, "[[$latestTitle]]"))
+                                    textChanged = true
+                                }
+                                if (replaceRegex.containsMatchIn(updatedBlock.toggleBody)) {
+                                    updatedBlock = updatedBlock.copy(toggleBody = replaceRegex.replace(updatedBlock.toggleBody, "[[$latestTitle]]"))
+                                    textChanged = true
+                                }
+                                knownLinkTargets[latestTitle.lowercase()] = targetId
+                            }
+                        } else {
+                            // Record known ID when current title matches
+                            allNotesForLinking.find { it.status != "TRASH" && it.title?.trim().equals(rawLink, ignoreCase = true) }?.let { matchedNote ->
+                                knownLinkTargets[lower] = matchedNote.id
+                            }
+                        }
+                    }
+                    if (textChanged) {
+                        blocks[i] = updatedBlock
                         blocksModified = true
                     }
                 }
@@ -2293,7 +2392,9 @@ fun NoteDetailScreen(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(14.dp))
                                     .clickable {
-                                        val linkText = "[[" + (targetNote.title ?: context.getString(R.string.untitled_note)) + "]] "
+                                        val resolvedTargetTitle = (targetNote.title ?: context.getString(R.string.untitled_note)).trim()
+                                        val linkText = "[[$resolvedTargetTitle]] "
+                                        knownLinkTargets[resolvedTargetTitle.lowercase()] = targetNote.id
                                         recordUndoState()
                                         if (blocks.isNotEmpty() && blocks.last().content.isBlank() && blocks.last().type == BlockType.PARAGRAPH) {
                                             blocks[blocks.lastIndex] = blocks.last().copy(content = linkText)
@@ -2302,7 +2403,8 @@ fun NoteDetailScreen(
                                         }
                                         showLinkNotePicker = false
                                         linkSearchQuery = ""
-                                        context.showToastShort(context.getString(R.string.link_connected_toast, targetNote.title ?: ""))
+                                        performSilentAutoSave()
+                                        context.showToastShort(context.getString(R.string.link_connected_toast, resolvedTargetTitle))
                                     },
                                 shape = RoundedCornerShape(14.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
