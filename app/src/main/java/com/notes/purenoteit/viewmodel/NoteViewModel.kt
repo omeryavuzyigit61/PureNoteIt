@@ -100,6 +100,7 @@ class NoteViewModel @Inject constructor(
                 if (!contentForLinks.isNullOrBlank()) {
                     syncNoteLinks(actualId, contentForLinks)
                 }
+                triggerAutoSync()
                 onSaved?.invoke(actualId)
             }, { error ->
                 Log.e("NoteViewModel", "Error saving note: ${error.message}")
@@ -111,6 +112,7 @@ class NoteViewModel @Inject constructor(
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllNotes()
                 notifyWidgetSync()
+                triggerAutoSync()
             }, {
                 Log.e("NoteViewModel", "Error deleting note: ${it.message}")
             }).let {
@@ -123,6 +125,7 @@ class NoteViewModel @Inject constructor(
             .observeOn(AndroidSchedulers.mainThread()).subscribe({
                 getAllNotes()
                 notifyWidgetSync()
+                triggerAutoSync()
                 Log.i("NoteViewModel", "Note deleted successfully")
             }, { error ->
                 Log.e("NoteViewModel", "Error deleting note: ${error.message}")
@@ -363,6 +366,27 @@ class NoteViewModel @Inject constructor(
                 onSuccess(notesCount, catsCount)
             },
             onError = onError
+        )
+    }
+
+    fun triggerAutoSync() {
+        if (VaultBackupManager.isAutoSyncEnabled(context)) {
+            VaultBackupManager.performAutoSync(
+                context = context,
+                noteRepository = repository,
+                categoryRepository = categoryRepository,
+                knowledgeRepository = knowledgeRepository
+            )
+        }
+    }
+
+    fun syncVaultNow(onComplete: (Boolean) -> Unit) {
+        VaultBackupManager.performAutoSync(
+            context = context,
+            noteRepository = repository,
+            categoryRepository = categoryRepository,
+            knowledgeRepository = knowledgeRepository,
+            onComplete = onComplete
         )
     }
 

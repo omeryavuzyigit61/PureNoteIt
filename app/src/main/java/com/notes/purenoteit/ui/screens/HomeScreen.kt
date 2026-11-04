@@ -1101,6 +1101,7 @@ fun HomeScreen(
                     NotionGraphView(
                         notes = filteredNotes,
                         links = allLinks,
+                        categories = categoryList,
                         onNodeClick = handleNoteClick,
                         isDark = isDarkTheme,
                         modifier = Modifier.padding(paddingValues)

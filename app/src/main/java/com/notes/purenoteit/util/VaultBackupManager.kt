@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.documentfile.provider.DocumentFile
 import com.google.gson.Gson
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
@@ -238,5 +239,138 @@ object VaultBackupManager {
                 }
             }
         }
+    }
+
+    // --- Google Drive & Cloud SAF E2EE Auto-Sync Engine ---
+    private const val PREF_VAULT_SYNC = "vault_auto_sync_prefs"
+    private const val KEY_AUTO_SYNC_ENABLED = "auto_sync_enabled"
+    private const val KEY_TREE_URI = "auto_sync_tree_uri"
+    private const val KEY_FOLDER_NAME = "auto_sync_folder_name"
+    private const val KEY_LAST_SYNC_TIME = "auto_sync_last_time"
+    const val AUTO_BACKUP_FILENAME = "PureNoteIt_AutoVault.purevault"
+
+    fun isAutoSyncEnabled(context: Context): Boolean {
+        val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
+        return sp.getBoolean(KEY_AUTO_SYNC_ENABLED, false)
+    }
+
+    fun setAutoSyncEnabled(context: Context, enabled: Boolean) {
+        val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
+        sp.edit().putBoolean(KEY_AUTO_SYNC_ENABLED, enabled).apply()
+    }
+
+    fun getConnectedFolderUri(context: Context): Uri? {
+        val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
+        val uriStr = sp.getString(KEY_TREE_URI, null) ?: return null
+        return runCatching { Uri.parse(uriStr) }.getOrNull()
+    }
+
+    fun getConnectedFolderName(context: Context): String? {
+        val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
+        return sp.getString(KEY_FOLDER_NAME, null)
+    }
+
+    fun getLastSyncTime(context: Context): Long {
+        val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
+        return sp.getLong(KEY_LAST_SYNC_TIME, 0L)
+    }
+
+    fun saveConnectedFolder(context: Context, uri: Uri, folderName: String) {
+        val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
+        sp.edit()
+            .putString(KEY_TREE_URI, uri.toString())
+            .putString(KEY_FOLDER_NAME, folderName)
+            .putBoolean(KEY_AUTO_SYNC_ENABLED, true)
+            .apply()
+    }
+
+    fun disconnectFolder(context: Context) {
+        val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
+        sp.edit()
+            .remove(KEY_TREE_URI)
+            .remove(KEY_FOLDER_NAME)
+            .putBoolean(KEY_AUTO_SYNC_ENABLED, false)
+            .apply()
+    }
+
+    /**
+     * Finds the latest encrypted backup archive inside the connected Google Drive / Cloud folder.
+     */
+    fun getAutoBackupUri(context: Context): Uri? {
+        val treeUri = getConnectedFolderUri(context) ?: return null
+        return try {
+            val rootDoc = DocumentFile.fromTreeUri(context, treeUri) ?: return null
+            rootDoc.findFile(AUTO_BACKUP_FILENAME)?.uri
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Saves the encrypted .purevault archive directly into the user's connected Google Drive / Cloud folder.
+     */
+    fun saveBackupToTreeUri(context: Context, backupFile: File, treeUri: Uri): Boolean {
+        return try {
+            val folderDoc = DocumentFile.fromTreeUri(context, treeUri) ?: return false
+            if (!folderDoc.canWrite()) return false
+
+            var targetFile = folderDoc.findFile(AUTO_BACKUP_FILENAME)
+            if (targetFile == null) {
+                targetFile = folderDoc.createFile("application/octet-stream", AUTO_BACKUP_FILENAME)
+            }
+            val targetUri = targetFile?.uri ?: return false
+
+            context.contentResolver.openOutputStream(targetUri, "wt")?.use { out ->
+                FileInputStream(backupFile).use { input ->
+                    input.copyTo(out)
+                }
+            } ?: return false
+
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
+     * Performs a background E2EE auto-backup to Google Drive / Cloud folder.
+     */
+    fun performAutoSync(
+        context: Context,
+        noteRepository: NoteRepository,
+        categoryRepository: CategoryRepository,
+        knowledgeRepository: KnowledgeRepository,
+        onComplete: ((Boolean) -> Unit)? = null
+    ) {
+        val treeUri = getConnectedFolderUri(context)
+        if (treeUri == null || !isAutoSyncEnabled(context)) {
+            onComplete?.invoke(false)
+            return
+        }
+
+        createBackup(
+            context = context,
+            noteRepository = noteRepository,
+            categoryRepository = categoryRepository,
+            knowledgeRepository = knowledgeRepository,
+            onSuccess = { backupFile ->
+                Schedulers.io().scheduleDirect {
+                    val success = saveBackupToTreeUri(context, backupFile, treeUri)
+                    if (success) {
+                        val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
+                        sp.edit().putLong(KEY_LAST_SYNC_TIME, System.currentTimeMillis()).apply()
+                    }
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        onComplete?.invoke(success)
+                    }
+                }
+            },
+            onError = {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    onComplete?.invoke(false)
+                }
+            }
+        )
     }
 }

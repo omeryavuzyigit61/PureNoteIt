@@ -480,4 +480,17 @@
     <string name="drawer_release_notes_sub">All features in v%s</string>
     <string name="release_notes_dialog_title">PureNoteIt What\'s New</string>
     <string name="release_notes_dialog_subtitle">All features crafted for you in v%s</string>
+
+    <!-- Google Drive & Cloud Auto-Sync (E2EE) -->
+    <string name="vault_drive_auto_title">Google Drive &amp; Cloud Auto-Sync</string>
+    <string name="vault_drive_auto_desc">Automatically syncs your encrypted notes (AES-256) to Google Drive or your selected cloud folder.</string>
+    <string name="vault_drive_folder_connected">Connected Cloud Folder</string>
+    <string name="vault_drive_connect_btn">Connect Drive / Cloud Folder</string>
+    <string name="vault_drive_sync_now">Sync Now</string>
+    <string name="vault_drive_syncing">Syncing...</string>
+    <string name="vault_drive_restore_btn">Restore from Drive</string>
+    <string name="vault_drive_last_sync">Last Synced: %1$s</string>
+    <string name="vault_drive_disconnect">Disconnect</string>
+    <string name="vault_drive_auto_toggle">Auto-Sync (On Note Change)</string>
+    <string name="vault_drive_never_synced">Not synced yet</string>
 </resources>

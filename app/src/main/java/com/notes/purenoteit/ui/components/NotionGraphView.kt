@@ -11,7 +11,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,7 +25,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Surface
+import com.notes.purenoteit.data.db.CategoryData
+import com.notes.purenoteit.ui.theme.BorderLight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,10 +64,28 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+private fun getCategoryNeonColor(categoryId: Int?, categories: List<CategoryData>): Color {
+    if (categoryId == null || categoryId <= 0) return VibrantOrange
+    val index = categories.indexOfFirst { it.id == categoryId }
+    if (index < 0) return VibrantOrange
+    val neonPalette = listOf(
+        Color(0xFFFF7A00), // PureNoteIt Neon Orange
+        Color(0xFF10B981), // Emerald Matrix Green
+        Color(0xFF06B6D4), // Electric Cyan
+        Color(0xFF8B5CF6), // Neural Violet
+        Color(0xFFF59E0B), // Solar Amber
+        Color(0xFFF43F5E), // Cyber Rose
+        Color(0xFF3B82F6)  // Hyper Cobalt Blue
+    )
+    return neonPalette[index % neonPalette.size]
+}
+
 /**
  * 2D Interactive Knowledge Graph View (Obsidian / Roam / Neural Network style).
  * Features:
  * - Fluid pan and pinch-to-zoom gestures.
+ * - Dynamic category-based neon constellation coloring.
+ * - Interactive category focus filtering HUD.
  * - Multi-layered glowing NEON link beams between connected notes.
  * - Animated flowing energy particles traveling along connection lines.
  * - Ambient orbiting sparkle dust particles around linked clusters.
@@ -71,6 +96,7 @@ import kotlin.math.sqrt
 fun NotionGraphView(
     notes: List<NoteData>,
     links: List<NoteLinkData>,
+    categories: List<CategoryData> = emptyList(),
     onNodeClick: (NoteData) -> Unit,
     isDark: Boolean,
     modifier: Modifier = Modifier
@@ -78,6 +104,7 @@ fun NotionGraphView(
     val defaultUntitled = stringResource(R.string.untitled_note)
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var selectedCategoryId by remember { mutableStateOf<Int?>(null) }
 
     // Neon & Particle Animation Loops
     val infiniteTransition = rememberInfiniteTransition(label = "neonGraphPulse")
@@ -185,6 +212,13 @@ fun NotionGraphView(
                 val start = nodePositions[link.sourceNoteId] ?: continue
                 val end = nodePositions[link.targetNoteId] ?: continue
 
+                val srcNote = notes.find { it.id == link.sourceNoteId }
+                val dstNote = notes.find { it.id == link.targetNoteId }
+                val isLinkDimmed = selectedCategoryId != null && (srcNote?.categoryId != selectedCategoryId && dstNote?.categoryId != selectedCategoryId)
+                val linkDimAlpha = if (isLinkDimmed) 0.08f else 1.0f
+
+                val beamNeonColor = srcNote?.let { getCategoryNeonColor(it.categoryId, categories) } ?: VibrantOrange
+
                 val startScreen = center + offset + (start * scale)
                 val endScreen = center + offset + (end * scale)
 
@@ -194,7 +228,7 @@ fun NotionGraphView(
 
                 // --- LAYER A: Wide Outer Ambient Neon Glow ---
                 drawLine(
-                    color = VibrantOrange.copy(alpha = 0.22f * neonGlowAlpha),
+                    color = beamNeonColor.copy(alpha = 0.22f * neonGlowAlpha * linkDimAlpha),
                     start = startScreen,
                     end = endScreen,
                     strokeWidth = 11f * scale,
@@ -203,7 +237,7 @@ fun NotionGraphView(
 
                 // --- LAYER B: Mid Intense Luminous Aura ---
                 drawLine(
-                    color = Color(0xFFFF9800).copy(alpha = 0.55f * neonGlowAlpha),
+                    color = beamNeonColor.copy(alpha = 0.55f * neonGlowAlpha * linkDimAlpha),
                     start = startScreen,
                     end = endScreen,
                     strokeWidth = 5.5f * scale,
@@ -212,50 +246,52 @@ fun NotionGraphView(
 
                 // --- LAYER C: Sharp Brilliant Inner Laser Core ---
                 drawLine(
-                    color = Color(0xFFFFE082),
+                    color = Color(0xFFFFE082).copy(alpha = linkDimAlpha),
                     start = startScreen,
                     end = endScreen,
                     strokeWidth = 2.2f * scale,
                     cap = StrokeCap.Round
                 )
 
-                // --- LAYER D: Flowing Neon Energy Particles (Embers traveling along beam) ---
-                val particleCount = 2
-                for (pIdx in 0 until particleCount) {
-                    val t = (flowProgress + (pIdx.toFloat() / particleCount)) % 1f
-                    val px = startScreen.x + delta.x * t
-                    val py = startScreen.y + delta.y * t
+                if (!isLinkDimmed) {
+                    // --- LAYER D: Flowing Neon Energy Particles (Embers traveling along beam) ---
+                    val particleCount = 2
+                    for (pIdx in 0 until particleCount) {
+                        val t = (flowProgress + (pIdx.toFloat() / particleCount)) % 1f
+                        val px = startScreen.x + delta.x * t
+                        val py = startScreen.y + delta.y * t
 
-                    // Slight wave perpendicular oscillation
-                    val perpX = -delta.y / length
-                    val perpY = delta.x / length
-                    val wobble = sin(t * 2 * PI + pIdx).toFloat() * 4f * scale
+                        // Slight wave perpendicular oscillation
+                        val perpX = -delta.y / length
+                        val perpY = delta.x / length
+                        val wobble = sin(t * 2 * PI + pIdx).toFloat() * 4f * scale
 
-                    val particlePos = Offset(px + perpX * wobble, py + perpY * wobble)
+                        val particlePos = Offset(px + perpX * wobble, py + perpY * wobble)
 
-                    // Outer particle neon flare
+                        // Outer particle neon flare
+                        drawCircle(
+                            color = beamNeonColor.copy(alpha = 0.65f),
+                            radius = 6.5f * scale,
+                            center = particlePos
+                        )
+                        // Bright electric white-gold nucleus
+                        drawCircle(
+                            color = Color(0xFFFFF9C4),
+                            radius = 3.0f * scale,
+                            center = particlePos
+                        )
+                    }
+
+                    // Midpoint Sparkle Aura Dust
+                    val midX = (startScreen.x + endScreen.x) / 2f
+                    val midY = (startScreen.y + endScreen.y) / 2f
+                    val dustWobble = cos(flowProgress * 2 * PI).toFloat() * 8f * scale
                     drawCircle(
-                        color = VibrantOrange.copy(alpha = 0.65f),
-                        radius = 6.5f * scale,
-                        center = particlePos
-                    )
-                    // Bright electric white-gold nucleus
-                    drawCircle(
-                        color = Color(0xFFFFF9C4),
-                        radius = 3.0f * scale,
-                        center = particlePos
+                        color = beamNeonColor.copy(alpha = 0.4f * neonGlowAlpha),
+                        radius = 4f * scale,
+                        center = Offset(midX + dustWobble, midY - dustWobble)
                     )
                 }
-
-                // Midpoint Sparkle Aura Dust
-                val midX = (startScreen.x + endScreen.x) / 2f
-                val midY = (startScreen.y + endScreen.y) / 2f
-                val dustWobble = cos(flowProgress * 2 * PI).toFloat() * 8f * scale
-                drawCircle(
-                    color = Color(0xFFFFB74D).copy(alpha = 0.4f * neonGlowAlpha),
-                    radius = 4f * scale,
-                    center = Offset(midX + dustWobble, midY - dustWobble)
-                )
             }
 
             // 3. Draw Nodes (Nöron Düğümleri)
@@ -267,36 +303,41 @@ fun NotionGraphView(
                 val isPinned = note.isPinned
                 val isConnected = links.any { it.sourceNoteId == note.id || it.targetNoteId == note.id }
 
-                // Extra Pulsing Neon Aura for connected/pinned nodes
-                if (isConnected || isPinned) {
+                val nodeCategoryColor = getCategoryNeonColor(note.categoryId, categories)
+                val isSelectedCat = selectedCategoryId != null && note.categoryId == selectedCategoryId
+                val isDimmed = selectedCategoryId != null && note.categoryId != selectedCategoryId
+                val nodeAlpha = if (isDimmed) 0.18f else 1.0f
+
+                // Extra Pulsing Neon Aura for connected/pinned/selected nodes
+                if ((isConnected || isPinned || isSelectedCat) && !isDimmed) {
                     drawCircle(
-                        color = VibrantOrange.copy(alpha = 0.35f * neonGlowAlpha),
-                        radius = nodeRadius + (10f * scale * neonGlowAlpha),
+                        color = nodeCategoryColor.copy(alpha = 0.38f * neonGlowAlpha),
+                        radius = nodeRadius + ((if (isSelectedCat) 14f else 10f) * scale * neonGlowAlpha),
                         center = screenPos
                     )
                 }
 
                 // Outer Halo Glow
                 drawCircle(
-                    color = VibrantOrange.copy(alpha = if (isPinned) 0.4f else 0.2f),
+                    color = nodeCategoryColor.copy(alpha = (if (isPinned || isSelectedCat) 0.45f else 0.22f) * nodeAlpha),
                     radius = nodeRadius + (6f * scale),
                     center = screenPos
                 )
 
                 // Node Body
                 drawCircle(
-                    color = if (isPinned) VibrantOrange else defaultNodeColor,
+                    color = if (isPinned) nodeCategoryColor.copy(alpha = nodeAlpha) else defaultNodeColor.copy(alpha = nodeAlpha),
                     radius = nodeRadius,
                     center = screenPos
                 )
 
                 // Node Neon Border
                 drawCircle(
-                    color = if (isConnected) VibrantOrange else VibrantOrange.copy(alpha = 0.65f),
+                    color = nodeCategoryColor.copy(alpha = (if (isConnected || isSelectedCat) 0.95f else 0.65f) * nodeAlpha),
                     radius = nodeRadius,
                     center = screenPos,
                     style = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = if (isConnected) 2.6f * scale else 1.8f * scale
+                        width = if (isConnected || isSelectedCat) 2.8f * scale else 1.8f * scale
                     )
                 )
 
@@ -304,6 +345,7 @@ fun NotionGraphView(
                 drawContext.canvas.nativeCanvas.apply {
                     val paint = android.graphics.Paint().apply {
                         color = textPaintColor
+                        alpha = (nodeAlpha * 255).toInt().coerceIn(40, 255)
                         textSize = (11f * scale).coerceIn(18f, 38f)
                         textAlign = android.graphics.Paint.Align.CENTER
                         isAntiAlias = true
@@ -314,6 +356,7 @@ fun NotionGraphView(
                     val isProtected = note.isPassword == true || note.isEncrypted
                     val iconText = if (isProtected) "🔒" else (note.icon ?: (note.title?.take(1) ?: "•"))
                     val iconPaint = android.graphics.Paint().apply {
+                        alpha = (nodeAlpha * 255).toInt().coerceIn(40, 255)
                         textSize = (13f * scale).coerceIn(20f, 42f)
                         textAlign = android.graphics.Paint.Align.CENTER
                         isAntiAlias = true
@@ -327,28 +370,102 @@ fun NotionGraphView(
             }
         }
 
-        // HUD Pill on Top Left: Node Count & Neon Connection Count
-        Surface(
+        // Top Left Controls: HUD Pill + Floating Category Filter Pills
+        Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp),
-            shape = RoundedCornerShape(20.dp),
-            color = if (isDark) CharcoalGray.copy(alpha = 0.88f) else PureWhite.copy(alpha = 0.92f),
-            shadowElevation = 6.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (isDark) CharcoalGray.copy(alpha = 0.88f) else PureWhite.copy(alpha = 0.92f),
+                shadowElevation = 6.dp,
+                border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
             ) {
-                Text(text = "🌌", fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = stringResource(R.string.graph_stats, notes.size, links.size),
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "🌌", fontSize = 14.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.graph_stats, notes.size, links.size),
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // Category Filter Pills HUD
+            if (categories.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item {
+                        val isAllSelected = selectedCategoryId == null
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { selectedCategoryId = null },
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isAllSelected) VibrantOrange else (if (isDark) CharcoalGray.copy(alpha = 0.85f) else PureWhite.copy(alpha = 0.9f)),
+                            shadowElevation = 4.dp,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isAllSelected) VibrantOrange else BorderLight.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Text(
+                                text = stringResource(R.string.filter_all),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                fontSize = 11.sp,
+                                fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isAllSelected) PureWhite else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    items(categories, key = { it.id }) { cat ->
+                        val isSelected = selectedCategoryId == cat.id
+                        val catColor = getCategoryNeonColor(cat.id, categories)
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    selectedCategoryId = if (isSelected) null else cat.id
+                                },
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) catColor else (if (isDark) CharcoalGray.copy(alpha = 0.85f) else PureWhite.copy(alpha = 0.9f)),
+                            shadowElevation = 4.dp,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) catColor else BorderLight.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSelected) PureWhite else catColor)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = cat.name,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 

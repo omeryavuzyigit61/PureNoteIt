@@ -480,4 +480,17 @@
     <string name="drawer_release_notes_sub">v%s ile gelen tüm özellikler</string>
     <string name="release_notes_dialog_title">PureNoteIt Yenilikleri</string>
     <string name="release_notes_dialog_subtitle">v%s sürümünde sizin için hazırlanan tüm özellikler</string>
+
+    <!-- Google Drive & Cloud Auto-Sync (E2EE) -->
+    <string name="vault_drive_auto_title">Google Drive &amp; Bulut Otomatik Eşitleme</string>
+    <string name="vault_drive_auto_desc">Notlarınızı Google Drive veya seçtiğiniz bulut klasörüne AES-256 ile şifreli olarak otomatik eşitler.</string>
+    <string name="vault_drive_folder_connected">Bağlı Bulut Klasörü</string>
+    <string name="vault_drive_connect_btn">Drive / Bulut Klasörü Bağla</string>
+    <string name="vault_drive_sync_now">Şimdi Eşitle</string>
+    <string name="vault_drive_syncing">Eşitleniyor...</string>
+    <string name="vault_drive_restore_btn">Drive\'dan Geri Yükle</string>
+    <string name="vault_drive_last_sync">Son Eşitleme: %1$s</string>
+    <string name="vault_drive_disconnect">Bağlantıyı Kes</string>
+    <string name="vault_drive_auto_toggle">Otomatik Eşitleme (Notlar Değiştikçe)</string>
+    <string name="vault_drive_never_synced">Henüz eşitlenmedi</string>
 </resources>

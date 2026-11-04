@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,6 +28,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -93,6 +95,20 @@ val KANBAN_COLUMNS = listOf(
     )
 )
 
+private fun getFastNextStatus(current: String): String? = when (current) {
+    "TODO" -> "IN_PROGRESS"
+    "IN_PROGRESS" -> "DONE"
+    "IN_REVIEW" -> "DONE"
+    else -> null
+}
+
+private fun getFastPrevStatus(current: String): String? = when (current) {
+    "DONE" -> "IN_PROGRESS"
+    "IN_REVIEW" -> "IN_PROGRESS"
+    "IN_PROGRESS" -> "TODO"
+    else -> null
+}
+
 @Composable
 fun NotionKanbanBoard(
     notes: List<NoteData>,
@@ -102,27 +118,109 @@ fun NotionKanbanBoard(
     onAddNewNoteWithStatus: (status: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxSize()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        for (column in KANBAN_COLUMNS) {
-            val columnNotes = notes.filter { (it.status ?: "TODO") == column.statusKey }
+    var selectedCategoryId by remember { mutableStateOf<Int?>(null) }
+    val displayedNotes = remember(notes, selectedCategoryId) {
+        if (selectedCategoryId == null) notes else notes.filter { it.categoryId == selectedCategoryId }
+    }
 
-            KanbanColumn(
-                columnDef = column,
-                notes = columnNotes,
-                categories = categories,
-                onNoteClick = onNoteClick,
-                onStatusChange = onStatusChange,
-                onAddNewNote = { onAddNewNoteWithStatus(column.statusKey) },
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        // Category Filter Chips Row
+        if (categories.isNotEmpty()) {
+            LazyRow(
                 modifier = Modifier
-                    .width(280.dp)
-                    .fillMaxHeight()
-            )
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // "Tümü" (All) Chip
+                item {
+                    val isAllSelected = selectedCategoryId == null
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { selectedCategoryId = null },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isAllSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isAllSelected) VibrantOrange else BorderLight.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.filter_all),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isAllSelected) PureWhite else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                // Individual Category Chips
+                items(categories, key = { it.id }) { cat ->
+                    val isCatSelected = selectedCategoryId == cat.id
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable {
+                                selectedCategoryId = if (isCatSelected) null else cat.id
+                            },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isCatSelected) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isCatSelected) VibrantOrange else BorderLight.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isCatSelected) VibrantOrange else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = cat.name,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isCatSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isCatSelected) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Horizontal Columns Board
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            for (column in KANBAN_COLUMNS) {
+                val columnNotes = displayedNotes.filter { (it.status ?: "TODO") == column.statusKey }
+
+                KanbanColumn(
+                    columnDef = column,
+                    notes = columnNotes,
+                    categories = categories,
+                    onNoteClick = onNoteClick,
+                    onStatusChange = onStatusChange,
+                    onAddNewNote = { onAddNewNoteWithStatus(column.statusKey) },
+                    modifier = Modifier
+                        .width(280.dp)
+                        .fillMaxHeight()
+                )
+            }
         }
     }
 }
@@ -384,35 +482,91 @@ private fun KanbanNoteCard(
                 }
             }
 
+            // Task Progress Bar (if note has todo items)
+            if (note.totalTasks > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val progress = (note.completedTasks.toFloat() / note.totalTasks.toFloat()).coerceIn(0f, 1f)
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.5.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = if (progress >= 1f) Color(0xFF22C55E) else VibrantOrange,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Footer info: Category Tag + To-do progress + Lock indicator
+            // Footer info: Category Tag + 1-Tap Quick Transition + To-do progress + Lock
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Category tag
-                if (category != null) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(SoftOrangeLight)
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = category.name,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = VibrantOrange
-                        )
+                // Category tag + Fast status transition arrows
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (category != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(SoftOrangeLight)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = category.name,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
                     }
-                } else {
-                    Spacer(modifier = Modifier.width(1.dp))
+
+                    // 1-Tap Quick Transition Arrows
+                    val fastPrev = getFastPrevStatus(note.status ?: "TODO")
+                    val fastNext = getFastNextStatus(note.status ?: "TODO")
+
+                    if (fastPrev != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                                .clickable { onStatusChange(fastPrev) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "◀",
+                                fontSize = 8.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+
+                    if (fastNext != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(SoftOrangeLight)
+                                .clickable { onStatusChange(fastNext) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "▶",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange
+                            )
+                        }
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Task Progress (e.g. 2/5)
+                    // Task Progress text (e.g. 2/5)
                     if (note.totalTasks > 0) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_checklist),
