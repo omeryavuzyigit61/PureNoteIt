@@ -48,9 +48,9 @@ object AppUpdateHelper {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val pInfo = getPackageInfo(context)
-            pInfo.versionName ?: "1.0.5"
+            pInfo.versionName ?: "1.0.6"
         } catch (e: Exception) {
-            "1.0.5"
+            "1.0.6"
         }
     }
 
@@ -195,18 +195,18 @@ object AppUpdateHelper {
             availableVersionCode = curCode,
             availableVersionName = "v$curName",
             releaseNotesTr = listOf(
-                "📐 Gelişmiş Matematik Editörü: Kesirli, köklü ifadeler ve 160+ matematik sembolü.",
-                "🌓 3 Seçenekli Tema: Sistem Varsayılanı, Açık ve Koyu tema desteği.",
-                "🖼️ Görsel Boyutlandırma: Windows tarzı köşe tutamacı ve en-boy oran kilidi.",
-                "🕸️ 2D Bilgi Ağı: Sayfa bağlantıları ve çift yönlü senkronizasyon.",
-                "⚡ Açılış & Geçiş: Açılış ekranı renk geçişi ve kontrast iyileştirmeleri."
+                "☁️ Google Drive & Bulut Otomatik Eşitleme: AES-256 E2EE şifreleme ile arka planda sessiz bulut senkronizasyonu.",
+                "📋 Görev Panosu (Kanban): Tek dokunuşla kart durum geçiş okları (◀ ▶), kategori filtre çipleri ve to-do ilerleme çubuğu.",
+                "🕸️ 2D Bilgi Ağı: Çoklu kategori neon renklendirmesi ve akıllı takımyıldızı odak filtresi.",
+                "🎨 Sol Menü (Drawer) İkon & Marka Yenileme: Tüm kopya ikonlar yerine özel Material vektörler ve yalın PureNoteIt kimliği.",
+                "🖼️ Görsel Boyutlandırıcı: Genişletilmiş üst aksiyon barı, yağ gibi pürüzsüz yatay boyutlandırma ve modern köşe tutamaç rozeti."
             ),
             releaseNotesEn = listOf(
-                "📐 Advanced Math Editor: Fractions, roots, and 160+ formula symbols.",
-                "🌓 3-Mode Theme: System Default, Light, and Dark mode support.",
-                "🖼️ Image Resizer: Windows-style corner handle and aspect ratio toggle.",
-                "🕸️ 2D Knowledge Graph: Note linking and bi-directional sync.",
-                "⚡ Launch & Transition: Splash screen smooth transition and contrast optimizations."
+                "☁️ Google Drive & Cloud Auto-Sync: Seamless background encrypted vault sync with AES-256-GCM (E2EE).",
+                "📋 Task Board (Kanban): 1-tap quick status transition arrows (◀ ▶), category filter chips, and task progress indicators.",
+                "🕸️ 2D Knowledge Graph: Category-based radiant neon coloring and interactive constellation focus filter.",
+                "🎨 Modern Drawer UI & Unified Branding: Replaced repeating generic icons with custom vector drawables.",
+                "🖼️ Fluid Image Resizer: Full-width top action row, ultra-smooth horizontal drag scaling, and modern corner handle."
             )
         )
     }
