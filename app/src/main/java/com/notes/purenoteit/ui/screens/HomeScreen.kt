@@ -427,11 +427,10 @@ fun HomeScreen(
     val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.isPinned } }
     val regularNotes = remember(filteredNotes) { filteredNotes.filter { !it.isPinned } }
 
+    var notePendingTrash by remember { mutableStateOf<NoteData?>(null) }
+
     val handleSoftDeleteNote: (NoteData) -> Unit = { note ->
-        val trashed = note.copy(status = "TRASH")
-        trashed.id = note.id
-        noteViewModel.saveNote(trashed, contentForLinks = null)
-        context.showToastShort("\"${note.title ?: "Not"}\" Çöp Kutusu'na taşındı (30 gün saklanır)")
+        notePendingTrash = note
     }
 
     val handleNoteClick: (NoteData) -> Unit = { note ->
@@ -1508,6 +1507,63 @@ fun HomeScreen(
                     TextButton(onClick = { showAgendaConfirmDialog = false }) {
                         Text("Vazgeç", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    // Home Screen Note Delete Confirmation Dialog
+    notePendingTrash?.let { targetNote ->
+        val isNoteProtected = targetNote.isPassword == true || targetNote.isEncrypted || (targetNote.categoryId in lockedCategoryIds)
+        val safeTitle = when {
+            isNoteProtected && !SecurityUtil.isVaultUnlocked -> "******"
+            targetNote.title.isNullOrBlank() -> stringResource(R.string.untitled_note)
+            else -> targetNote.title!!
+        }
+        AlertDialog(
+            onDismissRequest = { notePendingTrash = null },
+            title = {
+                Text(
+                    text = "Notu Çöp Kutusu'na Taşı?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Text(
+                    text = "\"$safeTitle\" adlı notu Çöp Kutusu'na taşımak istediğinize emin misiniz? (Çöp Kutusu'ndan istediğiniz zaman geri yükleyebilirsiniz.)",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val trashed = targetNote.copy(status = "TRASH")
+                        trashed.id = targetNote.id
+                        noteViewModel.saveNote(trashed, contentForLinks = null)
+                        context.showToastShort("\"$safeTitle\" Çöp Kutusu'na taşındı (30 gün saklanır)")
+                        notePendingTrash = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Evet, Sil",
+                        color = PureWhite,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { notePendingTrash = null }) {
+                    Text(
+                        text = stringResource(R.string.cancel),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             },
             shape = RoundedCornerShape(20.dp),

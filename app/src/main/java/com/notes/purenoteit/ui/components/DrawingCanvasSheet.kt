@@ -27,6 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +38,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -183,6 +185,9 @@ fun DrawingCanvasSheet(
 
     var canvasSize by remember { mutableStateOf(IntSize(1080, 1080)) }
     var previewBitmapState by remember { mutableStateOf<Bitmap?>(null) }
+    var isBaseBitmapCleared by remember(existingImagePath) { mutableStateOf(false) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
+    val activeBaseBitmap = if (isBaseBitmapCleared) null else baseBitmap
 
     val currentToolState by rememberUpdatedState(selectedTool)
     val currentColorState by rememberUpdatedState(selectedColor)
@@ -199,8 +204,8 @@ fun DrawingCanvasSheet(
         val canvas = android.graphics.Canvas(bitmap)
         canvas.drawColor(android.graphics.Color.WHITE)
 
-        // Render existing drawing bitmap as the base canvas layer
-        baseBitmap?.let { bmp ->
+        // Render existing drawing bitmap as the base canvas layer (unless cleared)
+        activeBaseBitmap?.let { bmp ->
             val srcRect = android.graphics.Rect(0, 0, bmp.width, bmp.height)
             val dstRect = android.graphics.Rect(0, 0, width, height)
             canvas.drawBitmap(bmp, srcRect, dstRect, null)
@@ -291,7 +296,7 @@ fun DrawingCanvasSheet(
     }
 
     fun saveDrawingToPng() {
-        if (items.isEmpty() && baseBitmap == null) {
+        if (items.isEmpty() && activeBaseBitmap == null && existingImagePath == null) {
             context.showToastShort(context.getString(R.string.drawing_empty_toast))
             return
         }
@@ -368,16 +373,23 @@ fun DrawingCanvasSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    // Undo
+                    // Undo (Restores last stroke, or restores cleared base drawing)
+                    val canUndo = items.isNotEmpty() || (isBaseBitmapCleared && baseBitmap != null)
                     IconButton(
-                        onClick = { if (items.isNotEmpty()) items.removeAt(items.lastIndex) },
-                        enabled = items.isNotEmpty(),
+                        onClick = {
+                            if (items.isNotEmpty()) {
+                                items.removeAt(items.lastIndex)
+                            } else if (isBaseBitmapCleared && baseBitmap != null) {
+                                isBaseBitmapCleared = false
+                            }
+                        },
+                        enabled = canUndo,
                         modifier = Modifier.size(30.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.arrow_left),
                             contentDescription = stringResource(R.string.undo),
-                            tint = if (items.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                            tint = if (canUndo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                             modifier = Modifier.size(17.dp)
                         )
                     }
@@ -389,7 +401,7 @@ fun DrawingCanvasSheet(
                             .background(SoftOrangeLight)
                             .border(0.8.dp, VibrantOrange.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                             .clickable {
-                                if (items.isEmpty() && baseBitmap == null) {
+                                if (items.isEmpty() && activeBaseBitmap == null) {
                                     context.showToastShort(context.getString(R.string.drawing_empty_toast))
                                 } else {
                                     previewBitmapState = renderCurrentCanvasToBitmap()
@@ -408,12 +420,18 @@ fun DrawingCanvasSheet(
                         )
                     }
 
-                    // Clear
+                    // Clear (Opens confirmation dialog before clearing canvas)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { items.clear() }
+                            .clickable {
+                                if (items.isEmpty() && activeBaseBitmap == null) {
+                                    context.showToastShort(context.getString(R.string.drawing_empty_toast))
+                                } else {
+                                    showClearConfirmDialog = true
+                                }
+                            }
                             .padding(horizontal = 8.dp, vertical = 5.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -795,8 +813,8 @@ fun DrawingCanvasSheet(
                             }
                         }
                 ) {
-                    // 0. Render existing base bitmap if editing an existing sketch
-                    baseBitmap?.let { bmp ->
+                    // 0. Render existing base bitmap if editing an existing sketch (unless cleared)
+                    activeBaseBitmap?.let { bmp ->
                         drawImage(
                             image = bmp.asImageBitmap(),
                             dstSize = IntSize(size.width.toInt(), size.height.toInt())
@@ -1099,6 +1117,80 @@ fun DrawingCanvasSheet(
             previewBitmap = bmp,
             isDrawing = true,
             onDismiss = { previewBitmapState = null }
+        )
+    }
+
+    // Clear Confirmation Dialog (Prevents accidental loss of drawing & supports clearing saved base layer)
+    if (showClearConfirmDialog) {
+        val hasBothSavedAndNew = activeBaseBitmap != null && items.isNotEmpty()
+        AlertDialog(
+            onDismissRequest = { showClearConfirmDialog = false },
+            title = {
+                Text(
+                    text = "Çizimi Temizle?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (hasBothSavedAndNew) {
+                            "Kayıtlı çizim üzerinde yeni eklediğiniz çizgiler var. Sadece son eklediklerinizi mi yoksa eski çizim dahil tüm tuvali mi temizlemek istiyorsunuz?"
+                        } else {
+                            "Tuval üzerindeki tüm çiziminiz silinecektir. Temizlemek istediğinize emin misiniz?"
+                        },
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (hasBothSavedAndNew) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    items.clear()
+                                    showClearConfirmDialog = false
+                                },
+                            shape = RoundedCornerShape(10.dp),
+                            color = SoftOrangeLight,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = "🧹 Sadece Yeni Eklediklerimi Sil",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        items.clear()
+                        isBaseBitmapCleared = true
+                        showClearConfirmDialog = false
+                    }
+                ) {
+                    Text(
+                        text = if (hasBothSavedAndNew) "Tüm Tuvali Sıfırla" else "Evet, Temizle",
+                        color = Color(0xFFE53935),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmDialog = false }) {
+                    Text(
+                        text = stringResource(R.string.cancel),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         )
     }
 }
