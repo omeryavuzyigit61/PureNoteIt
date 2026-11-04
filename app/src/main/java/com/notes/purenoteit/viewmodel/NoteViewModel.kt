@@ -87,7 +87,11 @@ class NoteViewModel @Inject constructor(
     fun upsert(item: NoteData) {
         io.reactivex.Completable.fromAction {
             if (item.id > 0) {
-                val previousStatus = runCatching { repository.getNoteById(item.id).blockingGet()?.status }.getOrNull()
+                val previousNote = runCatching { repository.getNoteById(item.id).blockingGet() }.getOrNull()
+                if (item.richBlocksJson == null && !previousNote?.richBlocksJson.isNullOrBlank()) {
+                    item.richBlocksJson = previousNote?.richBlocksJson
+                }
+                val previousStatus = previousNote?.status
                 repository.update(item).blockingAwait()
                 if (item.status == "TRASH") {
                     purgeDeletedNoteReferencesSync(item.id, item.title)
@@ -118,6 +122,9 @@ class NoteViewModel @Inject constructor(
                     ?: _noteList.value?.find { it.id == item.id }
             } else {
                 null
+            }
+            if (item.richBlocksJson == null && !previousNote?.richBlocksJson.isNullOrBlank()) {
+                item.richBlocksJson = previousNote?.richBlocksJson
             }
             val previousTitle = previousNote?.title
             val previousStatus = previousNote?.status
@@ -466,12 +473,7 @@ class NoteViewModel @Inject constructor(
                 }
                 parentModified
             } else {
-                // Parent note no longer exists or is in TRASH -> promote restored sub-page to standalone root note
-                val promoted = restoredNote.copy(richBlocksJson = null).also {
-                    it.id = restoredNote.id
-                }
-                runCatching { repository.update(promoted).blockingAwait() }
-                true
+                false
             }
         } catch (_: Exception) {
             false
@@ -485,6 +487,7 @@ class NoteViewModel @Inject constructor(
     private fun healOrphanedSubPagesSync(notes: List<NoteData>): Boolean {
         var anyModified = false
         try {
+            val now = System.currentTimeMillis()
             val activeNotes = notes.filter { it.status != "TRASH" }
             val referencedSubPageIds = activeNotes.flatMap { note ->
                 runCatching {
@@ -504,6 +507,7 @@ class NoteViewModel @Inject constructor(
             }.toSet()
 
             for (candidate in activeNotes) {
+                if (now - candidate.date < 3000L) continue
                 val richJson = candidate.richBlocksJson ?: continue
                 val isSubPageMeta = richJson.contains("\"isSubPage\":true") || richJson.contains("\"parentNoteId\"")
                 if (isSubPageMeta && candidate.id !in referencedSubPageIds) {

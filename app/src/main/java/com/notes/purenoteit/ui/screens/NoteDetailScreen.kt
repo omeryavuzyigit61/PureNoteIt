@@ -193,24 +193,24 @@ fun NoteDetailScreen(
         }
     }
 
-    var currentNoteId by remember(noteId) { mutableIntStateOf(noteId) }
-    var noteRichBlocksJson by remember { mutableStateOf<String?>(null) }
-    var isInitialLoadCompleted by remember { mutableStateOf(noteId == -1) }
+    var currentNoteId by rememberSaveable(noteId) { mutableIntStateOf(noteId) }
+    var noteRichBlocksJson by rememberSaveable(noteId) { mutableStateOf<String?>(null) }
+    var isInitialLoadCompleted by remember(noteId) { mutableStateOf(noteId == -1 && currentNoteId == -1) }
 
-    var title by remember { mutableStateOf("") }
-    var selectedIcon by remember { mutableStateOf<String?>(null) }
-    var isPassword by remember { mutableStateOf(false) }
-    var isPinned by remember { mutableStateOf(false) }
-    var selectedCategoryId by remember { mutableStateOf(1) }
-    var selectedCategoryName by remember { mutableStateOf("Not") }
-    var noteStatus by remember { mutableStateOf(initialStatus) }
-    var noteDate by remember { mutableStateOf(if (initialDate > 0) initialDate else System.currentTimeMillis()) }
+    var title by remember(noteId) { mutableStateOf("") }
+    var selectedIcon by remember(noteId) { mutableStateOf<String?>(null) }
+    var isPassword by remember(noteId) { mutableStateOf(false) }
+    var isPinned by remember(noteId) { mutableStateOf(false) }
+    var selectedCategoryId by remember(noteId) { mutableIntStateOf(1) }
+    var selectedCategoryName by remember(noteId) { mutableStateOf("Not") }
+    var noteStatus by remember(noteId) { mutableStateOf(initialStatus) }
+    var noteDate by remember(noteId) { mutableLongStateOf(if (initialDate > 0) initialDate else System.currentTimeMillis()) }
 
-    var reminderTime by remember { mutableStateOf<Long?>(null) }
-    var reminderType by remember { mutableStateOf("ALARM") }
-    var reminderSound by remember { mutableStateOf("default") }
-    var isReminderDone by remember { mutableStateOf(false) }
-    var showReminderSheet by remember { mutableStateOf(false) }
+    var reminderTime by remember(noteId) { mutableStateOf<Long?>(null) }
+    var reminderType by remember(noteId) { mutableStateOf("ALARM") }
+    var reminderSound by remember(noteId) { mutableStateOf("default") }
+    var isReminderDone by remember(noteId) { mutableStateOf(false) }
+    var showReminderSheet by remember(noteId) { mutableStateOf(false) }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -484,8 +484,9 @@ fun NoteDetailScreen(
     // Load existing note data with managed RxJava Disposable
     DisposableEffect(noteId) {
         var disposable: io.reactivex.disposables.Disposable? = null
-        if (noteId != -1) {
-            disposable = noteViewModel.getNoteById(noteId).subscribe({ note ->
+        val targetIdToLoad = if (noteId != -1) noteId else currentNoteId
+        if (targetIdToLoad != -1) {
+            disposable = noteViewModel.getNoteById(targetIdToLoad).subscribe({ note ->
                 loadedNoteRef = note
                 currentNoteId = note.id
                 noteRichBlocksJson = note.richBlocksJson
@@ -803,6 +804,10 @@ fun NoteDetailScreen(
         val effectiveLocked = isPassword || isSelectedCategoryLocked
         val finalContent = if (effectiveLocked) SecurityUtil.encrypt(jsonContent) else jsonContent
 
+        val preservedRichJson = noteRichBlocksJson
+            ?: loadedNoteRef?.takeIf { it.id == currentNoteId }?.richBlocksJson
+            ?: allNotesForLinking.find { it.id == currentNoteId }?.richBlocksJson
+
         val note = NoteData(
             title = if (title.isBlank()) "Başlıksız Not" else title.trim(),
             description = finalContent,
@@ -821,7 +826,7 @@ fun NoteDetailScreen(
             reminderType = reminderType,
             reminderSound = reminderSound,
             isReminderDone = isReminderDone,
-            richBlocksJson = noteRichBlocksJson
+            richBlocksJson = preservedRichJson
         )
         if (currentNoteId != -1) {
             note.id = currentNoteId
@@ -830,6 +835,7 @@ fun NoteDetailScreen(
     }
 
     val pendingSubPageBlockIds = remember { mutableStateListOf<String>() }
+    val permanentlyDeletedSubPageIds = remember { mutableStateListOf<Int>() }
     var openWhenReadyBlockId by remember { mutableStateOf<String?>(null) }
     var lastParentSubPageEditTime by remember { mutableLongStateOf(0L) }
 
@@ -840,7 +846,12 @@ fun NoteDetailScreen(
                 val childNote = allNotesForLinking.find { it.id == childId && it.status != "TRASH" } ?: continue
                 val desiredTitle = if (blk.content.isBlank()) "Yeni Alt Sayfa" else blk.content.trim()
                 if (childNote.title != desiredTitle) {
-                    val updatedChild = childNote.copy(title = desiredTitle).also { it.id = childNote.id }
+                    val ensuredRichJson = childNote.richBlocksJson
+                        ?: if (currentNoteId != -1) "{\"isSubPage\":true,\"parentNoteId\":$currentNoteId}" else null
+                    val updatedChild = childNote.copy(
+                        title = desiredTitle,
+                        richBlocksJson = ensuredRichJson
+                    ).also { it.id = childNote.id }
                     noteViewModel.saveNote(updatedChild, contentForLinks = null)
                 }
             }
@@ -849,7 +860,15 @@ fun NoteDetailScreen(
 
     fun performSilentAutoSave(onDone: ((Int) -> Unit)? = null) {
         if (isPassword && !isAccessGranted) return
-        if (!hasContent && currentNoteId == -1) return
+        val hasAnyBlockContent = title.isNotBlank() || blocks.any {
+            it.content.isNotBlank() ||
+            it.mediaPath != null ||
+            it.type == BlockType.SUB_PAGE ||
+            it.type == BlockType.TABLE ||
+            it.type == BlockType.DRAWING ||
+            it.toggleBody.isNotBlank()
+        }
+        if (!hasAnyBlockContent && currentNoteId == -1) return
 
         syncSubPageTitlesToChildren()
         val note = buildNoteDataObject()
@@ -1264,6 +1283,27 @@ fun NoteDetailScreen(
             }
             if (toRemove.isNotEmpty()) {
                 blocks.removeAll(toRemove)
+            }
+            if (currentNoteId != -1 && pendingSubPageBlockIds.isEmpty()) {
+                val existingSubPageIds = blocks.filter { it.type == BlockType.SUB_PAGE }.mapNotNull { it.subPageNoteId }.toSet()
+                val restoredChildren = allNotesForLinking.filter { candidate ->
+                    candidate.status != "TRASH" &&
+                        candidate.id !in existingSubPageIds &&
+                        candidate.id !in permanentlyDeletedSubPageIds &&
+                        candidate.richBlocksJson?.let { json ->
+                            Regex(""""parentNoteId"\s*:\s*$currentNoteId\b""").containsMatchIn(json)
+                        } == true
+                }
+                for (restoredChild in restoredChildren) {
+                    blocks.add(
+                        NoteBlock(
+                            type = BlockType.SUB_PAGE,
+                            content = restoredChild.title ?: "Yeni Alt Sayfa",
+                            subPageNoteId = restoredChild.id
+                        )
+                    )
+                    blocksModified = true
+                }
             }
             if (blocks.isEmpty()) {
                 blocks.add(NoteBlock())
@@ -2287,6 +2327,7 @@ fun NoteDetailScreen(
                             }
                             val childId = blockToDelete.subPageNoteId
                             if (childId != null) {
+                                permanentlyDeletedSubPageIds.add(childId)
                                 noteViewModel.deleteNoteById(childId)
                             }
                         }

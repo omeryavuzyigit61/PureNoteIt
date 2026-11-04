@@ -304,9 +304,7 @@ class MainActivity : AppCompatActivity() {
                                         if (existsInBackStack) {
                                             navController.popBackStack(targetRoute, inclusive = false)
                                         } else {
-                                            navController.navigate(targetRoute) {
-                                                launchSingleTop = true
-                                            }
+                                            navController.navigate(targetRoute)
                                         }
                                     }
                                 )

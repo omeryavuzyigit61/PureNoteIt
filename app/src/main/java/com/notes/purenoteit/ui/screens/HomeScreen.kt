@@ -394,11 +394,11 @@ fun HomeScreen(
                 val text = (note.title ?: "") + " " + (note.description ?: "")
                 text.contains(selectedHashtag!!, ignoreCase = true)
             }
-            // Notion Hiyerarşik Gizleme: Yalnızca aktif bir üst notun içinde gerçekten referansı bulunan alt sayfalar gizlenir;
-            // yetim kalmış hiçbir alt sayfa gizlenmez ve arama yapıldığında tüm alt sayfalar doğrudan bulunur!
+            // Notion Hiyerarşik Gizleme: Alt sayfalar ana ekranda gizlenir; yalnızca ana not içerisinden (veya arama yapıldığında) erişilir!
+            val isSubpageByMetadata = note.richBlocksJson?.contains("\"isSubPage\":true") == true || note.richBlocksJson?.contains("\"parentNoteId\"") == true
             val isSubpageById = note.id in subpageIds
             val isSubpageByTitle = note.title?.trim()?.lowercase() in subpageTitles
-            val isSubpage = isSubpageById || isSubpageByTitle
+            val isSubpage = isSubpageByMetadata || isSubpageById || isSubpageByTitle
             val matchesSubpageHierarchy = if (searchQuery.isBlank()) !isSubpage else true
 
             val matchesSmartFilter = when (selectedSmartFilter) {
