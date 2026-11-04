@@ -61,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -1374,9 +1375,10 @@ fun NotionBlockRow(
                 }
 
                 var currentHeightDp by remember(block.id) { mutableFloatStateOf(parsedHeight) }
-                var currentWidthPercent by remember(block.id) { mutableIntStateOf(parsedWidth) }
+                var currentWidthPercent by remember(block.id) { mutableFloatStateOf(parsedWidth.toFloat()) }
                 var isRatioLocked by remember(block.id) { mutableStateOf(parsedLock) }
                 var isDraggingResize by remember { mutableStateOf(false) }
+                var initialRatio by remember(block.id) { mutableFloatStateOf(2.6f) }
 
                 LaunchedEffect(parsedHeight) {
                     if (!isDraggingResize) {
@@ -1385,7 +1387,7 @@ fun NotionBlockRow(
                 }
                 LaunchedEffect(parsedWidth) {
                     if (!isDraggingResize) {
-                        currentWidthPercent = parsedWidth
+                        currentWidthPercent = parsedWidth.toFloat()
                     }
                 }
                 LaunchedEffect(parsedLock) {
@@ -1409,143 +1411,160 @@ fun NotionBlockRow(
                     }
                 }
 
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(vertical = 4.dp)
                 ) {
-                    Surface(
+                    // Full-width Header: Controls and presets on Left, Block controls & Delete 'X' on Right
+                    // NEVER squished or clipped because it fills the full width of the editor!
+                    Row(
                         modifier = Modifier
-                            .fillMaxWidth(currentWidthPercent / 100f)
-                            .height(currentHeightDp.dp)
-                            .clip(RoundedCornerShape(14.dp)),
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        border = BorderStroke(
-                            if (isDraggingResize) 2.dp else 1.dp,
-                            if (isDraggingResize) VibrantOrange else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
-                        ),
-                        shadowElevation = if (isDraggingResize) 4.dp else 1.dp
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            AsyncImage(
-                                model = File(block.mediaPath ?: ""),
-                                contentDescription = stringResource(R.string.block_image_desc),
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(14.dp)),
-                                contentScale = if (isRatioLocked) ContentScale.Fit else ContentScale.Crop
-                            )
-
-                            // Top Action Overlay: Aspect Ratio Lock Toggle + Size Presets + Reorder Controls
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .align(Alignment.TopCenter)
-                                    .padding(8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = CharcoalGray.copy(alpha = 0.85f),
-                                        modifier = Modifier.clickable {
-                                            isRatioLocked = !isRatioLocked
-                                            persistImageConfig(currentWidthPercent, currentHeightDp, isRatioLocked)
-                                        }
-                                    ) {
-                                        Text(
-                                            text = if (isRatioLocked) "🔒 Ölçeği Koru" else "🔓 Serbest Ölçek",
-                                            fontSize = 10.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isRatioLocked) Color(0xFFFFB74D) else PureWhite,
-                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
-                                        )
-                                    }
-
-                                    listOf(100, 75, 50).forEach { pct ->
-                                        val isSelected = currentWidthPercent == pct
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = if (isSelected) VibrantOrange else CharcoalGray.copy(alpha = 0.8f),
-                                            modifier = Modifier.clickable {
-                                                currentWidthPercent = pct
-                                                persistImageConfig(pct, currentHeightDp, isRatioLocked)
-                                            }
-                                        ) {
-                                            Text(
-                                                text = "%$pct",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = PureWhite,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                            )
-                                        }
-                                    }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isRatioLocked) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isRatioLocked) VibrantOrange.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                ),
+                                modifier = Modifier.clickable {
+                                    isRatioLocked = !isRatioLocked
+                                    persistImageConfig(currentWidthPercent.roundToInt(), currentHeightDp, isRatioLocked)
                                 }
-
-                                BlockReorderControls(
-                                    isDarkContainer = true,
-                                    controlModifier = Modifier.padding(start = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (isRatioLocked) "🔒 Oran Kilitli" else "🔓 Serbest Oran",
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isRatioLocked) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
                                 )
                             }
 
-                            // Windows-Style Corner Resize Handle (Bottom-Right ↘)
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(6.dp)
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (isDraggingResize) VibrantOrange else CharcoalGray.copy(alpha = 0.9f)
+                            listOf(100, 75, 50).forEach { pct ->
+                                val isSelected = currentWidthPercent.roundToInt() == pct
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.clickable {
+                                        currentWidthPercent = pct.toFloat()
+                                        persistImageConfig(pct, currentHeightDp, isRatioLocked)
+                                    }
+                                ) {
+                                    Text(
+                                        text = "%$pct",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                                     )
-                                    .border(1.dp, PureWhite.copy(alpha = 0.7f), CircleShape)
-                                    .pointerInput(block.id) {
-                                        detectDragGestures(
-                                            onDragStart = {
-                                                isDraggingResize = true
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            },
-                                            onDragEnd = {
-                                                isDraggingResize = false
-                                                persistImageConfig(currentWidthPercentState, currentHeightDpState, isRatioLockedState)
-                                            },
-                                            onDragCancel = {
-                                                isDraggingResize = false
-                                                persistImageConfig(currentWidthPercentState, currentHeightDpState, isRatioLockedState)
-                                            },
-                                            onDrag = { change, dragAmount ->
-                                                change.consume()
-                                                val dy = dragAmount.y
-                                                val dx = dragAmount.x
-                                                if (isRatioLockedState) {
-                                                    val delta = (dy + dx) / 2f
-                                                    currentHeightDp = (currentHeightDp + delta).coerceIn(120f, 900f)
-                                                } else {
-                                                    currentHeightDp = (currentHeightDp + dy).coerceIn(120f, 900f)
-                                                    if (dx > 25f && currentWidthPercent < 100) {
-                                                        currentWidthPercent = (currentWidthPercent + 5).coerceAtMost(100)
-                                                    } else if (dx < -25f && currentWidthPercent > 35) {
-                                                        currentWidthPercent = (currentWidthPercent - 5).coerceAtLeast(35)
+                                }
+                            }
+                        }
+
+                        BlockReorderControls(
+                            controlModifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Centered Resizable Image Surface
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth(currentWidthPercent / 100f)
+                                .height(currentHeightDp.dp)
+                                .clip(RoundedCornerShape(14.dp)),
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(
+                                if (isDraggingResize) 2.dp else 1.dp,
+                                if (isDraggingResize) VibrantOrange else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                            ),
+                            shadowElevation = if (isDraggingResize) 6.dp else 1.dp
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                AsyncImage(
+                                    model = File(block.mediaPath ?: ""),
+                                    contentDescription = stringResource(R.string.block_image_desc),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(14.dp)),
+                                    contentScale = if (isRatioLocked) ContentScale.Fit else ContentScale.Crop
+                                )
+
+                                // Modern Corner Resize Handle Badge with Sleek Vector Icon
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(8.dp)
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .background(
+                                            if (isDraggingResize) VibrantOrange else Color(0xCC1F1F24)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isDraggingResize) PureWhite else PureWhite.copy(alpha = 0.5f),
+                                            RoundedCornerShape(9.dp)
+                                        )
+                                        .pointerInput(block.id) {
+                                            detectDragGestures(
+                                                onDragStart = {
+                                                    isDraggingResize = true
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    val w = currentWidthPercentState.coerceAtLeast(10f)
+                                                    initialRatio = (currentHeightDpState / w).coerceIn(0.5f, 15f)
+                                                },
+                                                onDragEnd = {
+                                                    isDraggingResize = false
+                                                    persistImageConfig(currentWidthPercentState.roundToInt(), currentHeightDpState, isRatioLockedState)
+                                                },
+                                                onDragCancel = {
+                                                    isDraggingResize = false
+                                                    persistImageConfig(currentWidthPercentState.roundToInt(), currentHeightDpState, isRatioLockedState)
+                                                },
+                                                onDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    val dy = dragAmount.y
+                                                    val dx = dragAmount.x
+                                                    if (isRatioLockedState) {
+                                                        // Diagonally locked scaling: Both width and height scale in exact lockstep
+                                                        val delta = (dy + (dx * 1.5f)) / 2f
+                                                        val newHeight = (currentHeightDp + delta).coerceIn(120f, 900f)
+                                                        currentHeightDp = newHeight
+                                                        currentWidthPercent = (newHeight / initialRatio).coerceIn(30f, 100f)
+                                                    } else {
+                                                        // Free independent scaling: Smooth like butter in both X and Y
+                                                        currentHeightDp = (currentHeightDp + dy).coerceIn(120f, 900f)
+                                                        currentWidthPercent = (currentWidthPercent + (dx / 6f)).coerceIn(30f, 100f)
                                                     }
                                                 }
-                                            }
-                                        )
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "↘",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = PureWhite
-                                )
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_resize_handle),
+                                        contentDescription = "Resize",
+                                        tint = PureWhite,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }
