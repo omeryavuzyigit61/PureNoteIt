@@ -523,4 +523,9 @@
     <string name="vault_drive_disconnect">Disconnect</string>
     <string name="vault_drive_auto_toggle">Auto-Sync (On Note Change)</string>
     <string name="vault_drive_never_synced">Not synced yet</string>
+
+    <!-- Subpage Rename Dialog -->
+    <string name="rename_subpage_title">Edit Subpage Title</string>
+    <string name="rename_subpage_hint">Subpage title...</string>
+    <string name="rename_subpage_updated_toast">Subpage title updated</string>
 </resources>

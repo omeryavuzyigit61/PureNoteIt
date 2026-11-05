@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,10 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,7 +55,7 @@ fun PageRelationsHub(
     onOpenLinkedNote: (String) -> Unit,
     onAddSubPage: () -> Unit,
     onAddLink: () -> Unit,
-    onSubPageTitleChange: ((NoteBlock, String) -> Unit)? = null,
+    onRequestRename: ((NoteBlock) -> Unit)? = null,
     onDeleteSubPage: ((NoteBlock) -> Unit)? = null,
     onRemoveLinkedNote: ((String) -> Unit)? = null,
     onMoveUp: (() -> Unit)? = null,
@@ -283,6 +280,7 @@ fun PageRelationsHub(
 
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             subPageBlocks.forEach { block ->
+                                val titleText = block.content.ifBlank { stringResource(R.string.new_subpage_default) }
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -294,40 +292,42 @@ fun PageRelationsHub(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                                            .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(text = "📄", fontSize = 15.sp)
                                         Spacer(modifier = Modifier.width(8.dp))
 
-                                        // Inline Editable Title TextField
-                                        BasicTextField(
-                                            value = block.content,
-                                            onValueChange = { newTitle ->
-                                                onSubPageTitleChange?.invoke(block, newTitle)
-                                            },
-                                            textStyle = TextStyle(
-                                                fontSize = 13.5.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            ),
-                                            cursorBrush = SolidColor(VibrantOrange),
-                                            singleLine = true,
-                                            decorationBox = { innerTextField ->
-                                                if (block.content.isBlank()) {
-                                                    Text(
-                                                        text = stringResource(R.string.new_subpage_default),
-                                                        fontSize = 13.5.sp,
-                                                        fontWeight = FontWeight.Normal,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-                                                    )
-                                                }
-                                                innerTextField()
-                                            },
-                                            modifier = Modifier.weight(1f)
+                                        // Static readable Title Text
+                                        Text(
+                                            text = titleText,
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable { onOpenSubPage(block) }
                                         )
 
                                         Spacer(modifier = Modifier.width(6.dp))
+
+                                        // "✏️ Düzenle" (Rename) Button
+                                        if (onRequestRename != null) {
+                                            IconButton(
+                                                onClick = { onRequestRename(block) },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(id = R.drawable.ic_pencil_edit),
+                                                    contentDescription = stringResource(R.string.rename_subpage_title),
+                                                    tint = VibrantOrange,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                        }
 
                                         // "Aç ↗" Navigation Pill
                                         Surface(

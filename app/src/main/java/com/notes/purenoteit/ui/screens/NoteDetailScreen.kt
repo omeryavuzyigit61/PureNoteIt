@@ -355,9 +355,23 @@ fun NoteDetailScreen(
     // Page Relations & Index Hub State (Centralized Alt Sayfalar & Not Bağlantıları)
     var isRelationsExpanded by rememberSaveable { mutableStateOf(true) }
     var showRelationsHubManually by rememberSaveable { mutableStateOf(false) }
+    var renamingSubPageBlock by remember { mutableStateOf<NoteBlock?>(null) }
+    var renameSubPageInput by remember { mutableStateOf("") }
 
     val subPageBlocks by remember {
-        derivedStateOf { blocks.filter { it.type == BlockType.SUB_PAGE } }
+        derivedStateOf {
+            val seenIds = mutableSetOf<Int>()
+            val result = mutableListOf<NoteBlock>()
+            for (b in blocks) {
+                if (b.type == BlockType.SUB_PAGE) {
+                    val sid = b.subPageNoteId
+                    if (sid == null || seenIds.add(sid)) {
+                        result.add(b)
+                    }
+                }
+            }
+            result
+        }
     }
     val outgoingWikiLinks by remember {
         derivedStateOf {
@@ -1212,6 +1226,21 @@ fun NoteDetailScreen(
             var blocksModified = false
             val toRemove = mutableListOf<NoteBlock>()
             val wikiRegex = Regex("""\[\[(.*?)\]\]""")
+
+            // Deduplicate accidental multiple SUB_PAGE blocks with identical subPageNoteId
+            val seenSubIds = mutableSetOf<Int>()
+            val duplicatesToRemove = mutableListOf<NoteBlock>()
+            for (b in blocks) {
+                if (b.type == BlockType.SUB_PAGE && b.subPageNoteId != null) {
+                    if (!seenSubIds.add(b.subPageNoteId!!)) {
+                        duplicatesToRemove.add(b)
+                    }
+                }
+            }
+            if (duplicatesToRemove.isNotEmpty()) {
+                blocks.removeAll(duplicatesToRemove)
+                blocksModified = true
+            }
 
             for (i in blocks.indices) {
                 var b = blocks[i]
@@ -2413,20 +2442,9 @@ fun NoteDetailScreen(
                         onOpenLinkedNote = { targetTitle -> navigateToNoteByTitle(targetTitle) },
                         onAddSubPage = { addSubPageBlock() },
                         onAddLink = { showLinkNotePicker = true },
-                        onSubPageTitleChange = { subBlock, newTitle ->
-                            val idx = blocks.indexOfFirst { it.id == subBlock.id }
-                            if (idx != -1) {
-                                blocks[idx] = subBlock.copy(content = newTitle)
-                                lastParentSubPageEditTime = System.currentTimeMillis()
-                                val childId = subBlock.subPageNoteId
-                                if (childId != null) {
-                                    val childNote = allNotesForLinking.find { it.id == childId }
-                                    if (childNote != null && childNote.title != newTitle) {
-                                        noteViewModel.saveNote(childNote.copy(title = newTitle), contentForLinks = null)
-                                    }
-                                }
-                                performSilentAutoSave()
-                            }
+                        onRequestRename = { subBlock ->
+                            renamingSubPageBlock = subBlock
+                            renameSubPageInput = subBlock.content
                         },
                         onDeleteSubPage = { subBlock ->
                             recordUndoState()
@@ -2612,6 +2630,70 @@ fun NoteDetailScreen(
                 }
             }
         }
+    }
+
+    // Sub-Page Rename Dialog (Atomic Popup Edit)
+    if (renamingSubPageBlock != null) {
+        val targetBlock = renamingSubPageBlock!!
+        AlertDialog(
+            onDismissRequest = { renamingSubPageBlock = null },
+            title = {
+                Text(
+                    text = stringResource(R.string.rename_subpage_title),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                OutlinedTextField(
+                    value = renameSubPageInput,
+                    onValueChange = { renameSubPageInput = it },
+                    singleLine = true,
+                    placeholder = { Text(stringResource(R.string.rename_subpage_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val newTitle = renameSubPageInput.trim().ifBlank { context.getString(R.string.new_subpage_default) }
+                        recordUndoState()
+                        val idx = blocks.indexOfFirst { it.id == targetBlock.id }
+                        if (idx != -1) {
+                            blocks[idx] = targetBlock.copy(content = newTitle)
+                            lastParentSubPageEditTime = System.currentTimeMillis()
+                            val childId = targetBlock.subPageNoteId
+                            if (childId != null) {
+                                val childNote = allNotesForLinking.find { it.id == childId }
+                                if (childNote != null && childNote.title != newTitle) {
+                                    val updatedChild = childNote.copy(title = newTitle).also { it.id = childNote.id }
+                                    noteViewModel.saveNote(updatedChild, contentForLinks = null)
+                                }
+                            }
+                            performSilentAutoSave()
+                            context.showToastShort(context.getString(R.string.rename_subpage_updated_toast))
+                        }
+                        renamingSubPageBlock = null
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VibrantOrange,
+                        contentColor = PureWhite
+                    )
+                ) {
+                    Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { renamingSubPageBlock = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+            shape = RoundedCornerShape(18.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     }
 
     // Emoji Picker Sheet

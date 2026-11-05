@@ -523,4 +523,9 @@
     <string name="vault_drive_disconnect">Bağlantıyı Kes</string>
     <string name="vault_drive_auto_toggle">Otomatik Eşitleme (Notlar Değiştikçe)</string>
     <string name="vault_drive_never_synced">Henüz eşitlenmedi</string>
+
+    <!-- Subpage Rename Dialog -->
+    <string name="rename_subpage_title">Alt Sayfa Adını Düzenle</string>
+    <string name="rename_subpage_hint">Alt sayfa adı...</string>
+    <string name="rename_subpage_updated_toast">Alt sayfa adı güncellendi</string>
 </resources>
