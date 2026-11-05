@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,7 +34,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,6 +58,12 @@ fun PageRelationsHub(
     onOpenLinkedNote: (String) -> Unit,
     onAddSubPage: () -> Unit,
     onAddLink: () -> Unit,
+    onSubPageTitleChange: ((NoteBlock, String) -> Unit)? = null,
+    onDeleteSubPage: ((NoteBlock) -> Unit)? = null,
+    onRemoveLinkedNote: ((String) -> Unit)? = null,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
+    onDeleteHub: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val rotationState by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f, label = "hub_chevron")
@@ -72,15 +83,16 @@ fun PageRelationsHub(
         ) {
             // Header Bar
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggleExpand() },
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // Title and badges (clickable to expand/collapse)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onToggleExpand() }
                 ) {
                     Box(
                         modifier = Modifier
@@ -142,17 +154,61 @@ fun PageRelationsHub(
                     }
                 }
 
-                // Chevron expand/collapse toggle
-                IconButton(
-                    onClick = onToggleExpand,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Text(
-                        text = "▼",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.rotate(rotationState)
-                    )
+                // Controls: Move Up (▲), Move Down (▼), Chevron, Close (✕)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onMoveUp != null) {
+                        IconButton(
+                            onClick = onMoveUp,
+                            modifier = Modifier.size(26.dp)
+                        ) {
+                            Text(
+                                text = "▲",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (onMoveDown != null) {
+                        IconButton(
+                            onClick = onMoveDown,
+                            modifier = Modifier.size(26.dp)
+                        ) {
+                            Text(
+                                text = "▼",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onToggleExpand,
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Text(
+                            text = "▼",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.rotate(rotationState)
+                        )
+                    }
+
+                    if (onDeleteHub != null) {
+                        IconButton(
+                            onClick = onDeleteHub,
+                            modifier = Modifier.size(26.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.cancel),
+                                contentDescription = stringResource(R.string.close),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.size(11.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -227,45 +283,87 @@ fun PageRelationsHub(
 
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             subPageBlocks.forEach { block ->
-                                val titleText = block.content.takeIf { it.isNotBlank() } ?: stringResource(R.string.new_subpage_default)
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable { onOpenSubPage(block) },
-                                    shape = RoundedCornerShape(10.dp),
+                                        .clip(RoundedCornerShape(12.dp)),
+                                    shape = RoundedCornerShape(12.dp),
                                     color = MaterialTheme.colorScheme.surface,
                                     border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.5f))
                                 ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                            .padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text(text = "📄", fontSize = 14.sp)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = titleText,
-                                                fontSize = 13.sp,
+                                        Text(text = "📄", fontSize = 15.sp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                        // Inline Editable Title TextField
+                                        BasicTextField(
+                                            value = block.content,
+                                            onValueChange = { newTitle ->
+                                                onSubPageTitleChange?.invoke(block, newTitle)
+                                            },
+                                            textStyle = TextStyle(
+                                                fontSize = 13.5.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            ),
+                                            cursorBrush = SolidColor(VibrantOrange),
+                                            singleLine = true,
+                                            decorationBox = { innerTextField ->
+                                                if (block.content.isBlank()) {
+                                                    Text(
+                                                        text = stringResource(R.string.new_subpage_default),
+                                                        fontSize = 13.5.sp,
+                                                        fontWeight = FontWeight.Normal,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                                    )
+                                                }
+                                                innerTextField()
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        )
+
+                                        Spacer(modifier = Modifier.width(6.dp))
+
+                                        // "Aç ↗" Navigation Pill
+                                        Surface(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable { onOpenSubPage(block) },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = SoftOrangeLight.copy(alpha = 0.7f)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.block_subpage_open),
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = VibrantOrange
+                                                )
+                                            }
                                         }
 
-                                        Text(
-                                            text = "→",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = VibrantOrange
-                                        )
+                                        if (onDeleteSubPage != null) {
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                            IconButton(
+                                                onClick = { onDeleteSubPage(block) },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(id = R.drawable.cancel),
+                                                    contentDescription = stringResource(R.string.delete),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -296,14 +394,13 @@ fun PageRelationsHub(
                             linkedNotes.forEach { targetTitle ->
                                 Surface(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable { onOpenLinkedNote(targetTitle) },
+                                        .clip(RoundedCornerShape(10.dp)),
                                     shape = RoundedCornerShape(10.dp),
                                     color = SoftOrangeLight.copy(alpha = 0.7f),
                                     border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(text = "🔗", fontSize = 11.sp)
@@ -313,8 +410,23 @@ fun PageRelationsHub(
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = VibrantOrange,
-                                            maxLines = 1
+                                            maxLines = 1,
+                                            modifier = Modifier.clickable { onOpenLinkedNote(targetTitle) }
                                         )
+                                        if (onRemoveLinkedNote != null) {
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                            IconButton(
+                                                onClick = { onRemoveLinkedNote(targetTitle) },
+                                                modifier = Modifier.size(20.dp)
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(id = R.drawable.cancel),
+                                                    contentDescription = "Bağlantıyı Kaldır",
+                                                    tint = VibrantOrange.copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(10.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }

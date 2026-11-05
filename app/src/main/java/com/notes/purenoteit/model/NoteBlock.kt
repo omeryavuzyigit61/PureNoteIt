@@ -21,7 +21,8 @@ enum class BlockType {
     SUB_PAGE,
     CODE,
     MATH,
-    TABLE_OF_CONTENTS
+    TABLE_OF_CONTENTS,
+    PAGE_RELATIONS
 }
 
 data class NoteBlock(

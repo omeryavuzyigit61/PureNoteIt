@@ -368,6 +368,15 @@ fun NoteDetailScreen(
         }
     }
 
+    // Auto-mount PAGE_RELATIONS block in blocks when relations exist and none is mounted
+    LaunchedEffect(subPageBlocks.size, outgoingWikiLinks.size, showRelationsHubManually) {
+        val shouldHaveHub = subPageBlocks.isNotEmpty() || outgoingWikiLinks.isNotEmpty() || showRelationsHubManually
+        val hasHubBlock = blocks.any { it.type == BlockType.PAGE_RELATIONS }
+        if (shouldHaveHub && !hasHubBlock) {
+            blocks.add(0, NoteBlock(type = BlockType.PAGE_RELATIONS))
+        }
+    }
+
     // Smart Link Suggestion (Feature 3)
     val suggestedLinkTitle = remember(blocks.map { it.content }, allNotesForLinking, noteId) {
         val allText = blocks.joinToString(" ") { it.content + " " + it.toggleBody }
@@ -951,6 +960,10 @@ fun NoteDetailScreen(
 
     fun addSubPageBlock() {
         recordUndoState()
+        if (blocks.none { it.type == BlockType.PAGE_RELATIONS }) {
+            blocks.add(0, NoteBlock(type = BlockType.PAGE_RELATIONS))
+        }
+        isRelationsExpanded = true
         val newBlock = NoteBlock(type = BlockType.SUB_PAGE, content = "")
         val blockId = newBlock.id
         pendingSubPageBlockIds.add(blockId)
@@ -2219,9 +2232,18 @@ fun NoteDetailScreen(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .clickable {
-                                showRelationsHubManually = !showRelationsHubManually
-                                if (showRelationsHubManually) {
-                                    isRelationsExpanded = true
+                                showRelationsHubManually = true
+                                isRelationsExpanded = true
+                                val hubIdx = blocks.indexOfFirst { it.type == BlockType.PAGE_RELATIONS }
+                                if (hubIdx == -1) {
+                                    blocks.add(0, NoteBlock(type = BlockType.PAGE_RELATIONS))
+                                    coroutineScope.launch {
+                                        listState.animateScrollToItem(1)
+                                    }
+                                } else {
+                                    coroutineScope.launch {
+                                        listState.animateScrollToItem((hubIdx + 1).coerceAtLeast(0))
+                                    }
                                 }
                             },
                         shape = RoundedCornerShape(12.dp),
@@ -2334,9 +2356,54 @@ fun NoteDetailScreen(
                     }
                 }
 
-                // Page Relations & Index Hub (Consolidated Alt Sayfalar & Bağlantılı Notlar)
-                if (subPageBlocks.isNotEmpty() || outgoingWikiLinks.isNotEmpty() || showRelationsHubManually) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Dynamic Notion Blocks
+            itemsIndexed(blocks, key = { _, block -> block.id }) { index, block ->
+                // Do not render standalone subpage cards in the main feed (all grouped inside PageRelationsHub)
+                if (block.type == BlockType.SUB_PAGE) {
+                    return@itemsIndexed
+                }
+
+                val canMoveUp = remember(blocks.size, index) {
+                    var p = index - 1
+                    while (p >= 0 && blocks[p].type == BlockType.SUB_PAGE) p--
+                    p >= 0
+                }
+                val canMoveDown = remember(blocks.size, index) {
+                    var n = index + 1
+                    while (n < blocks.size && blocks[n].type == BlockType.SUB_PAGE) n++
+                    n < blocks.size
+                }
+
+                val moveBlockUpVisible: () -> Unit = {
+                    var prevIdx = index - 1
+                    while (prevIdx >= 0 && blocks[prevIdx].type == BlockType.SUB_PAGE) {
+                        prevIdx--
+                    }
+                    if (prevIdx >= 0) {
+                        recordUndoState()
+                        val item = blocks.removeAt(index)
+                        blocks.add(prevIdx, item)
+                        performSilentAutoSave()
+                    }
+                }
+
+                val moveBlockDownVisible: () -> Unit = {
+                    var nextIdx = index + 1
+                    while (nextIdx < blocks.size && blocks[nextIdx].type == BlockType.SUB_PAGE) {
+                        nextIdx++
+                    }
+                    if (nextIdx < blocks.size) {
+                        recordUndoState()
+                        val item = blocks.removeAt(index)
+                        blocks.add(nextIdx, item)
+                        performSilentAutoSave()
+                    }
+                }
+
+                if (block.type == BlockType.PAGE_RELATIONS) {
                     PageRelationsHub(
                         subPageBlocks = subPageBlocks,
                         linkedNotes = outgoingWikiLinks,
@@ -2345,15 +2412,69 @@ fun NoteDetailScreen(
                         onOpenSubPage = { subBlock -> navigateToSubPage(subBlock) },
                         onOpenLinkedNote = { targetTitle -> navigateToNoteByTitle(targetTitle) },
                         onAddSubPage = { addSubPageBlock() },
-                        onAddLink = { showLinkNotePicker = true }
+                        onAddLink = { showLinkNotePicker = true },
+                        onSubPageTitleChange = { subBlock, newTitle ->
+                            val idx = blocks.indexOfFirst { it.id == subBlock.id }
+                            if (idx != -1) {
+                                blocks[idx] = subBlock.copy(content = newTitle)
+                                lastParentSubPageEditTime = System.currentTimeMillis()
+                                val childId = subBlock.subPageNoteId
+                                if (childId != null) {
+                                    val childNote = allNotesForLinking.find { it.id == childId }
+                                    if (childNote != null && childNote.title != newTitle) {
+                                        noteViewModel.saveNote(childNote.copy(title = newTitle), contentForLinks = null)
+                                    }
+                                }
+                                performSilentAutoSave()
+                            }
+                        },
+                        onDeleteSubPage = { subBlock ->
+                            recordUndoState()
+                            pendingSubPageBlockIds.remove(subBlock.id)
+                            if (openWhenReadyBlockId == subBlock.id) {
+                                openWhenReadyBlockId = null
+                            }
+                            val childId = subBlock.subPageNoteId
+                            if (childId != null) {
+                                permanentlyDeletedSubPageIds.add(childId)
+                                noteViewModel.deleteNoteById(childId)
+                            }
+                            blocks.removeAll { it.id == subBlock.id }
+                            performSilentAutoSave()
+                            context.showToastShort(context.getString(R.string.delete) + ": " + (subBlock.content.ifBlank { context.getString(R.string.new_subpage_default) }))
+                        },
+                        onRemoveLinkedNote = { targetTitle ->
+                            recordUndoState()
+                            val removeRegex = Regex("""\[\[\s*${Regex.escape(targetTitle)}\s*\]\]\s*""", RegexOption.IGNORE_CASE)
+                            var changed = false
+                            for (i in blocks.indices) {
+                                val blk = blocks[i]
+                                if (removeRegex.containsMatchIn(blk.content) || removeRegex.containsMatchIn(blk.toggleBody)) {
+                                    val newContent = removeRegex.replace(blk.content, "").trimEnd()
+                                    val newToggle = removeRegex.replace(blk.toggleBody, "").trimEnd()
+                                    blocks[i] = blk.copy(content = newContent, toggleBody = newToggle)
+                                    changed = true
+                                }
+                            }
+                            if (changed) {
+                                knownLinkTargets.remove(targetTitle.trim().lowercase())
+                                performSilentAutoSave()
+                                context.showToastShort(targetTitle + " " + context.getString(R.string.delete))
+                            }
+                        },
+                        onMoveUp = if (canMoveUp) moveBlockUpVisible else null,
+                        onMoveDown = if (canMoveDown) moveBlockDownVisible else null,
+                        onDeleteHub = {
+                            recordUndoState()
+                            blocks.removeAt(index)
+                            showRelationsHubManually = false
+                            performSilentAutoSave()
+                        },
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
+                    return@itemsIndexed
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // Dynamic Notion Blocks
-            itemsIndexed(blocks, key = { _, block -> block.id }) { index, block ->
                 NotionBlockRow(
                     block = block,
                     onContentChange = { newText ->
@@ -2404,20 +2525,8 @@ fun NoteDetailScreen(
                         }
                         performSilentAutoSave()
                     },
-                    onMoveUp = if (index > 0) {
-                        {
-                            recordUndoState()
-                            val item = blocks.removeAt(index)
-                            blocks.add(index - 1, item)
-                        }
-                    } else null,
-                    onMoveDown = if (index < blocks.lastIndex) {
-                        {
-                            recordUndoState()
-                            val item = blocks.removeAt(index)
-                            blocks.add(index + 1, item)
-                        }
-                    } else null,
+                    onMoveUp = if (canMoveUp) moveBlockUpVisible else null,
+                    onMoveDown = if (canMoveDown) moveBlockDownVisible else null,
                     onEditDrawing = { existingPath ->
                         editingDrawingPath = existingPath
                         editingDrawingBlockIndex = index
@@ -2657,6 +2766,10 @@ fun NoteDetailScreen(
                                         val linkText = "[[$resolvedTargetTitle]] "
                                         knownLinkTargets[resolvedTargetTitle.lowercase()] = targetNote.id
                                         recordUndoState()
+                                        if (blocks.none { it.type == BlockType.PAGE_RELATIONS }) {
+                                            blocks.add(0, NoteBlock(type = BlockType.PAGE_RELATIONS))
+                                        }
+                                        isRelationsExpanded = true
                                         if (blocks.isNotEmpty() && blocks.last().content.isBlank() && blocks.last().type == BlockType.PARAGRAPH) {
                                             blocks[blocks.lastIndex] = blocks.last().copy(content = linkText)
                                         } else {
