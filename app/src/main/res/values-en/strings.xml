@@ -482,6 +482,7 @@
     <string name="relations_hub_title">Page Index &amp; Relations</string>
     <string name="relations_subpages_title">Sub-Pages</string>
     <string name="relations_links_title">Linked Notes</string>
+    <string name="relations_backlinks_title">Backlinks &amp; Parent Note</string>
     <string name="relations_add_subpage">+ Sub-Page</string>
     <string name="relations_add_link">+ Link Note</string>
     <string name="relations_empty_subpages">No sub-pages added yet</string>

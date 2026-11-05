@@ -482,6 +482,7 @@
     <string name="relations_hub_title">Sayfa Dizini &amp; Bağlantılar</string>
     <string name="relations_subpages_title">Alt Sayfalar</string>
     <string name="relations_links_title">Bağlantılı Notlar</string>
+    <string name="relations_backlinks_title">Bu Nota Bağlantılar / Üst Not</string>
     <string name="relations_add_subpage">+ Alt Sayfa</string>
     <string name="relations_add_link">+ Not Bağla</string>
     <string name="relations_empty_subpages">Henüz alt sayfa eklenmedi</string>

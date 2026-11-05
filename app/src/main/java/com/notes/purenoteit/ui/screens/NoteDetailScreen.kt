@@ -383,9 +383,9 @@ fun NoteDetailScreen(
         }
     }
 
-    // Auto-mount PAGE_RELATIONS block in blocks when relations exist and none is mounted
-    LaunchedEffect(subPageBlocks.size, outgoingWikiLinks.size, showRelationsHubManually) {
-        val shouldHaveHub = subPageBlocks.isNotEmpty() || outgoingWikiLinks.isNotEmpty() || showRelationsHubManually
+    // Auto-mount PAGE_RELATIONS block in blocks when relations exist (subpages, outgoing links, or backlinks) and none is mounted
+    LaunchedEffect(subPageBlocks.size, outgoingWikiLinks.size, backlinks.size, showRelationsHubManually) {
+        val shouldHaveHub = subPageBlocks.isNotEmpty() || outgoingWikiLinks.isNotEmpty() || backlinks.isNotEmpty() || showRelationsHubManually
         val hasHubBlock = blocks.any { it.type == BlockType.PAGE_RELATIONS }
         if (shouldHaveHub && !hasHubBlock) {
             blocks.add(0, NoteBlock(type = BlockType.PAGE_RELATIONS))
@@ -996,7 +996,10 @@ fun NoteDetailScreen(
                 }
                 val newChild = NoteData(
                     title = initialTitle,
-                    description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
+                    description = BlockParser.serialize(listOf(
+                        NoteBlock(type = BlockType.PAGE_RELATIONS),
+                        NoteBlock(content = "")
+                    )),
                     date = System.currentTimeMillis(),
                     categoryId = selectedCategoryId,
                     icon = "📄",
@@ -1093,7 +1096,10 @@ fun NoteDetailScreen(
                 val childTitle = if (latestBlock.content.isBlank()) "Yeni Alt Sayfa" else latestBlock.content.trim()
                 val newChild = NoteData(
                     title = childTitle,
-                    description = BlockParser.serialize(listOf(NoteBlock(content = ""))),
+                    description = BlockParser.serialize(listOf(
+                        NoteBlock(type = BlockType.PAGE_RELATIONS),
+                        NoteBlock(content = "")
+                    )),
                     date = System.currentTimeMillis(),
                     categoryId = selectedCategoryId,
                     icon = "📄",
@@ -2496,10 +2502,20 @@ fun NoteDetailScreen(
                     PageRelationsHub(
                         subPageBlocks = subPageBlocks,
                         linkedNotes = outgoingWikiLinks,
+                        backlinks = backlinks,
                         isExpanded = isRelationsExpanded,
                         onToggleExpand = { isRelationsExpanded = !isRelationsExpanded },
                         onOpenSubPage = { subBlock -> navigateToSubPage(subBlock) },
                         onOpenLinkedNote = { targetTitle -> navigateToNoteByTitle(targetTitle) },
+                        onOpenBacklink = { bNote ->
+                            if (bNote.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+                                requestGatekeeperUnlock {
+                                    onNavigateToNote?.invoke(bNote.id)
+                                }
+                            } else {
+                                onNavigateToNote?.invoke(bNote.id)
+                            }
+                        },
                         onAddSubPage = { addSubPageBlock() },
                         onAddLink = { showLinkNotePicker = true },
                         onRequestRename = { subBlock ->
@@ -2623,82 +2639,6 @@ fun NoteDetailScreen(
                     },
                     audioRecorder = audioRecorder
                 )
-            }
-
-            // Backlinks Section (Bu Nota Referans Veren Diğer Notlar - Paket 1)
-            if (noteId != -1 && backlinks.isNotEmpty()) {
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(14.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_link_hub),
-                                contentDescription = null,
-                                tint = VibrantOrange,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = stringResource(R.string.backlinks_header, backlinks.size),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            for (bNote in backlinks) {
-                                Surface(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            if (bNote.isPassword == true && !SecurityUtil.isVaultUnlocked) {
-                                                requestGatekeeperUnlock {
-                                                    onNavigateToNote?.invoke(bNote.id)
-                                                }
-                                            } else {
-                                                onNavigateToNote?.invoke(bNote.id)
-                                            }
-                                        },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.surface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        ModernNoteIconBadge(
-                                            iconKey = bNote.icon,
-                                            isProtected = bNote.isPassword == true,
-                                            size = 20.dp,
-                                            iconSize = 11.dp,
-                                            shape = RoundedCornerShape(5.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = bNote.title ?: stringResource(R.string.untitled_note),
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }

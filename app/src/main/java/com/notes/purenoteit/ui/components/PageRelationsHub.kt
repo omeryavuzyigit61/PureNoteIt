@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.R
+import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
@@ -49,10 +51,12 @@ import com.notes.purenoteit.ui.theme.VibrantOrange
 fun PageRelationsHub(
     subPageBlocks: List<NoteBlock>,
     linkedNotes: List<String>,
+    backlinks: List<NoteData> = emptyList(),
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
     onOpenSubPage: (NoteBlock) -> Unit,
     onOpenLinkedNote: (String) -> Unit,
+    onOpenBacklink: ((NoteData) -> Unit)? = null,
     onAddSubPage: () -> Unit,
     onAddLink: () -> Unit,
     onRequestRename: ((NoteBlock) -> Unit)? = null,
@@ -172,6 +176,35 @@ fun PageRelationsHub(
                                     fontSize = 10.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = VibrantOrange
+                                )
+                            }
+                        }
+                    }
+
+                    if (backlinks.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(0.5.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_link_hub),
+                                    contentDescription = null,
+                                    tint = Color(0xFF1976D2),
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = "${backlinks.size}",
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF1976D2)
                                 )
                             }
                         }
@@ -479,8 +512,70 @@ fun PageRelationsHub(
                         }
                     }
 
-                    // Empty state if user manually opened hub and there are neither subpages nor links
-                    if (subPageBlocks.isEmpty() && linkedNotes.isEmpty()) {
+                    // Divider between sections if subpages or outgoing links exist before backlinks
+                    if ((subPageBlocks.isNotEmpty() || linkedNotes.isNotEmpty()) && backlinks.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    // Backlinks Section (Bu Nota Bağlantılar / Üst Not)
+                    if (backlinks.isNotEmpty()) {
+                        Text(
+                            text = stringResource(R.string.relations_backlinks_title) + " (${backlinks.size})",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            backlinks.forEach { bNote ->
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { onOpenBacklink?.invoke(bNote) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.7f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        ModernNoteIconBadge(
+                                            iconKey = bNote.icon,
+                                            isProtected = bNote.isPassword == true,
+                                            size = 20.dp,
+                                            iconSize = 11.dp,
+                                            shape = RoundedCornerShape(5.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = bNote.title?.ifBlank { null } ?: stringResource(R.string.untitled_note),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_link_hub),
+                                            contentDescription = null,
+                                            tint = VibrantOrange,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Empty state if user manually opened hub and there are neither subpages nor links nor backlinks
+                    if (subPageBlocks.isEmpty() && linkedNotes.isEmpty() && backlinks.isEmpty()) {
                         Text(
                             text = stringResource(R.string.relations_empty_subpages),
                             fontSize = 12.sp,
