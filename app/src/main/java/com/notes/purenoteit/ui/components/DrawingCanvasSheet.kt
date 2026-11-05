@@ -410,14 +410,25 @@ fun DrawingCanvasSheet(
                             .padding(horizontal = 8.dp, vertical = 5.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "🔍 İncele",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = VibrantOrange,
-                            maxLines = 1,
-                            softWrap = false
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_draw_inspect),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.tool_inspect),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VibrantOrange,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
 
                     // Clear (Opens confirmation dialog before clearing canvas)
@@ -493,10 +504,17 @@ fun DrawingCanvasSheet(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.weight(1f)
                 ) {
+                    Icon(
+                        painter = painterResource(id = if (isPalmRejectionLocked) R.drawable.ic_draw_stylus else R.drawable.ic_draw_finger),
+                        contentDescription = null,
+                        tint = if (isPalmRejectionLocked) VibrantOrange else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(15.dp)
+                    )
                     Text(
-                        text = if (isPalmRejectionLocked) "🖊️ Avuç İçi Kilidi: Açık (Sadece Kalem)" else "👆 Parmak & Kalem Modu (Avuç Filtreli)",
+                        text = if (isPalmRejectionLocked) "Avuç İçi Kilidi: Açık (Sadece Kalem)" else "Parmak & Kalem Modu (Avuç Filtreli)",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isPalmRejectionLocked) VibrantOrange else MaterialTheme.colorScheme.onSurface,
@@ -533,6 +551,7 @@ fun DrawingCanvasSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ToolChip(
+                        iconRes = R.drawable.ic_draw_pen,
                         title = stringResource(R.string.tool_pen),
                         isSelected = selectedTool == DrawingTool.PEN
                     ) {
@@ -540,6 +559,7 @@ fun DrawingCanvasSheet(
                     }
 
                     ToolChip(
+                        iconRes = R.drawable.ic_draw_eraser,
                         title = stringResource(R.string.tool_eraser),
                         isSelected = selectedTool == DrawingTool.ERASER,
                         activeColor = Color(0xFFE53935)
@@ -568,12 +588,12 @@ fun DrawingCanvasSheet(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ToolChip(title = stringResource(R.string.tool_line), isSelected = selectedTool == DrawingTool.LINE) { selectedTool = DrawingTool.LINE }
-                    ToolChip(title = stringResource(R.string.tool_rect), isSelected = selectedTool == DrawingTool.RECTANGLE) { selectedTool = DrawingTool.RECTANGLE }
-                    ToolChip(title = stringResource(R.string.tool_circle), isSelected = selectedTool == DrawingTool.CIRCLE) { selectedTool = DrawingTool.CIRCLE }
-                    ToolChip(title = stringResource(R.string.tool_triangle), isSelected = selectedTool == DrawingTool.TRIANGLE) { selectedTool = DrawingTool.TRIANGLE }
-                    ToolChip(title = stringResource(R.string.tool_arrow), isSelected = selectedTool == DrawingTool.ARROW) { selectedTool = DrawingTool.ARROW }
-                    ToolChip(title = stringResource(R.string.tool_star), isSelected = selectedTool == DrawingTool.STAR) { selectedTool = DrawingTool.STAR }
+                    ToolChip(iconRes = R.drawable.ic_draw_line, title = stringResource(R.string.tool_line), isSelected = selectedTool == DrawingTool.LINE) { selectedTool = DrawingTool.LINE }
+                    ToolChip(iconRes = R.drawable.ic_draw_rect, title = stringResource(R.string.tool_rect), isSelected = selectedTool == DrawingTool.RECTANGLE) { selectedTool = DrawingTool.RECTANGLE }
+                    ToolChip(iconRes = R.drawable.ic_draw_circle, title = stringResource(R.string.tool_circle), isSelected = selectedTool == DrawingTool.CIRCLE) { selectedTool = DrawingTool.CIRCLE }
+                    ToolChip(iconRes = R.drawable.ic_draw_triangle, title = stringResource(R.string.tool_triangle), isSelected = selectedTool == DrawingTool.TRIANGLE) { selectedTool = DrawingTool.TRIANGLE }
+                    ToolChip(iconRes = R.drawable.ic_draw_arrow, title = stringResource(R.string.tool_arrow), isSelected = selectedTool == DrawingTool.ARROW) { selectedTool = DrawingTool.ARROW }
+                    ToolChip(iconRes = R.drawable.ic_draw_star, title = stringResource(R.string.tool_star), isSelected = selectedTool == DrawingTool.STAR) { selectedTool = DrawingTool.STAR }
                 }
             }
 
@@ -1157,13 +1177,24 @@ fun DrawingCanvasSheet(
                             color = SoftOrangeLight,
                             border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.5f))
                         ) {
-                            Text(
-                                text = "🧹 Sadece Yeni Eklediklerimi Sil",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = VibrantOrange,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_draw_eraser),
+                                    contentDescription = null,
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Sadece Yeni Eklediklerimi Sil",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            }
                         }
                     }
                 }
@@ -1197,24 +1228,38 @@ fun DrawingCanvasSheet(
 
 @Composable
 private fun ToolChip(
+    iconRes: Int? = null,
     title: String,
     isSelected: Boolean,
     activeColor: Color = VibrantOrange,
     onClick: () -> Unit
 ) {
-    Box(
+    Surface(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) activeColor else MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 5.dp),
-        contentAlignment = Alignment.Center
+            .clickable { onClick() },
+        shape = RoundedCornerShape(8.dp),
+        color = if (isSelected) activeColor else MaterialTheme.colorScheme.surfaceVariant
     ) {
-        Text(
-            text = title,
-            fontSize = 11.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    tint = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Text(
+                text = title,
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

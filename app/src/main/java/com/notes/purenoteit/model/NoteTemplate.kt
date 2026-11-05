@@ -14,7 +14,8 @@ enum class TemplateCategory(val titleRes: Int) {
 
 data class NoteTemplate(
     val id: String,
-    val icon: String,
+    val icon: String = "",
+    val iconRes: Int = R.drawable.ic_tpl_laptop,
     val badgeBgColor: Color,
     val badgeContentColor: Color,
     val category: TemplateCategory,
@@ -37,6 +38,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "dev_bug_tracker",
             icon = "⚡",
+            iconRes = R.drawable.ic_tpl_laptop,
             badgeBgColor = Color(0xFFE3F2FD),
             badgeContentColor = Color(0xFF1565C0),
             category = TemplateCategory.TECH,
@@ -44,7 +46,7 @@ object NoteTemplates {
             descRes = R.string.template_dev_desc,
             defaultTitleTr = "Hata Analizi & Kod Çözümü",
             defaultTitleEn = "Bug Analysis & Code Fix",
-            tags = listOf("💻 Kod Bloğu", "📊 Hata Seviyesi", "✅ Aksiyonlar"),
+            tags = listOf("Kod Bloğu", "Hata Seviyesi", "Aksiyonlar"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -56,7 +58,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "💻 Optimized Solution Code" else "💻 Optimize Edilmiş Çözüm Kodu"
+                        content = if (isEn) "Optimized Solution Code" else "Optimize Edilmiş Çözüm Kodu"
                     ),
                     NoteBlock(
                         type = BlockType.CODE,
@@ -65,7 +67,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📊 Module Impact Table" else "📊 Modül Etki & Öncelik Tablosu"
+                        content = if (isEn) "Module Impact Table" else "Modül Etki & Öncelik Tablosu"
                     ),
                     NoteBlock(
                         type = BlockType.TABLE,
@@ -83,7 +85,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_2,
-                        content = if (isEn) "✅ Verification Checklist" else "✅ Doğrulama & Test Kontrolleri"
+                        content = if (isEn) "Verification Checklist" else "Doğrulama & Test Kontrolleri"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
@@ -103,6 +105,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "math_notebook",
             icon = "♾️",
+            iconRes = R.drawable.ic_tpl_ruler,
             badgeBgColor = Color(0xFFFFF8E1),
             badgeContentColor = Color(0xFFF57F17),
             category = TemplateCategory.EDUCATION,
@@ -110,7 +113,7 @@ object NoteTemplates {
             descRes = R.string.template_math_desc,
             defaultTitleTr = "Matematik & Formül Defteri",
             defaultTitleEn = "Math & Formula Notebook",
-            tags = listOf("📐 LaTeX Formülleri", "✏️ Çizim Taslağı", "💡 İspat"),
+            tags = listOf("LaTeX Formülleri", "Çizim Taslağı", "İspat"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -122,7 +125,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📐 Core Mathematical Formulas" else "📐 Temel Matematik Formülleri"
+                        content = if (isEn) "Core Mathematical Formulas" else "Temel Matematik Formülleri"
                     ),
                     NoteBlock(
                         type = BlockType.MATH,
@@ -134,7 +137,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🔍 Theorem Proof & Geometric Insight" else "🔍 Teorem İspatı & Geometrik Yorum"
+                        content = if (isEn) "Theorem Proof & Geometric Insight" else "Teorem İspatı & Geometrik Yorum"
                     ),
                     NoteBlock(
                         type = BlockType.TOGGLE,
@@ -145,7 +148,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_2,
-                        content = if (isEn) "✏️ Geometry Sketch Area" else "✏️ Geometri & Grafik Çizim Notu"
+                        content = if (isEn) "Geometry Sketch Area" else "Geometri & Grafik Çizim Notu"
                     ),
                     NoteBlock(
                         type = BlockType.CALLOUT,
@@ -161,6 +164,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "cornell_notes",
             icon = "📖",
+            iconRes = R.drawable.ic_tpl_education,
             badgeBgColor = Color(0xFFEDE7F6),
             badgeContentColor = Color(0xFF512DA8),
             category = TemplateCategory.EDUCATION,
@@ -168,7 +172,7 @@ object NoteTemplates {
             descRes = R.string.template_cornell_desc,
             defaultTitleTr = "Cornell Notu: Veri Yapıları",
             defaultTitleEn = "Cornell Note: Data Structures",
-            tags = listOf("🎓 Cornell Metodu", "❓ Aktif Hatırlama", "📝 Özet"),
+            tags = listOf("Cornell Metodu", "Aktif Hatırlama", "Ders Özeti"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -180,7 +184,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🎯 Key Cues & Keywords" else "🎯 Anahtar Kavramlar & İpuçları (Cues)"
+                        content = if (isEn) "Key Cues & Keywords" else "Anahtar Kavramlar & İpuçları (Cues)"
                     ),
                     NoteBlock(
                         type = BlockType.BULLET_LIST,
@@ -194,7 +198,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "❓ Active Recall (Flashcards)" else "❓ Aktif Hatırlama & Soru-Cevap"
+                        content = if (isEn) "Active Recall (Flashcards)" else "Aktif Hatırlama & Soru-Cevap"
                     ),
                     NoteBlock(
                         type = BlockType.TOGGLE,
@@ -212,7 +216,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📝 3-Sentence Summary" else "📝 3 Cümlelik Ders Özeti"
+                        content = if (isEn) "3-Sentence Summary" else "3 Cümlelik Ders Özeti"
                     ),
                     NoteBlock(
                         type = BlockType.CALLOUT,
@@ -228,6 +232,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "architecture_adr",
             icon = "🏛️",
+            iconRes = R.drawable.ic_tpl_architecture,
             badgeBgColor = Color(0xFFECEFF1),
             badgeContentColor = Color(0xFF37474F),
             category = TemplateCategory.TECH,
@@ -235,7 +240,7 @@ object NoteTemplates {
             descRes = R.string.template_architecture_desc,
             defaultTitleTr = "Mimari Karar: MVI Durum Yönetimi",
             defaultTitleEn = "Architecture Decision: MVI State Pattern",
-            tags = listOf("🏛️ Mimari ADR", "📊 Kıyaslama", "🎯 Yol Haritası"),
+            tags = listOf("Mimari ADR", "Kıyaslama", "Yol Haritası"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -247,7 +252,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📋 Context & Problem Statement" else "📋 Bağlam & Karşılaşılan Sorun"
+                        content = if (isEn) "Context & Problem Statement" else "Bağlam & Karşılaşılan Sorun"
                     ),
                     NoteBlock(
                         type = BlockType.PARAGRAPH,
@@ -256,7 +261,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📊 Architecture Alternatives Comparison" else "📊 Mimari Alternatifler Kıyaslama Tablosu"
+                        content = if (isEn) "Architecture Alternatives Comparison" else "Mimari Alternatifler Kıyaslama Tablosu"
                     ),
                     NoteBlock(
                         type = BlockType.TABLE,
@@ -274,7 +279,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_2,
-                        content = if (isEn) "🚀 Implementation Steps" else "🚀 Uygulama ve Geçiş Adımları"
+                        content = if (isEn) "Implementation Steps" else "Uygulama ve Geçiş Adımları"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
@@ -294,6 +299,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "language_learning",
             icon = "🗣️",
+            iconRes = R.drawable.ic_tpl_globe,
             badgeBgColor = Color(0xFFE0F7FA),
             badgeContentColor = Color(0xFF00838F),
             category = TemplateCategory.EDUCATION,
@@ -301,7 +307,7 @@ object NoteTemplates {
             descRes = R.string.template_language_desc,
             defaultTitleTr = "İleri Seviye İngilizce Deyimler",
             defaultTitleEn = "Advanced English Idioms & Vocab",
-            tags = listOf("🗣️ Telaffuz", "📊 Kelime Tablosu", "🎧 Ses Kaydı"),
+            tags = listOf("Kelime & Anlam", "Telaffuz", "Pratik"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -313,7 +319,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📊 Core Vocabulary Table" else "📊 Kelime & Anlam Tablosu"
+                        content = if (isEn) "Core Vocabulary Table" else "Kelime & Anlam Tablosu"
                     ),
                     NoteBlock(
                         type = BlockType.TABLE,
@@ -331,7 +337,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_2,
-                        content = if (isEn) "🎧 Pronunciation Practice" else "🎧 Telaffuz Pratiği & Aksan"
+                        content = if (isEn) "Pronunciation Practice" else "Telaffuz Pratiği & Aksan"
                     ),
                     NoteBlock(
                         type = BlockType.CALLOUT,
@@ -352,6 +358,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "lean_canvas",
             icon = "💎",
+            iconRes = R.drawable.ic_tpl_rocket,
             badgeBgColor = Color(0xFFFCE4EC),
             badgeContentColor = Color(0xFFC2185B),
             category = TemplateCategory.WORK,
@@ -359,7 +366,7 @@ object NoteTemplates {
             descRes = R.string.template_lean_canvas_desc,
             defaultTitleTr = "Proje Fikir Tuvali: Mobil Girişim",
             defaultTitleEn = "Startup Lean Canvas: Mobile App",
-            tags = listOf("💎 Değer Önerisi", "📊 Maliyet/Gelir", "🚀 MVP"),
+            tags = listOf("Değer Önerisi", "Maliyet & Gelir", "İlk Sürüm MVP"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -371,7 +378,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🎯 Core Problem & Unique Value" else "🎯 Temel Problem & Eşsiz Değer Önerisi"
+                        content = if (isEn) "Core Problem & Unique Value" else "Temel Problem & Eşsiz Değer Önerisi"
                     ),
                     NoteBlock(
                         type = BlockType.BULLET_LIST,
@@ -385,7 +392,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📊 Revenue & Cost Structure" else "📊 Gelir Modeli ve Maliyet Kalemleri"
+                        content = if (isEn) "Revenue & Cost Structure" else "Gelir Modeli ve Maliyet Kalemleri"
                     ),
                     NoteBlock(
                         type = BlockType.TABLE,
@@ -398,51 +405,52 @@ object NoteTemplates {
                             listOf("Kalem", "Tür", "Tahmini Tutar"),
                             listOf("Ömür Boyu Pro Lisans", "Gelir", "499 ₺ tek seferlik"),
                             listOf("Play Store Komisyonu (%15)", "Maliyet", "-75 ₺ satış başı"),
-                            listOf("Sunucu & Altyapı Gideri", "Maliyet", "0 ₺ (Yerel Depolama)")
+                            listOf("Sunucu & Altyapı", "Maliyet", "0 ₺ (Tamamen Yerel)")
                         )
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_2,
-                        content = if (isEn) "🚀 Next Milestone Actions" else "🚀 İlk Sürüm (MVP) Aksiyonları"
+                        content = if (isEn) "Next Milestone Actions" else "İlk Sürüm (MVP) Aksiyonları"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
-                        content = if (isEn) "Launch closed beta test with 20 privacy-conscious developers"
-                                  else "20 kişilik geliştirici grubuyla kapalı beta testini başlat"
+                        content = if (isEn) "Deploy initial alpha to closed testing track on Google Play"
+                                  else "Google Play kapalı test kanalına ilk alfa sürümünü yükle"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
-                        content = if (isEn) "Prepare ProductHunt launch graphics and brief video"
-                                  else "Lansman için mağaza görsellerini ve kısa tanıtımı hazırla"
+                        content = if (isEn) "Conduct user feedback interviews with 10 beta testers"
+                                  else "10 beta kullanıcısıyla birebir geri bildirim görüşmesi yap"
                     )
                 )
             }
         ),
 
-        // 7. Haftalık Yemek & Beslenme Planı (Yaşam & Sağlık)
+        // 7. Beslenme & Yemek Planı (Yaşam & Sağlık)
         NoteTemplate(
-            id = "meal_planner",
-            icon = "🥑",
+            id = "nutrition_meal",
+            icon = "🥗",
+            iconRes = R.drawable.ic_tpl_nutrition,
             badgeBgColor = Color(0xFFE8F5E9),
-            badgeContentColor = Color(0xFF33691E),
+            badgeContentColor = Color(0xFF2E7D32),
             category = TemplateCategory.LIFE,
             titleRes = R.string.template_meal_title,
             descRes = R.string.template_meal_desc,
-            defaultTitleTr = "Haftalık Beslenme & Menü Planı",
-            defaultTitleEn = "Weekly Meal & Diet Plan",
-            tags = listOf("🥑 Kalori Dengesi", "📊 Menü Tablosu", "🛒 Alışveriş"),
+            defaultTitleTr = "Haftalık Beslenme & Yemek Planı",
+            defaultTitleEn = "Weekly Nutrition & Meal Plan",
+            tags = listOf("Öğün Çizelgesi", "Kalori & Makro", "Alışveriş"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
                     NoteBlock(
                         type = BlockType.CALLOUT,
-                        calloutIcon = "🥑",
+                        calloutIcon = "🥗",
                         content = if (isEn) "Daily Target: 2,100 kcal | Protein: 130g | Water: 3 Liters"
                                   else "Günlük Hedef: 2.100 kcal | Protein: 130g | Su: 3 Litre"
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📊 Weekly Meal Schedule" else "📊 7 Günlük Öğün & Kalori Çizelgesi"
+                        content = if (isEn) "Weekly Meal Schedule" else "7 Günlük Öğün & Kalori Çizelgesi"
                     ),
                     NoteBlock(
                         type = BlockType.TABLE,
@@ -464,7 +472,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_2,
-                        content = if (isEn) "🛒 Grocery Shopping Checklist" else "🛒 Market & Manav Alışveriş Listesi"
+                        content = if (isEn) "Grocery Shopping Checklist" else "Market & Manav Alışveriş Listesi"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
@@ -489,6 +497,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "workout_log",
             icon = "💪",
+            iconRes = R.drawable.ic_tpl_fitness,
             badgeBgColor = Color(0xFFFFE0B2),
             badgeContentColor = Color(0xFFD84315),
             category = TemplateCategory.LIFE,
@@ -496,7 +505,7 @@ object NoteTemplates {
             descRes = R.string.template_workout_desc,
             defaultTitleTr = "Antrenman Günlüğü: İtme (Push)",
             defaultTitleEn = "Workout Log: Push Day",
-            tags = listOf("💪 Ağırlık Takibi", "📊 Set/Tekrar", "🏆 Rekor"),
+            tags = listOf("Ağırlık Takibi", "Set & Tekrar", "Gelişim Notu"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -508,7 +517,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📊 Exercise, Weight & Rep Tracker" else "📊 Hareket, Ağırlık & Set Çizelgesi"
+                        content = if (isEn) "Exercise, Weight & Rep Tracker" else "Hareket, Ağırlık & Set Çizelgesi"
                     ),
                     NoteBlock(
                         type = BlockType.TABLE,
@@ -530,7 +539,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_2,
-                        content = if (isEn) "🏆 Session Notes & Form Check" else "🏆 Antrenman Notları & Gelişim"
+                        content = if (isEn) "Session Notes & Form Check" else "Antrenman Notları & Gelişim"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
@@ -550,6 +559,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "gratitude_journal",
             icon = "🌿",
+            iconRes = R.drawable.ic_tpl_mind,
             badgeBgColor = Color(0xFFF1F8E9),
             badgeContentColor = Color(0xFF558B2F),
             category = TemplateCategory.LIFE,
@@ -557,7 +567,7 @@ object NoteTemplates {
             descRes = R.string.template_gratitude_desc,
             defaultTitleTr = "Zihin & Şükran Günlüğü",
             defaultTitleEn = "Mindfulness & Gratitude Journal",
-            tags = listOf("🌿 Farkındalık", "✨ Şükran", "🧘 Dinginlik"),
+            tags = listOf("Farkındalık", "3 Şükran", "Günün Odak Noktası"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -569,7 +579,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "✨ 3 Things I am Grateful For Today" else "✨ Bugün Minnettar Olduğum 3 Şey"
+                        content = if (isEn) "3 Things I am Grateful For Today" else "Bugün Minnettar Olduğum 3 Şey"
                     ),
                     NoteBlock(
                         type = BlockType.BULLET_LIST,
@@ -588,7 +598,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🧘 Tomorrow's Single North Star" else "🧘 Yarın İçin Tek Büyük Odak Noktam"
+                        content = if (isEn) "Tomorrow's Single North Star" else "Yarın İçin Tek Büyük Odak Noktam"
                     ),
                     NoteBlock(
                         type = BlockType.TOGGLE,
@@ -605,6 +615,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "budget",
             icon = "📊",
+            iconRes = R.drawable.ic_tpl_finance,
             badgeBgColor = Color(0xFFE8F5E9),
             badgeContentColor = Color(0xFF2E7D32),
             category = TemplateCategory.WORK,
@@ -612,7 +623,7 @@ object NoteTemplates {
             descRes = R.string.template_budget_desc,
             defaultTitleTr = "Aylık Bütçe Planı",
             defaultTitleEn = "Monthly Budget Plan",
-            tags = listOf("📊 Dinamik Tablo", "∑ Otomatik Toplam", "🎯 Tasarruf"),
+            tags = listOf("Dinamik Tablo", "Otomatik Toplam", "Tasarruf"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -624,7 +635,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "💳 Income & Fixed Expenses" else "💳 Gelir ve Sabit Giderler"
+                        content = if (isEn) "Income & Fixed Expenses" else "Gelir ve Sabit Giderler"
                     ),
                     NoteBlock(
                         type = BlockType.TABLE,
@@ -646,7 +657,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_2,
-                        content = if (isEn) "🎯 Savings Targets" else "🎯 Tasarruf Hedefleri"
+                        content = if (isEn) "Savings Targets" else "Tasarruf Hedefleri"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
@@ -666,6 +677,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "meeting",
             icon = "📋",
+            iconRes = R.drawable.ic_tpl_meeting,
             badgeBgColor = Color(0xFFEFEBE9),
             badgeContentColor = Color(0xFF5D4037),
             category = TemplateCategory.WORK,
@@ -673,7 +685,7 @@ object NoteTemplates {
             descRes = R.string.template_meeting_desc,
             defaultTitleTr = "Toplantı: Proje Yol Haritası",
             defaultTitleEn = "Meeting: Project Roadmap",
-            tags = listOf("👥 Toplantı", "✅ Görevler", "📌 Kararlar"),
+            tags = listOf("Toplantı Gündemi", "Alınan Kararlar", "Aksiyon Dağılımı"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
@@ -685,7 +697,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "📌 Agenda Items" else "📌 Gündem Maddeleri"
+                        content = if (isEn) "Agenda Items" else "Gündem Maddeleri"
                     ),
                     NoteBlock(
                         type = BlockType.BULLET_LIST,
@@ -699,7 +711,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🎯 Key Decisions" else "🎯 Alınan Kararlar"
+                        content = if (isEn) "Key Decisions" else "Alınan Kararlar"
                     ),
                     NoteBlock(
                         type = BlockType.BULLET_LIST,
@@ -708,7 +720,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "✅ Action Items" else "✅ Aksiyon Listesi & Dağılım"
+                        content = if (isEn) "Action Items" else "Aksiyon Listesi & Dağılım"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
@@ -728,6 +740,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "travel",
             icon = "🧭",
+            iconRes = R.drawable.ic_tpl_travel,
             badgeBgColor = Color(0xFFE1F5FE),
             badgeContentColor = Color(0xFF0277BD),
             category = TemplateCategory.LIFE,
@@ -735,43 +748,48 @@ object NoteTemplates {
             descRes = R.string.template_travel_desc,
             defaultTitleTr = "Seyahat Planı: Roma & Floransa",
             defaultTitleEn = "Travel Plan: Rome & Florence",
-            tags = listOf("🧳 Bavul", "🪪 Belgeler", "📍 Rota", "🏨 Otel"),
+            tags = listOf("Bavul Listesi", "Belgeler & Biletler", "Gezilecek Rota"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
                     NoteBlock(
                         type = BlockType.CALLOUT,
-                        calloutIcon = "📍",
-                        content = if (isEn) "Destination: Rome, Italy | Dates: Next Month | Hotel: City Center"
-                                  else "Hedef: Roma & Floransa | Tarihler: Gelecek Ay | Otel: Şehir Merkezi"
+                        calloutIcon = "🧭",
+                        content = if (isEn) "Destination: Italy | Duration: 7 Days | Flight: 10:30 AM"
+                                  else "Hedef: İtalya | Süre: 7 Gün | Uçuş: 10:30"
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🪪 Documents & Essentials" else "🪪 Belgeler & Biletler"
+                        content = if (isEn) "Documents & Essentials" else "Belgeler & Biletler"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
-                        content = if (isEn) "Check passport validity (>6 months)" else "Pasaport geçerlilik kontrolü (>6 ay)"
+                        content = if (isEn) "Passport, Schengen visa, and boarding pass"
+                                  else "Pasaport, Schengen vizesi ve biniş kartı çıktısı"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
-                        content = if (isEn) "Download boarding passes & booking confirmations" else "Uçak biletleri ve otel rezervasyon belgeleri"
+                        content = if (isEn) "Hotel booking voucher & international travel insurance"
+                                  else "Otel rezervasyon belgesi ve seyahat sağlık sigortası"
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🧳 Packing Checklist" else "🧳 Bavul Kontrol Listesi"
+                        content = if (isEn) "Packing Checklist" else "Bavul Kontrol Listesi"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
-                        content = if (isEn) "Comfortable walking shoes & weather gear" else "Rahat yürüyüş ayakkabıları & mevsime uygun kıyafetler"
+                        content = if (isEn) "Universal power adapter and high-capacity powerbank"
+                                  else "Evrensel priz dönüştürücü ve hızlı şarj powerbank"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
-                        content = if (isEn) "Chargers, powerbank, and EU plug adapter" else "Şarj cihazları, powerbank ve priz adaptörü"
+                        content = if (isEn) "Noise-cancelling headphones and travel pillow"
+                                  else "Gürültü engelleyici kulaklık ve seyahat yastığı"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
-                        content = if (isEn) "Travel medical kit and daily vitamins" else "Kişisel bakım kiti ve seyahat ilk yardım çantası"
+                        content = if (isEn) "Comfortable walking sneakers (15,000+ daily steps)"
+                                  else "Rahat yürüyüş ayakkabısı (günde 15.000+ adım)"
                     )
                 )
             }
@@ -781,6 +799,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "goals",
             icon = "🎯",
+            iconRes = R.drawable.ic_tpl_target,
             badgeBgColor = Color(0xFFFFF3E0),
             badgeContentColor = Color(0xFFE65100),
             category = TemplateCategory.WORK,
@@ -788,19 +807,19 @@ object NoteTemplates {
             descRes = R.string.template_goals_desc,
             defaultTitleTr = "Haftalık Hedefler & Sprint",
             defaultTitleEn = "Weekly Goals & Sprint",
-            tags = listOf("🔥 P1 Öncelikler", "⚡ İkincil", "🧘 Alışkanlıklar"),
+            tags = listOf("P1 Öncelikler", "İkincil Hedefler", "Alışkanlıklar"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
                     NoteBlock(
                         type = BlockType.CALLOUT,
-                        calloutIcon = "🔥",
+                        calloutIcon = "🎯",
                         content = if (isEn) "Weekly North Star: Ship the release update smoothly."
                                   else "Haftalık Ana Odak: Sürüm güncellemesini eksiksiz yayınla."
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🚀 Priority 1 (Must-Have)" else "🚀 Öncelik 1 (P1 - Olmazsa Olmaz)"
+                        content = if (isEn) "Priority 1 (Must-Have)" else "Öncelik 1 (P1 - Olmazsa Olmaz)"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
@@ -814,7 +833,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "⚡ Priority 2 (Nice-to-Have)" else "⚡ Öncelik 2 (P2 - İkincil)"
+                        content = if (isEn) "Priority 2 (Nice-to-Have)" else "Öncelik 2 (P2 - İkincil)"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
@@ -823,7 +842,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🧘 Wellness & Mind" else "🧘 Sağlık & Kişisel Alışkanlıklar"
+                        content = if (isEn) "Wellness & Mind" else "Sağlık & Kişisel Alışkanlıklar"
                     ),
                     NoteBlock(
                         type = BlockType.TODO,
@@ -843,6 +862,7 @@ object NoteTemplates {
         NoteTemplate(
             id = "review",
             icon = "📚",
+            iconRes = R.drawable.ic_tpl_book,
             badgeBgColor = Color(0xFFF3E5F5),
             badgeContentColor = Color(0xFF7B1FA2),
             category = TemplateCategory.LIFE,
@@ -850,19 +870,19 @@ object NoteTemplates {
             descRes = R.string.template_review_desc,
             defaultTitleTr = "Kitap İncelemesi: Atomik Alışkanlıklar",
             defaultTitleEn = "Book Review: Atomic Habits",
-            tags = listOf("⭐ Puanlama", "📖 Özet", "✨ Alıntılar", "👁️ Spoiler"),
+            tags = listOf("Puanlama & Özet", "Ana Fikir", "Alıntılar"),
             buildBlocks = { ctx ->
                 val isEn = ctx.resources.configuration.locales[0].language.startsWith("en", ignoreCase = true)
                 listOf(
                     NoteBlock(
                         type = BlockType.CALLOUT,
                         calloutIcon = "📖",
-                        content = if (isEn) "Author: James Clear | Rating: ⭐⭐⭐⭐⭐ (5/5) | Finished: Today"
-                                  else "Yazar: James Clear | Puan: ⭐⭐⭐⭐⭐ (5/5) | Bitiş: Bugün"
+                        content = if (isEn) "Author: James Clear | Rating: 5/5 | Finished: Today"
+                                  else "Yazar: James Clear | Puan: 5/5 | Bitiş: Bugün"
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "💡 Core Takeaways" else "💡 Ana Fikir ve Kısa Özet"
+                        content = if (isEn) "Core Takeaways" else "Ana Fikir ve Kısa Özet"
                     ),
                     NoteBlock(
                         type = BlockType.PARAGRAPH,
@@ -871,7 +891,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "🔍 In-depth Analysis & Spoilers" else "🔍 Detaylı Bölüm Notları"
+                        content = if (isEn) "In-depth Analysis & Spoilers" else "Detaylı Bölüm Notları"
                     ),
                     NoteBlock(
                         type = BlockType.TOGGLE,
@@ -882,7 +902,7 @@ object NoteTemplates {
                     ),
                     NoteBlock(
                         type = BlockType.HEADING_1,
-                        content = if (isEn) "✨ Favorite Quotes" else "✨ En Etkileyici Alıntılar"
+                        content = if (isEn) "Favorite Quotes" else "En Etkileyici Alıntılar"
                     ),
                     NoteBlock(
                         type = BlockType.CALLOUT,

@@ -98,7 +98,12 @@ fun PageRelationsHub(
                             .background(SoftOrangeLight),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "📑", fontSize = 15.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_hub_index),
+                            contentDescription = null,
+                            tint = VibrantOrange,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
@@ -121,14 +126,25 @@ fun PageRelationsHub(
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(MaterialTheme.colorScheme.surface)
                                 .border(0.5.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Text(
-                                text = "📄 ${subPageBlocks.size}",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_subpage_doc),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = "${subPageBlocks.size}",
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
 
@@ -139,14 +155,25 @@ fun PageRelationsHub(
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(MaterialTheme.colorScheme.surface)
                                 .border(0.5.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Text(
-                                text = "🔗 ${linkedNotes.size}",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = VibrantOrange
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_link_hub),
+                                    contentDescription = null,
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = "${linkedNotes.size}",
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = VibrantOrange
+                                )
+                            }
                         }
                     }
 
@@ -304,7 +331,12 @@ fun PageRelationsHub(
                                             .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(text = "📄", fontSize = 15.sp)
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_subpage_doc),
+                                            contentDescription = null,
+                                            tint = VibrantOrange,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(8.dp))
 
                                         // Static readable Title Text
@@ -412,7 +444,12 @@ fun PageRelationsHub(
                                         modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(text = "🔗", fontSize = 11.sp)
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_link_hub),
+                                            contentDescription = null,
+                                            tint = VibrantOrange,
+                                            modifier = Modifier.size(13.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(5.dp))
                                         Text(
                                             text = targetTitle,

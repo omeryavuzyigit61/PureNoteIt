@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +51,8 @@ import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
+import com.notes.purenoteit.util.Constants
+import com.notes.purenoteit.util.SharedPrefencesUtil
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -68,6 +71,11 @@ fun TrashBinSheet(
     onEmptyTrash: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val prefs = remember { SharedPrefencesUtil(context) }
+    val retentionDays = remember {
+        prefs.get(Constants.KEY_TRASH_RETENTION_DAYS, Constants.DEFAULT_TRASH_RETENTION_DAYS)
+    }
     var showEmptyConfirmDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
@@ -95,7 +103,12 @@ fun TrashBinSheet(
                             .background(Color(0xFFFFEBEE)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "🗑️", fontSize = 20.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.delete),
+                            contentDescription = null,
+                            tint = Color(0xFFD32F2F),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -121,7 +134,11 @@ fun TrashBinSheet(
                             }
                         }
                         Text(
-                            text = stringResource(R.string.trash_subtitle),
+                            text = if (retentionDays > 0) {
+                                "$retentionDays gün sonra otomatik kalıcı temizlenir"
+                            } else {
+                                stringResource(R.string.trash_subtitle)
+                            },
                             fontSize = 11.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

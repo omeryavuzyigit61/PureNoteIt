@@ -95,7 +95,12 @@ fun TemplateHubSheet(
                             .background(SoftOrangeLight),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "✨", fontSize = 20.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_drawer_templates),
+                            contentDescription = null,
+                            tint = VibrantOrange,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -206,7 +211,12 @@ fun TemplateHubSheet(
                                             .border(1.dp, template.badgeContentColor.copy(alpha = 0.3f), RoundedCornerShape(14.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(text = template.icon, fontSize = 21.sp)
+                                        Icon(
+                                            painter = painterResource(id = template.iconRes),
+                                            contentDescription = null,
+                                            tint = template.badgeContentColor,
+                                            modifier = Modifier.size(24.dp)
+                                        )
                                     }
 
                                     Spacer(modifier = Modifier.width(12.dp))

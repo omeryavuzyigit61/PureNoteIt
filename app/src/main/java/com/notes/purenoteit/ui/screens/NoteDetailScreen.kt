@@ -2390,25 +2390,29 @@ fun NoteDetailScreen(
 
             // Dynamic Notion Blocks
             itemsIndexed(blocks, key = { _, block -> block.id }) { index, block ->
-                // Do not render standalone subpage cards in the main feed (all grouped inside PageRelationsHub)
-                if (block.type == BlockType.SUB_PAGE) {
+                val isPureLinkBlock = block.type == BlockType.PARAGRAPH && block.content.trim().matches(Regex("""^\[\[.+?\]\]$"""))
+                // Do not render standalone subpage cards or standalone link cards in the main feed (all grouped inside PageRelationsHub)
+                if (block.type == BlockType.SUB_PAGE || isPureLinkBlock) {
                     return@itemsIndexed
                 }
 
+                fun isBlockHiddenInFeed(b: NoteBlock): Boolean =
+                    b.type == BlockType.SUB_PAGE || (b.type == BlockType.PARAGRAPH && b.content.trim().matches(Regex("""^\[\[.+?\]\]$""")))
+
                 val canMoveUp = remember(blocks.size, index) {
                     var p = index - 1
-                    while (p >= 0 && blocks[p].type == BlockType.SUB_PAGE) p--
+                    while (p >= 0 && isBlockHiddenInFeed(blocks[p])) p--
                     p >= 0
                 }
                 val canMoveDown = remember(blocks.size, index) {
                     var n = index + 1
-                    while (n < blocks.size && blocks[n].type == BlockType.SUB_PAGE) n++
+                    while (n < blocks.size && isBlockHiddenInFeed(blocks[n])) n++
                     n < blocks.size
                 }
 
                 val moveBlockUpVisible: () -> Unit = {
                     var prevIdx = index - 1
-                    while (prevIdx >= 0 && blocks[prevIdx].type == BlockType.SUB_PAGE) {
+                    while (prevIdx >= 0 && isBlockHiddenInFeed(blocks[prevIdx])) {
                         prevIdx--
                     }
                     if (prevIdx >= 0) {
@@ -2421,7 +2425,7 @@ fun NoteDetailScreen(
 
                 val moveBlockDownVisible: () -> Unit = {
                     var nextIdx = index + 1
-                    while (nextIdx < blocks.size && blocks[nextIdx].type == BlockType.SUB_PAGE) {
+                    while (nextIdx < blocks.size && isBlockHiddenInFeed(blocks[nextIdx])) {
                         nextIdx++
                     }
                     if (nextIdx < blocks.size) {

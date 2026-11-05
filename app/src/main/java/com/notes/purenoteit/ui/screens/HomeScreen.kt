@@ -137,6 +137,8 @@ import com.notes.purenoteit.ui.components.TemplateHubSheet
 import com.notes.purenoteit.ui.components.TrashBinSheet
 import com.notes.purenoteit.ui.components.UpdateAvailableDialog
 import com.notes.purenoteit.ui.components.VaultBackupRestoreDialog
+import com.notes.purenoteit.util.Constants
+import com.notes.purenoteit.util.SharedPrefencesUtil
 import com.notes.purenoteit.util.AppUpdateData
 import com.notes.purenoteit.util.AppUpdateHelper
 import com.notes.purenoteit.util.ThemeMode
@@ -236,6 +238,9 @@ fun HomeScreen(
     // Trash Bin Sheet state (Feature 2)
     var showTrashBinSheet by remember { mutableStateOf(false) }
 
+    // Dedicated Settings Screen state
+    var showSettingsScreen by remember { mutableStateOf(false) }
+
     // Language Selection Sheet state (Feature 3: Çoklu Dil)
     var showLanguageSheet by remember { mutableStateOf(false) }
 
@@ -310,6 +315,19 @@ fun HomeScreen(
     }
     val trashedNotes = remember(noteList) {
         noteList.filter { it.status == "TRASH" }
+    }
+
+    // Dynamic Trash Retention Auto-Purge (Configurable in Settings)
+    LaunchedEffect(trashedNotes.size) {
+        val prefs = SharedPrefencesUtil(context)
+        val retentionDays = prefs.get(Constants.KEY_TRASH_RETENTION_DAYS, Constants.DEFAULT_TRASH_RETENTION_DAYS)
+        if (retentionDays > 0) {
+            val threshold = System.currentTimeMillis() - (retentionDays.toLong() * 24L * 60L * 60L * 1000L)
+            val expiredNotes = trashedNotes.filter { it.date < threshold }
+            for (expired in expiredNotes) {
+                noteViewModel.deleteNoteById(expired.id)
+            }
+        }
     }
 
     // Set of locked category IDs for unified Vault security
@@ -668,153 +686,16 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Menu Item: Language Selection (Çoklu Dil)
+                    // Menu Item: Settings (Ayarlar - Tema, Dil, Çöp Saklama Süresi ve Güncellemeler)
                     DrawerMenuTile(
-                        iconRes = R.drawable.ic_drawer_language,
-                        title = stringResource(R.string.drawer_language),
-                        subtitle = LanguageManager.getLanguageLabel(context),
+                        iconRes = R.drawable.ic_drawer_settings,
+                        title = stringResource(R.string.drawer_settings),
+                        subtitle = stringResource(R.string.drawer_settings_sub),
                         onClick = {
                             scope.launch { drawerState.close() }
-                            showLanguageSheet = true
+                            showSettingsScreen = true
                         }
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Menu Item: Check for Updates (Güncellemeleri Denetle - Yalnızca Gerçek Google Play)
-                    DrawerMenuTile(
-                        iconRes = R.drawable.ic_drawer_update_check,
-                        title = stringResource(R.string.update_check_menu),
-                        subtitle = stringResource(R.string.update_check_menu_sub),
-                        badge = "v${AppUpdateHelper.getCurrentVersionName(context)}",
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            if (currentActivity != null) {
-                                context.showToastShort(context.getString(R.string.checking_updates_toast))
-                                AppUpdateHelper.checkForAppUpdate(
-                                    activity = currentActivity,
-                                    isManual = true,
-                                    onUpdateFound = { data ->
-                                        updateDialogData = data
-                                        isManualReleaseNotesView = false
-                                        showUpdateDialog = true
-                                    },
-                                    onUpToDate = {
-                                        context.showToastShort(
-                                            context.getString(
-                                                R.string.app_up_to_date_toast,
-                                                "v" + AppUpdateHelper.getCurrentVersionName(context)
-                                             )
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Menu Item: Release Notes (Sürüm Notları / Yenilikler)
-                    DrawerMenuTile(
-                        iconRes = R.drawable.ic_drawer_release_notes,
-                        title = stringResource(R.string.drawer_release_notes),
-                        subtitle = stringResource(R.string.drawer_release_notes_sub, AppUpdateHelper.getCurrentVersionName(context)),
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            updateDialogData = AppUpdateHelper.getReleaseHighlights(context)
-                            isManualReleaseNotesView = true
-                            showUpdateDialog = true
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Menu Item: Theme Selection (3 Mod: Sistem, Açık, Koyu)
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp)),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(SoftOrangeLight),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.theme),
-                                        contentDescription = null,
-                                        tint = VibrantOrange,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = stringResource(R.string.theme_mode_title),
-                                        fontSize = 13.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = when (currentThemeMode) {
-                                            ThemeMode.SYSTEM -> stringResource(R.string.theme_system) + " (" + (if (isDarkTheme) stringResource(R.string.theme_dark) else stringResource(R.string.theme_light)) + ")"
-                                            ThemeMode.LIGHT -> stringResource(R.string.theme_light)
-                                            ThemeMode.DARK -> stringResource(R.string.theme_dark)
-                                        },
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // 3-Option Segmented Selector
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(MaterialTheme.colorScheme.surface)
-                                    .padding(3.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                val modes = listOf(
-                                    Triple(ThemeMode.SYSTEM, "🌓", stringResource(R.string.theme_system)),
-                                    Triple(ThemeMode.LIGHT, "☀️", stringResource(R.string.theme_light)),
-                                    Triple(ThemeMode.DARK, "🌙", stringResource(R.string.theme_dark))
-                                )
-                                for ((mode, emoji, label) in modes) {
-                                    val isSelected = currentThemeMode == mode
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) VibrantOrange else androidx.compose.ui.graphics.Color.Transparent)
-                                            .clickable { onThemeModeChange(mode) }
-                                            .padding(vertical = 6.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "$emoji $label",
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
@@ -1600,6 +1481,21 @@ fun HomeScreen(
                 context.showToastShort("Çöp kutusu boşaltıldı")
             },
             onDismiss = { showTrashBinSheet = false }
+        )
+    }
+
+    // Settings Screen Modal (Central Settings Hub)
+    if (showSettingsScreen) {
+        SettingsScreen(
+            currentThemeMode = currentThemeMode,
+            onThemeModeChange = onThemeModeChange,
+            isDarkTheme = isDarkTheme,
+            onShowUpdateDialog = { data, isReleaseOnly ->
+                updateDialogData = data
+                isManualReleaseNotesView = isReleaseOnly
+                showUpdateDialog = true
+            },
+            onDismiss = { showSettingsScreen = false }
         )
     }
 
