@@ -31,7 +31,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.R
 import com.notes.purenoteit.model.NoteTemplate
 import com.notes.purenoteit.model.NoteTemplates
+import com.notes.purenoteit.model.TemplateCategory
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
@@ -60,6 +64,12 @@ fun TemplateHubSheet(
 ) {
     val context = LocalContext.current
     val templates = remember(context) { NoteTemplates.getAll(context) }
+    var selectedCategory by remember { mutableStateOf(TemplateCategory.ALL) }
+
+    val filteredTemplates = remember(templates, selectedCategory) {
+        if (selectedCategory == TemplateCategory.ALL) templates
+        else templates.filter { it.category == selectedCategory }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -85,7 +95,7 @@ fun TemplateHubSheet(
                             .background(SoftOrangeLight),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "📋", fontSize = 20.sp)
+                        Text(text = "✨", fontSize = 20.sp)
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -118,7 +128,41 @@ fun TemplateHubSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Category Filter Pills
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TemplateCategory.values().forEach { category ->
+                    val isSelected = category == selectedCategory
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { selectedCategory = category },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isSelected) VibrantOrange else BorderLight.copy(alpha = 0.6f)
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(category.titleRes),
+                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             val maxListHeight = (LocalConfiguration.current.screenHeightDp.dp * 0.72f).coerceIn(300.dp, 560.dp)
 
@@ -130,7 +174,7 @@ fun TemplateHubSheet(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                items(templates, key = { it.id }) { template ->
+                items(filteredTemplates, key = { it.id }) { template ->
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -156,12 +200,13 @@ fun TemplateHubSheet(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(42.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.surface),
+                                            .size(44.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(template.badgeBgColor)
+                                            .border(1.dp, template.badgeContentColor.copy(alpha = 0.3f), RoundedCornerShape(14.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(text = template.icon, fontSize = 22.sp)
+                                        Text(text = template.icon, fontSize = 21.sp)
                                     }
 
                                     Spacer(modifier = Modifier.width(12.dp))

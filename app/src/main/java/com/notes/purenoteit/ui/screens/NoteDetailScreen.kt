@@ -74,6 +74,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
@@ -127,6 +128,7 @@ import com.notes.purenoteit.ui.components.MediaLightboxDialog
 import com.notes.purenoteit.ui.components.NotionBlockRow
 import com.notes.purenoteit.ui.components.NotionSlashDialog
 import com.notes.purenoteit.ui.components.NotionToolbar
+import com.notes.purenoteit.ui.components.PageRelationsHub
 import com.notes.purenoteit.ui.components.PdfExportStudioSheet
 import com.notes.purenoteit.ui.components.ReminderBottomSheet
 import com.notes.purenoteit.ui.components.SpotifyAudioVisualizer
@@ -349,6 +351,22 @@ fun NoteDetailScreen(
     }
     val charCount = remember(allNoteText) { allNoteText.length }
     val readingTimeMinutes = remember(wordCount) { maxOf(1, (wordCount + 199) / 200) }
+
+    // Page Relations & Index Hub State (Centralized Alt Sayfalar & Not Bağlantıları)
+    var isRelationsExpanded by rememberSaveable { mutableStateOf(true) }
+    var showRelationsHubManually by rememberSaveable { mutableStateOf(false) }
+
+    val subPageBlocks by remember {
+        derivedStateOf { blocks.filter { it.type == BlockType.SUB_PAGE } }
+    }
+    val outgoingWikiLinks by remember {
+        derivedStateOf {
+            val wikiRegex = Regex("""\[\[(.*?)\]\]""")
+            blocks.flatMap { blk ->
+                wikiRegex.findAll(blk.content + " " + blk.toggleBody).map { it.groupValues[1].trim() }
+            }.filter { it.isNotBlank() }.distinct()
+        }
+    }
 
     // Smart Link Suggestion (Feature 3)
     val suggestedLinkTitle = remember(blocks.map { it.content }, allNotesForLinking, noteId) {
@@ -2194,6 +2212,39 @@ fun NoteDetailScreen(
                             }
                         }
                     }
+
+                    // Quick Page Relations / Index Hub Toggle Chip
+                    val totalRelations = subPageBlocks.size + outgoingWikiLinks.size
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                showRelationsHubManually = !showRelationsHubManually
+                                if (showRelationsHubManually) {
+                                    isRelationsExpanded = true
+                                }
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (totalRelations > 0 || showRelationsHubManually) SoftOrangeLight.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            0.5.dp,
+                            if (totalRelations > 0 || showRelationsHubManually) VibrantOrange.copy(alpha = 0.4f) else BorderLight.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "📑", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = stringResource(R.string.relations_hub_title) + if (totalRelations > 0) " ($totalRelations)" else "",
+                                fontSize = 11.5.sp,
+                                fontWeight = if (totalRelations > 0 || showRelationsHubManually) FontWeight.Bold else FontWeight.Medium,
+                                color = if (totalRelations > 0 || showRelationsHubManually) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
 
                 // Notion Ready-to-Use Templates Hub Banner (Visible on fresh/empty notes, dismissible)
@@ -2281,6 +2332,21 @@ fun NoteDetailScreen(
                             }
                         }
                     }
+                }
+
+                // Page Relations & Index Hub (Consolidated Alt Sayfalar & Bağlantılı Notlar)
+                if (subPageBlocks.isNotEmpty() || outgoingWikiLinks.isNotEmpty() || showRelationsHubManually) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    PageRelationsHub(
+                        subPageBlocks = subPageBlocks,
+                        linkedNotes = outgoingWikiLinks,
+                        isExpanded = isRelationsExpanded,
+                        onToggleExpand = { isRelationsExpanded = !isRelationsExpanded },
+                        onOpenSubPage = { subBlock -> navigateToSubPage(subBlock) },
+                        onOpenLinkedNote = { targetTitle -> navigateToNoteByTitle(targetTitle) },
+                        onAddSubPage = { addSubPageBlock() },
+                        onAddLink = { showLinkNotePicker = true }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
