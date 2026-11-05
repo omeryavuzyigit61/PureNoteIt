@@ -22,6 +22,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -226,6 +228,11 @@ fun NoteDetailScreen(
     val blocks = remember { mutableStateListOf<NoteBlock>() }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val showTopBarTitle by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset > 160)
+        }
+    }
     var isRecordingAudio by remember { mutableStateOf(false) }
     var recordingSeconds by remember { mutableIntStateOf(0) }
     var currentAmplitude by remember { mutableIntStateOf(0) }
@@ -383,9 +390,35 @@ fun NoteDetailScreen(
         }
     }
 
-    // Auto-mount PAGE_RELATIONS block in blocks when relations exist (subpages, outgoing links, or backlinks) and none is mounted
-    LaunchedEffect(subPageBlocks.size, outgoingWikiLinks.size, backlinks.size, showRelationsHubManually) {
-        val shouldHaveHub = subPageBlocks.isNotEmpty() || outgoingWikiLinks.isNotEmpty() || backlinks.isNotEmpty() || showRelationsHubManually
+    // Parent Note resolution (Hierarchical Subpage Parent)
+    val parentNoteId: Int? = remember(noteRichBlocksJson, loadedNoteRef, allNotesForLinking, currentNoteId) {
+        val json = noteRichBlocksJson
+            ?: loadedNoteRef?.takeIf { it.id == currentNoteId }?.richBlocksJson
+            ?: allNotesForLinking.find { it.id == currentNoteId }?.richBlocksJson
+        val idFromJson = if (json != null) {
+            Regex(""""parentNoteId"\s*:\s*(\d+)""").find(json)?.groupValues?.get(1)?.toIntOrNull()
+        } else null
+        if (idFromJson != null) return@remember idFromJson
+
+        // Fallback: Check if any note in allNotesForLinking has a SUB_PAGE block referencing currentNoteId
+        if (currentNoteId != -1) {
+            val parent = allNotesForLinking.find { candidate ->
+                candidate.description?.contains("\"subPageNoteId\":$currentNoteId") == true
+            }
+            if (parent != null) return@remember parent.id
+        }
+        null
+    }
+
+    val parentNote: NoteData? = remember(parentNoteId, allNotesForLinking) {
+        if (parentNoteId != null) {
+            allNotesForLinking.find { it.id == parentNoteId }
+        } else null
+    }
+
+    // Auto-mount PAGE_RELATIONS block in blocks when relations exist (parent, subpages, outgoing links, or backlinks) and none is mounted
+    LaunchedEffect(subPageBlocks.size, outgoingWikiLinks.size, backlinks.size, parentNote, showRelationsHubManually) {
+        val shouldHaveHub = subPageBlocks.isNotEmpty() || outgoingWikiLinks.isNotEmpty() || backlinks.isNotEmpty() || (parentNote != null) || showRelationsHubManually
         val hasHubBlock = blocks.any { it.type == BlockType.PAGE_RELATIONS }
         if (shouldHaveHub && !hasHubBlock) {
             blocks.add(0, NoteBlock(type = BlockType.PAGE_RELATIONS))
@@ -1504,7 +1537,52 @@ fun NoteDetailScreen(
         topBar = {
             TopAppBar(
                 modifier = Modifier.statusBarsPadding(),
-                title = {},
+                title = {
+                    AnimatedVisibility(
+                        visible = showTopBarTitle,
+                        enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
+                            initialOffsetY = { it / 2 },
+                            animationSpec = tween(220)
+                        ),
+                        exit = fadeOut(animationSpec = tween(180)) + slideOutVertically(
+                            targetOffsetY = { it / 2 },
+                            animationSpec = tween(180)
+                        )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    coroutineScope.launch {
+                                        listState.animateScrollToItem(0)
+                                    }
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            if (selectedIcon != null) {
+                                ModernNoteIconBadge(
+                                    iconKey = selectedIcon,
+                                    isProtected = isPassword,
+                                    size = 24.dp,
+                                    iconSize = 13.dp,
+                                    shape = RoundedCornerShape(7.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(
+                                text = title.ifBlank { stringResource(R.string.untitled_note) },
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { handleExitWithAutoSave() }) {
                         Icon(
@@ -2503,11 +2581,21 @@ fun NoteDetailScreen(
 
                 if (block.type == BlockType.PAGE_RELATIONS) {
                     PageRelationsHub(
+                        parentNote = parentNote,
                         subPageBlocks = subPageBlocks,
                         linkedNotes = outgoingWikiLinks,
-                        backlinks = backlinks,
+                        backlinks = backlinks.filter { it.id != parentNote?.id },
                         isExpanded = isRelationsExpanded,
                         onToggleExpand = { isRelationsExpanded = !isRelationsExpanded },
+                        onOpenParentNote = { pNote ->
+                            if (pNote.isPassword == true && !SecurityUtil.isVaultUnlocked) {
+                                requestGatekeeperUnlock {
+                                    onNavigateToNote?.invoke(pNote.id)
+                                }
+                            } else {
+                                onNavigateToNote?.invoke(pNote.id)
+                            }
+                        },
                         onOpenSubPage = { subBlock -> navigateToSubPage(subBlock) },
                         onOpenLinkedNote = { targetTitle -> navigateToNoteByTitle(targetTitle) },
                         onOpenBacklink = { bNote ->

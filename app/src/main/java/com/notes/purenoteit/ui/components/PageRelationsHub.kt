@@ -49,11 +49,13 @@ import com.notes.purenoteit.ui.theme.VibrantOrange
 
 @Composable
 fun PageRelationsHub(
+    parentNote: NoteData? = null,
     subPageBlocks: List<NoteBlock>,
     linkedNotes: List<String>,
     backlinks: List<NoteData> = emptyList(),
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
+    onOpenParentNote: ((NoteData) -> Unit)? = null,
     onOpenSubPage: (NoteBlock) -> Unit,
     onOpenLinkedNote: (String) -> Unit,
     onOpenBacklink: ((NoteData) -> Unit)? = null,
@@ -124,6 +126,35 @@ fun PageRelationsHub(
                     Spacer(modifier = Modifier.width(6.dp))
 
                     // Badges for counts
+                    if (parentNote != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(SoftOrangeLight.copy(alpha = 0.85f))
+                                .border(0.5.dp, VibrantOrange.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_move_up),
+                                    contentDescription = null,
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = stringResource(R.string.relations_parent_badge),
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+
                     if (subPageBlocks.isNotEmpty()) {
                         Box(
                             modifier = Modifier
@@ -336,6 +367,95 @@ fun PageRelationsHub(
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Spacer(modifier = Modifier.height(10.dp))
+
+                    // Parent Page Section (Üst Sayfa / Ebeveyn Not)
+                    if (parentNote != null) {
+                        Text(
+                            text = stringResource(R.string.relations_parent_title),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onOpenParentNote?.invoke(parentNote) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.7f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(SoftOrangeLight),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_move_up),
+                                        contentDescription = null,
+                                        tint = VibrantOrange,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                ModernNoteIconBadge(
+                                    iconKey = parentNote.icon,
+                                    isProtected = parentNote.isPassword == true,
+                                    size = 22.dp,
+                                    iconSize = 12.dp,
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(
+                                    text = parentNote.title?.ifBlank { null } ?: stringResource(R.string.untitled_note),
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Spacer(modifier = Modifier.width(6.dp))
+
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { onOpenParentNote?.invoke(parentNote) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = SoftOrangeLight.copy(alpha = 0.7f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.block_subpage_open),
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = VibrantOrange
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (subPageBlocks.isNotEmpty() || linkedNotes.isNotEmpty() || backlinks.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+                    }
 
                     // Subpages Section
                     if (subPageBlocks.isNotEmpty()) {
@@ -574,8 +694,8 @@ fun PageRelationsHub(
                         }
                     }
 
-                    // Empty state if user manually opened hub and there are neither subpages nor links nor backlinks
-                    if (subPageBlocks.isEmpty() && linkedNotes.isEmpty() && backlinks.isEmpty()) {
+                    // Empty state if user manually opened hub and there are neither parent, subpages, links nor backlinks
+                    if (parentNote == null && subPageBlocks.isEmpty() && linkedNotes.isEmpty() && backlinks.isEmpty()) {
                         Text(
                             text = stringResource(R.string.relations_empty_subpages),
                             fontSize = 12.sp,

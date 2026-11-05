@@ -480,9 +480,11 @@
     <string name="template_cat_work">İş &amp; Finans</string>
     <string name="template_cat_life">Yaşam &amp; Sağlık</string>
     <string name="relations_hub_title">Sayfa Dizini &amp; Bağlantılar</string>
+    <string name="relations_parent_title">Üst Sayfa (Ebeveyn Not)</string>
+    <string name="relations_parent_badge">Üst</string>
     <string name="relations_subpages_title">Alt Sayfalar</string>
     <string name="relations_links_title">Bağlantılı Notlar</string>
-    <string name="relations_backlinks_title">Bu Nota Bağlantılar / Üst Not</string>
+    <string name="relations_backlinks_title">Bu Nota Bağlantılar</string>
     <string name="relations_add_subpage">+ Alt Sayfa</string>
     <string name="relations_add_link">+ Not Bağla</string>
     <string name="relations_empty_subpages">Henüz alt sayfa eklenmedi</string>
