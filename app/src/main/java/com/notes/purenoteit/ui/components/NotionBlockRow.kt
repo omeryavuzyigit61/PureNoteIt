@@ -1896,6 +1896,14 @@ fun NotionBlockRow(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        if (block.type == BlockType.HEADING_1 || block.type == BlockType.HEADING_2) {
+                            ModernHeadingIconBadge(
+                                headingType = block.type,
+                                content = block.content,
+                                modifier = Modifier.padding(end = 10.dp)
+                            )
+                        }
+
                         BasicTextField(
                             value = block.content,
                             onValueChange = onContentChange,

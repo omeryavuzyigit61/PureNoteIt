@@ -145,19 +145,14 @@ fun UpdateAvailableDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Version Tags Row (Guaranteed never to print identical versions like 1.0.7 -> 1.0.7)
+                    // Version Tags Row (Evrensel: 1.1.8, 2.1.8 veya gelecekteki her sürüm için güvenilir gösterim)
                     val currentDisplay = "v" + updateData.currentVersionName.removePrefix("v").trim()
-                    var availableDisplay = "v" + updateData.availableVersionName.removePrefix("v").trim()
-                    if (!isReleaseNotesOnly && availableDisplay == currentDisplay) {
-                        val parts = updateData.currentVersionName.removePrefix("v").trim().split(".")
-                        availableDisplay = if (parts.size >= 3) {
-                            val major = parts[0].toIntOrNull() ?: 1
-                            val minor = parts[1].toIntOrNull() ?: 0
-                            val patch = (parts[2].toIntOrNull() ?: 0) + 1
-                            "v$major.$minor.$patch"
-                        } else {
-                            "$currentDisplay.1"
-                        }
+                    val targetDisplay = if (updateData.availableVersionName.isNotBlank() && updateData.availableVersionName != currentDisplay) {
+                        updateData.availableVersionName
+                    } else if (updateData.availableVersionCode > updateData.currentVersionCode) {
+                        "Google Play En Son Sürüm"
+                    } else {
+                        currentDisplay
                     }
 
                     Row(
@@ -174,7 +169,7 @@ fun UpdateAvailableDialog(
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (!isReleaseNotesOnly && availableDisplay != currentDisplay) {
+                        if (!isReleaseNotesOnly && targetDisplay != currentDisplay) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Icon(
                                 painter = painterResource(id = R.drawable.arrow_right),
@@ -184,7 +179,7 @@ fun UpdateAvailableDialog(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = availableDisplay,
+                                text = targetDisplay,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = VibrantOrange

@@ -78,44 +78,25 @@ object AppUpdateHelper {
     }
 
     /**
-     * Dynamically and deterministically computes the target semantic version name from Google Play versionCode
-     * and known version mappings so the update dialog NEVER displays a stale or identical past version string (e.g. 1.0.7 -> 1.0.7).
+     * Evrensel Sürüm Çözücü:
+     * Google Play In-App Updates SDK yalnızca tamsayı (versionCode) döner.
+     * Bu fonksiyon hiçbir statik haritaya veya 4 sürümlük kısıtlamaya bağlı kalmadan,
+     * gelecekteki her türlü majör (2.1.8), minör (1.1.8) veya yama sürümü için
+     * güvenilir ve evrensel bir hedef sürüm etiketi üretir.
      */
     fun resolveAvailableVersionName(
         currentVersionName: String,
         currentVersionCode: Long,
         availableVersionCode: Long
     ): String {
-        // 1. Explicit versionCode to versionName mappings
-        val knownVersions = mapOf(
-            10L to "v1.0.6",
-            11L to "v1.0.7",
-            12L to "v1.0.8",
-            13L to "v1.0.9",
-            14L to "v1.1.0"
-        )
-        val mappedTarget = knownVersions[availableVersionCode]
         val cleanCurrent = currentVersionName.removePrefix("v").trim()
+        val buildInfo = if (availableVersionCode > 0) "Build $availableVersionCode" else "Güncel"
 
-        if (mappedTarget != null && mappedTarget.removePrefix("v").trim() != cleanCurrent) {
-            return mappedTarget
-        }
-
-        // 2. Dynamic Semantic Version calculation
-        val parts = cleanCurrent.split(".")
-        return if (parts.size >= 3) {
-            val major = parts[0].toIntOrNull() ?: 1
-            val minor = parts[1].toIntOrNull() ?: 0
-            val currentPatch = parts[2].toIntOrNull() ?: 0
-            val delta = if (availableVersionCode > currentVersionCode) {
-                (availableVersionCode - currentVersionCode).toInt()
-            } else {
-                1
-            }
-            val targetPatch = currentPatch + delta.coerceAtLeast(1)
-            "v$major.$minor.$targetPatch"
+        // Eğer Google Play'den daha yüksek bir versionCode gelmişse
+        return if (availableVersionCode > currentVersionCode) {
+            "v$cleanCurrent+ ($buildInfo)"
         } else {
-            "v$cleanCurrent.1"
+            "v$cleanCurrent"
         }
     }
 

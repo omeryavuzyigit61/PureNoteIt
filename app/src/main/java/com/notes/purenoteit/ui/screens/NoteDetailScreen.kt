@@ -2030,24 +2030,37 @@ fun NoteDetailScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Page Emoji Icon
+                    // Modern Note Icon Badge
                     Box(
                         modifier = Modifier
                             .size(46.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(SoftOrangeLight)
                             .clickable { showEmojiSheet = true },
                         contentAlignment = Alignment.Center
                     ) {
                         if (selectedIcon != null) {
-                            Text(text = selectedIcon!!, fontSize = 24.sp)
-                        } else {
-                            Icon(
-                                painter = painterResource(id = R.drawable.apps_add),
-                                contentDescription = stringResource(R.string.select_icon),
-                                tint = VibrantOrange,
-                                modifier = Modifier.size(20.dp)
+                            ModernNoteIconBadge(
+                                iconKey = selectedIcon,
+                                isProtected = isPassword,
+                                size = 46.dp,
+                                iconSize = 24.dp,
+                                shape = RoundedCornerShape(14.dp)
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(SoftOrangeLight),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.apps_add),
+                                    contentDescription = stringResource(R.string.select_icon),
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
 

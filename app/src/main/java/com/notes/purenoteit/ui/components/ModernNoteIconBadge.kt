@@ -126,3 +126,79 @@ fun ModernCalloutIconBadge(
         )
     }
 }
+
+/**
+ * Modern Heading Icon Badge.
+ * Automatically resolves and displays a crisp Material vector icon for headings
+ * (such as Agenda/Pin, Decisions/Target, Actions/Checklist, Code, Math, Ideas, etc.)
+ * so headings have sharp visual hierarchy instead of raw emojis or plain naked text.
+ */
+@Composable
+fun ModernHeadingIconBadge(
+    headingType: com.notes.purenoteit.model.BlockType,
+    content: String,
+    modifier: Modifier = Modifier,
+    size: Dp = if (headingType == com.notes.purenoteit.model.BlockType.HEADING_1) 24.dp else 20.dp,
+    iconSize: Dp = if (headingType == com.notes.purenoteit.model.BlockType.HEADING_1) 15.dp else 13.dp
+) {
+    val lower = content.lowercase()
+    val (drawableRes, tintColor) = when {
+        // Gündem / Agenda / Pin
+        lower.contains("gündem") || lower.contains("agenda") || lower.contains("madde") || content.startsWith("📌") ->
+            Pair(R.drawable.ic_pin, Color(0xFFE53935))
+
+        // Kararlar / Hedefler / Decisions / Target
+        lower.contains("karar") || lower.contains("decision") || lower.contains("hedef") || lower.contains("sprint") || content.startsWith("🎯") ->
+            Pair(R.drawable.ic_tpl_target, Color(0xFFE65100))
+
+        // Aksiyon / Görev / Action / Checklist
+        lower.contains("aksiyon") || lower.contains("action") || lower.contains("görev") || lower.contains("dağılım") || lower.contains("kontrol") || lower.contains("test") || content.startsWith("✅") ->
+            Pair(R.drawable.ic_checklist, Color(0xFF2E7D32))
+
+        // Fikir / Not / Çıkarım / Ideas
+        lower.contains("fikir") || lower.contains("takeaway") || lower.contains("özet") || lower.contains("not") || content.startsWith("💡") ->
+            Pair(R.drawable.ic_tpl_mind, Color(0xFFF57F17))
+
+        // Kod / Yazılım / Bug / Solution
+        lower.contains("kod") || lower.contains("code") || lower.contains("çözüm") || lower.contains("hata") || content.startsWith("⚡") || content.startsWith("💻") ->
+            Pair(R.drawable.ic_tpl_laptop, Color(0xFF1565C0))
+
+        // Formül / Matematik / Math
+        lower.contains("formül") || lower.contains("matematik") || lower.contains("teorem") || content.startsWith("📐") || content.startsWith("♾") ->
+            Pair(R.drawable.ic_tpl_ruler, Color(0xFFF57F17))
+
+        // Tablo / Rapor / Modül / Impact
+        lower.contains("tablo") || lower.contains("rapor") || lower.contains("modül") || lower.contains("analiz") || content.startsWith("📊") ->
+            Pair(R.drawable.ic_stream_timeline, Color(0xFF5E35B1))
+
+        // Kitap / İnceleme / Ders / Book
+        lower.contains("kitap") || lower.contains("ders") || lower.contains("alıntı") || content.startsWith("📖") || content.startsWith("📚") ->
+            Pair(R.drawable.ic_tpl_book, Color(0xFF4A148C))
+
+        // Mimari / Sistem / Architecture
+        lower.contains("mimari") || lower.contains("sistem") || lower.contains("adr") || content.startsWith("🏛") ->
+            Pair(R.drawable.ic_tpl_architecture, Color(0xFF37474F))
+
+        // Default H1 vs H2
+        headingType == com.notes.purenoteit.model.BlockType.HEADING_1 ->
+            Pair(R.drawable.ic_format_h1, VibrantOrange)
+
+        else ->
+            Pair(R.drawable.ic_format_h2, VibrantOrange)
+    }
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(6.dp))
+            .background(tintColor.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            painter = painterResource(id = drawableRes),
+            contentDescription = null,
+            tint = tintColor,
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
