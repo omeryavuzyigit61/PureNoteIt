@@ -393,11 +393,12 @@ fun NoteDetailScreen(
     }
 
     // Smart Link Suggestion (Feature 3)
-    val suggestedLinkTitle = remember(blocks.map { it.content }, allNotesForLinking, noteId) {
+    val suggestedLinkTitle = remember(blocks.map { it.content }, allNotesForLinking, noteId, currentNoteId, title) {
         val allText = blocks.joinToString(" ") { it.content + " " + it.toggleBody }
         val existingLinks = Regex("""\[\[(.*?)\]\]""").findAll(allText).map { it.groupValues[1].trim().lowercase() }.toSet()
         val subpageTitles = blocks.filter { it.type == BlockType.SUB_PAGE }.map { it.content.trim().lowercase() }.toSet()
         val subpageIds = blocks.filter { it.type == BlockType.SUB_PAGE }.mapNotNull { it.subPageNoteId }.toSet()
+        val currentTitleClean = title.trim()
 
         allNotesForLinking.firstOrNull { noteCandidate ->
             val candidateTitle = noteCandidate.title?.trim() ?: ""
@@ -408,6 +409,8 @@ fun NoteDetailScreen(
 
             candidateTitle.length >= 3 &&
             noteCandidate.id != noteId &&
+            (currentNoteId == -1 || noteCandidate.id != currentNoteId) &&
+            (currentTitleClean.isBlank() || !candidateTitle.equals(currentTitleClean, ignoreCase = true)) &&
             !isCandidateSubpage &&
             !existingLinks.contains(candidateTitle.lowercase()) &&
             allText.contains(candidateTitle, ignoreCase = true)
@@ -2767,9 +2770,16 @@ fun NoteDetailScreen(
         val currentSubpageTitles = remember(blocks) {
             blocks.filter { it.type == BlockType.SUB_PAGE }.map { it.content.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
         }
-        val filteredLinkNotes = remember(allNotesForLinking, linkSearchQuery, noteId, currentSubpageIds, currentSubpageTitles) {
+        val currentTitleLower = title.trim().lowercase()
+        val outgoingTitles = remember(outgoingWikiLinks) {
+            outgoingWikiLinks.map { it.trim().lowercase() }.toSet()
+        }
+        val filteredLinkNotes = remember(allNotesForLinking, linkSearchQuery, noteId, currentNoteId, currentTitleLower, currentSubpageIds, currentSubpageTitles, outgoingTitles) {
             allNotesForLinking
                 .filter { it.id != noteId }
+                .filter { currentNoteId == -1 || it.id != currentNoteId }
+                .filter { currentTitleLower.isBlank() || (it.title?.trim()?.lowercase() ?: "") != currentTitleLower }
+                .filter { (it.title?.trim()?.lowercase() ?: "") !in outgoingTitles }
                 .filter { it.status != "TRASH" }
                 .filter { it.id !in currentSubpageIds }
                 .filter { it.richBlocksJson?.contains("\"isSubPage\":true") != true }
