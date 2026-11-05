@@ -149,20 +149,40 @@ fun PageRelationsHub(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    // Dedicated Accordion Chevron Icon (Toggles expand/collapse)
+                    IconButton(
+                        onClick = onToggleExpand,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_chevron_down),
+                            contentDescription = if (isExpanded) "Katla" else "Genişlet",
+                            tint = VibrantOrange,
+                            modifier = Modifier
+                                .size(14.dp)
+                                .rotate(rotationState)
+                        )
+                    }
                 }
 
-                // Controls: Move Up (▲), Move Down (▼), Chevron, Close (✕)
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Block-Level Controls: Move Up (↑), Move Down (↓), Close/Remove (✕)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
                     if (onMoveUp != null) {
                         IconButton(
                             onClick = onMoveUp,
                             modifier = Modifier.size(26.dp)
                         ) {
-                            Text(
-                                text = "▲",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_move_up),
+                                contentDescription = "Yukarı Taşı",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
@@ -172,28 +192,17 @@ fun PageRelationsHub(
                             onClick = onMoveDown,
                             modifier = Modifier.size(26.dp)
                         ) {
-                            Text(
-                                text = "▼",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_move_down),
+                                contentDescription = "Aşağı Taşı",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
 
-                    IconButton(
-                        onClick = onToggleExpand,
-                        modifier = Modifier.size(26.dp)
-                    ) {
-                        Text(
-                            text = "▼",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.rotate(rotationState)
-                        )
-                    }
-
                     if (onDeleteHub != null) {
+                        Spacer(modifier = Modifier.width(2.dp))
                         IconButton(
                             onClick = onDeleteHub,
                             modifier = Modifier.size(26.dp)
