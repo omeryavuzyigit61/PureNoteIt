@@ -48,9 +48,9 @@ object AppUpdateHelper {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val pInfo = getPackageInfo(context)
-            pInfo.versionName ?: "1.0.8"
+            pInfo.versionName ?: "1.0.9"
         } catch (e: Exception) {
-            "1.0.8"
+            "1.0.9"
         }
     }
 
@@ -144,16 +144,16 @@ object AppUpdateHelper {
                     availableVersionCode = availableVerCode,
                     availableVersionName = dynamicTargetVersion,
                     releaseNotesTr = listOf(
-                        "📄 Alt Sayfa Mimarisi & Hiyerarşik İzolasyon: Alt sayfaların anında benzersiz kimlikle bağlanması, çift yönlü senkronizasyon ve kalıcı silme.",
-                        "🖼️ Tam Ekran Büyüteç (Lightbox) & Çizim Önizleme: Görseller ve el yazısı çizimler için tam ekran pinch-to-zoom ve düzenleme desteği.",
-                        "✍️ Evrensel Stylus & Avuç İçi Engelleme: Kalemle çizim yaparken istenmeyen avuç içi dokunuşlarının engellenmesi.",
-                        "🗑️ Güvenli Çöp Kutusu & Geri Yükleme: Çizim temizleme ve not silme onay pencereleri ile çöp kutusu bütünlüğü."
+                        "📑 Sayfa Dizini & İlişkiler Merkezi: Alt sayfalar, giden bağlantılar ve gelen referansların tek bir panelde birleştirilmesi.",
+                        "📂 Üst Sayfa (Ebeveyn Not) Hiyerarşisi: Alt sayfalarda ebeveyn nota kolay erişim sağlayan özel hiyerarşi kartı ve rozeti.",
+                        "✨ Kayan Not Başlığı (Sticky TopAppBar): Notu aşağı kaydırdığınızda üst barda beliren akıllı başlık ve tek dokunuşla en üste sarma.",
+                        "🔗 Akıllı Not Bağlantısı: Mevcut ve mükerrer notların bağlantı listesinden elenmesi ile temiz ilişki yönetimi."
                     ),
                     releaseNotesEn = listOf(
-                        "📄 Sub-Page Architecture & Hierarchy Isolation: Instant unique subPage ID binding, bi-directional sync, and isolated permanent deletion.",
-                        "🖼️ Full-Screen Lightbox & Drawing Preview: Read-only pinch-to-zoom and seamless edit transition for images and drawings.",
-                        "✍️ Universal Stylus & Palm Rejection: Anatomical palm contact rejection and multi-touch cluster filtering for digital pens.",
-                        "🗑️ Trash Confirmation & Safe Recovery: Clear canvas confirmation and trash deletion dialog with enhanced recovery integrity."
+                        "📑 Unified Page Index & Relations: Sub-pages, outgoing links, and incoming backlinks organized in a single hub.",
+                        "📂 Distinct Parent Page Hierarchy: Dedicated breadcrumb hierarchy card separating parent pages from regular links.",
+                        "✨ Sticky TopAppBar Title: Smooth collapsing note header in top bar with quick tap-to-top navigation.",
+                        "🔗 Smart Note Linking: Automatic exclusion of self-notes and duplicates from the link suggestion picker."
                     ),
                     playUpdateInfo = appUpdateInfo
                 )
@@ -223,16 +223,16 @@ object AppUpdateHelper {
             availableVersionCode = curCode,
             availableVersionName = "v$curName",
             releaseNotesTr = listOf(
-                "📄 Alt Sayfa Mimarisi & Hiyerarşik İzolasyon: Alt sayfaların anında benzersiz kimlikle bağlanması, çift yönlü senkronizasyon ve kalıcı silme.",
-                "🖼️ Tam Ekran Büyüteç (Lightbox) & Çizim Önizleme: Görseller ve el yazısı çizimler için tam ekran pinch-to-zoom ve düzenleme desteği.",
-                "✍️ Evrensel Stylus & Avuç İçi Engelleme: Kalemle çizim yaparken istenmeyen avuç içi dokunuşlarının engellenmesi.",
-                "🗑️ Güvenli Çöp Kutusu & Geri Yükleme: Çizim temizleme ve not silme onay pencereleri ile çöp kutusu bütünlüğü."
+                "📑 Sayfa Dizini & İlişkiler Merkezi: Alt sayfalar, giden bağlantılar ve gelen referansların tek bir panelde birleştirilmesi.",
+                "📂 Üst Sayfa (Ebeveyn Not) Hiyerarşisi: Alt sayfalarda ebeveyn nota kolay erişim sağlayan özel hiyerarşi kartı ve rozeti.",
+                "✨ Kayan Not Başlığı (Sticky TopAppBar): Notu aşağı kaydırdığınızda üst barda beliren akıllı başlık ve tek dokunuşla en üste sarma.",
+                "🔗 Akıllı Not Bağlantısı: Mevcut ve mükerrer notların bağlantı listesinden elenmesi ile temiz ilişki yönetimi."
             ),
             releaseNotesEn = listOf(
-                "📄 Sub-Page Architecture & Hierarchy Isolation: Instant unique subPage ID binding, bi-directional sync, and isolated permanent deletion.",
-                "🖼️ Full-Screen Lightbox & Drawing Preview: Read-only pinch-to-zoom and seamless edit transition for images and drawings.",
-                "✍️ Universal Stylus & Palm Rejection: Anatomical palm contact rejection and multi-touch cluster filtering for digital pens.",
-                "🗑️ Trash Confirmation & Safe Recovery: Clear canvas confirmation and trash deletion dialog with enhanced recovery integrity."
+                "📑 Unified Page Index & Relations: Sub-pages, outgoing links, and incoming backlinks organized in a single hub.",
+                "📂 Distinct Parent Page Hierarchy: Dedicated breadcrumb hierarchy card separating parent pages from regular links.",
+                "✨ Sticky TopAppBar Title: Smooth collapsing note header in top bar with quick tap-to-top navigation.",
+                "🔗 Smart Note Linking: Automatic exclusion of self-notes and duplicates from the link suggestion picker."
             )
         )
     }
