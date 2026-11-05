@@ -416,12 +416,15 @@ private fun KanbanNoteCard(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (!note.icon.isNullOrBlank()) {
-                        Text(text = note.icon!!, fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-
                     val isProtected = note.isPassword == true || note.isEncrypted || category?.isPassword == true
+                    ModernNoteIconBadge(
+                        iconKey = note.icon,
+                        isProtected = isProtected,
+                        size = 24.dp,
+                        iconSize = 13.dp,
+                        shape = RoundedCornerShape(6.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = when {
                             isProtected -> "******"

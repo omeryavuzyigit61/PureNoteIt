@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -33,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -109,9 +111,13 @@ fun UpdateAvailableDialog(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = if (isReleaseNotesOnly) "✨" else "🚀",
-                            fontSize = 32.sp
+                        Icon(
+                            painter = painterResource(
+                                id = if (isReleaseNotesOnly) R.drawable.ic_drawer_release_notes else R.drawable.ic_drawer_update_check
+                            ),
+                            contentDescription = null,
+                            tint = PureWhite,
+                            modifier = Modifier.size(32.dp)
                         )
                     }
 
@@ -139,7 +145,21 @@ fun UpdateAvailableDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Version Tags Row
+                    // Version Tags Row (Guaranteed never to print identical versions like 1.0.7 -> 1.0.7)
+                    val currentDisplay = "v" + updateData.currentVersionName.removePrefix("v").trim()
+                    var availableDisplay = "v" + updateData.availableVersionName.removePrefix("v").trim()
+                    if (!isReleaseNotesOnly && availableDisplay == currentDisplay) {
+                        val parts = updateData.currentVersionName.removePrefix("v").trim().split(".")
+                        availableDisplay = if (parts.size >= 3) {
+                            val major = parts[0].toIntOrNull() ?: 1
+                            val minor = parts[1].toIntOrNull() ?: 0
+                            val patch = (parts[2].toIntOrNull() ?: 0) + 1
+                            "v$major.$minor.$patch"
+                        } else {
+                            "$currentDisplay.1"
+                        }
+                    }
+
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
@@ -149,22 +169,22 @@ fun UpdateAvailableDialog(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "v${updateData.currentVersionName}",
+                            text = currentDisplay,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (!isReleaseNotesOnly) {
+                        if (!isReleaseNotesOnly && availableDisplay != currentDisplay) {
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "➔",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = VibrantOrange
+                            Icon(
+                                painter = painterResource(id = R.drawable.arrow_right),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(12.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = updateData.availableVersionName,
+                                text = availableDisplay,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = VibrantOrange
@@ -202,7 +222,12 @@ fun UpdateAvailableDialog(
                             .padding(14.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "✨", fontSize = 14.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_drawer_release_notes),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(15.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = stringResource(R.string.update_whats_new_header),
@@ -276,11 +301,23 @@ fun UpdateAvailableDialog(
                                 contentColor = PureWhite
                             )
                         ) {
-                            Text(
-                                text = "⚡ " + stringResource(R.string.update_now_btn),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_drawer_update_check),
+                                    contentDescription = null,
+                                    tint = PureWhite,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.update_now_btn),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))

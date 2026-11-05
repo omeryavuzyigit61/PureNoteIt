@@ -912,11 +912,15 @@ fun NotionCalendarEventCard(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (!note.icon.isNullOrBlank()) {
-                            Text(text = note.icon!!, fontSize = 12.sp)
-                            Spacer(modifier = Modifier.width(4.dp))
-                        }
                         val isProtected = note.isPassword == true || note.isEncrypted || cat?.isPassword == true
+                        ModernNoteIconBadge(
+                            iconKey = note.icon,
+                            isProtected = isProtected,
+                            size = 20.dp,
+                            iconSize = 11.dp,
+                            shape = RoundedCornerShape(5.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = when {
                                 isProtected -> "******"

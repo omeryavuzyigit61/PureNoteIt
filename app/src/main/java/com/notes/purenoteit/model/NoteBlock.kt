@@ -49,6 +49,21 @@ object BlockParser {
     private val gson = Gson()
     private const val PREFIX = "NOTION_BLOCKS_V1:"
 
+    private val LEGACY_HEADING_EMOJIS = listOf(
+        "📌", "🎯", "✅", "💡", "🚀", "⚡", "🧘", "🧳", "🗺️", "✨", "🔥", "💎",
+        "🥗", "💪", "🌿", "📊", "📋", "🧭", "📚", "📖", "💻", "📐", "🎓", "🏛️", "🏛"
+    )
+
+    fun sanitizeHeading(content: String): String {
+        var clean = content.trim()
+        for (prefix in LEGACY_HEADING_EMOJIS) {
+            if (clean.startsWith(prefix)) {
+                clean = clean.removePrefix(prefix).trimStart()
+            }
+        }
+        return clean
+    }
+
     fun blocksToJson(blocks: List<NoteBlock>): String {
         return PREFIX + gson.toJson(blocks)
     }
@@ -72,6 +87,9 @@ object BlockParser {
                     if (b.codeLanguage.isNullOrBlank()) {
                         b.codeLanguage = "kotlin"
                     }
+                    if (b.type == BlockType.HEADING_1 || b.type == BlockType.HEADING_2) {
+                        b.content = sanitizeHeading(b.content)
+                    }
                 }
                 if (list.isEmpty()) listOf(NoteBlock()) else list
             } catch (e: Exception) {
@@ -86,10 +104,10 @@ object BlockParser {
         for (line in lines) {
             when {
                 line.startsWith("# ") -> {
-                    blocks.add(NoteBlock(type = BlockType.HEADING_1, content = line.removePrefix("# ")))
+                    blocks.add(NoteBlock(type = BlockType.HEADING_1, content = sanitizeHeading(line.removePrefix("# "))))
                 }
                 line.startsWith("## ") -> {
-                    blocks.add(NoteBlock(type = BlockType.HEADING_2, content = line.removePrefix("## ")))
+                    blocks.add(NoteBlock(type = BlockType.HEADING_2, content = sanitizeHeading(line.removePrefix("## "))))
                 }
                 line.startsWith("[ ] ") -> {
                     blocks.add(NoteBlock(type = BlockType.TODO, content = line.removePrefix("[ ] "), isChecked = false))

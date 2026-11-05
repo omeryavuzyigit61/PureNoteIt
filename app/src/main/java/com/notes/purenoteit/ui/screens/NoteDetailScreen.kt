@@ -125,6 +125,7 @@ import com.notes.purenoteit.ui.components.DrawingCanvasSheet
 import com.notes.purenoteit.ui.components.EmojiPickerSheet
 import com.notes.purenoteit.ui.components.KANBAN_COLUMNS
 import com.notes.purenoteit.ui.components.MediaLightboxDialog
+import com.notes.purenoteit.ui.components.ModernNoteIconBadge
 import com.notes.purenoteit.ui.components.NotionBlockRow
 import com.notes.purenoteit.ui.components.NotionSlashDialog
 import com.notes.purenoteit.ui.components.NotionToolbar
@@ -1424,7 +1425,12 @@ fun NoteDetailScreen(
                             modifier = Modifier.size(72.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(text = "🔒", fontSize = 36.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.lock),
+                                    contentDescription = null,
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(36.dp)
+                                )
                             }
                         }
                         Spacer(modifier = Modifier.height(20.dp))
@@ -1598,7 +1604,14 @@ fun NoteDetailScreen(
 
                             // Zen Mode Action
                             DropdownMenuItem(
-                                leadingIcon = { Text(text = "🧘", fontSize = 16.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.diary),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
                                 text = {
                                     Text(
                                         text = stringResource(R.string.zen_mode_badge),
@@ -1801,7 +1814,12 @@ fun NoteDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text(text = "💡", fontSize = 14.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_link_hub),
+                                    contentDescription = null,
+                                    tint = Color(0xFF1976D2),
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = stringResource(R.string.link_detected_title, suggestedLinkTitle ?: ""),
@@ -2117,7 +2135,12 @@ fun NoteDetailScreen(
                             modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "🏷️", fontSize = 11.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.category),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(13.dp)
+                            )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
                                 text = selectedCategoryName,
@@ -2188,7 +2211,12 @@ fun NoteDetailScreen(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "📊", fontSize = 11.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_stream_timeline),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(13.dp)
+                            )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
                                 text = stringResource(R.string.zen_words, wordCount) + " • " + stringResource(R.string.zen_reading_time, readingTimeMinutes),
@@ -2218,7 +2246,12 @@ fun NoteDetailScreen(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = "📑", fontSize = 11.sp)
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_checklist),
+                                        contentDescription = null,
+                                        tint = VibrantOrange,
+                                        modifier = Modifier.size(13.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(5.dp))
                                     Text(
                                         text = stringResource(R.string.toc_title) + " ($headingsCount)",
@@ -2286,7 +2319,12 @@ fun NoteDetailScreen(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "📑", fontSize = 11.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_hub_index),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(13.dp)
+                            )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
                                 text = stringResource(R.string.relations_hub_title) + if (totalRelations > 0) " ($totalRelations)" else "",
@@ -2329,7 +2367,12 @@ fun NoteDetailScreen(
                                         .background(PureWhite),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(text = "✨", fontSize = 18.sp)
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_drawer_templates),
+                                        contentDescription = null,
+                                        tint = VibrantOrange,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -2581,7 +2624,12 @@ fun NoteDetailScreen(
                             .padding(14.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "🔗", fontSize = 14.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_link_hub),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(15.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = stringResource(R.string.backlinks_header, backlinks.size),
@@ -2618,7 +2666,13 @@ fun NoteDetailScreen(
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(text = bNote.icon ?: "📝", fontSize = 13.sp)
+                                        ModernNoteIconBadge(
+                                            iconKey = bNote.icon,
+                                            isProtected = bNote.isPassword == true,
+                                            size = 20.dp,
+                                            iconSize = 11.dp,
+                                            shape = RoundedCornerShape(5.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = bNote.title ?: stringResource(R.string.untitled_note),
@@ -2788,7 +2842,12 @@ fun NoteDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "🔗", fontSize = 20.sp)
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_link_hub),
+                        contentDescription = null,
+                        tint = VibrantOrange,
+                        modifier = Modifier.size(20.dp)
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
@@ -2875,7 +2934,13 @@ fun NoteDetailScreen(
                                         .padding(horizontal = 14.dp, vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = targetNote.icon ?: "📝", fontSize = 18.sp)
+                                    ModernNoteIconBadge(
+                                        iconKey = targetNote.icon,
+                                        isProtected = targetNote.isPassword == true,
+                                        size = 28.dp,
+                                        iconSize = 15.dp,
+                                        shape = RoundedCornerShape(7.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
@@ -2962,7 +3027,12 @@ fun NoteDetailScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "🎯", fontSize = 18.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_tpl_target),
+                            contentDescription = null,
+                            tint = VibrantOrange,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.select_status),
@@ -3063,7 +3133,12 @@ fun NoteDetailScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "🏷️", fontSize = 18.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.category),
+                            contentDescription = null,
+                            tint = VibrantOrange,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.category_sheet_title),
@@ -3350,7 +3425,12 @@ fun NoteDetailScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "📷", fontSize = 20.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_ocr_scan),
+                            contentDescription = null,
+                            tint = VibrantOrange,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
@@ -3502,7 +3582,12 @@ fun NoteDetailScreen(
             },
             text = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "📷", fontSize = 24.sp)
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_ocr_scan),
+                        contentDescription = null,
+                        tint = VibrantOrange,
+                        modifier = Modifier.size(24.dp)
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(text = stringResource(R.string.ocr_scanning_desc))
                 }
@@ -3515,7 +3600,14 @@ fun NoteDetailScreen(
     if (showStatsDialog) {
         AlertDialog(
             onDismissRequest = { showStatsDialog = false },
-            icon = { Text(text = "📊", fontSize = 28.sp) },
+            icon = {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_stream_timeline),
+                    contentDescription = null,
+                    tint = VibrantOrange,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
             title = { Text(text = stringResource(R.string.note_stats_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -3542,7 +3634,14 @@ fun NoteDetailScreen(
     if (showTrashConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showTrashConfirmDialog = false },
-            icon = { Text(text = "🗑️", fontSize = 28.sp) },
+            icon = {
+                Icon(
+                    painter = painterResource(id = R.drawable.delete),
+                    contentDescription = null,
+                    tint = Color(0xFFD32F2F),
+                    modifier = Modifier.size(28.dp)
+                )
+            },
             title = { Text(text = stringResource(R.string.note_trash_confirm_title), fontWeight = FontWeight.Bold) },
             text = {
                 Text(

@@ -158,7 +158,12 @@ fun VaultBackupRestoreDialog(
                             .background(Color(0xFFE8F5E9)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "🛡️", fontSize = 20.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.lock),
+                            contentDescription = null,
+                            tint = Color(0xFF2E7D32),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -284,7 +289,12 @@ fun VaultBackupRestoreDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "☁️", fontSize = 22.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_drawer_backup_restore),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(22.dp)
+                            )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
@@ -427,7 +437,12 @@ fun VaultBackupRestoreDialog(
                                             color = PureWhite
                                         )
                                     } else {
-                                        Text(text = "🔄", fontSize = 13.sp)
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_redo),
+                                            contentDescription = null,
+                                            tint = PureWhite,
+                                            modifier = Modifier.size(13.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = stringResource(R.string.vault_drive_sync_now),
@@ -473,7 +488,12 @@ fun VaultBackupRestoreDialog(
                                         horizontalArrangement = Arrangement.Center,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(text = "📥", fontSize = 13.sp)
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_drawer_backup_restore),
+                                            contentDescription = null,
+                                            tint = Color(0xFF10B981),
+                                            modifier = Modifier.size(13.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = stringResource(R.string.vault_drive_restore_btn),
@@ -512,7 +532,12 @@ fun VaultBackupRestoreDialog(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "📁", fontSize = 15.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.category),
+                                    contentDescription = null,
+                                    tint = PureWhite,
+                                    modifier = Modifier.size(15.dp)
+                                )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(R.string.vault_drive_connect_btn),
@@ -572,7 +597,12 @@ fun VaultBackupRestoreDialog(
                                 strokeWidth = 2.5.dp
                             )
                         } else {
-                            Text(text = "📤", fontSize = 22.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.share_square),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
                     }
 
@@ -632,7 +662,12 @@ fun VaultBackupRestoreDialog(
                                 strokeWidth = 2.5.dp
                             )
                         } else {
-                            Text(text = "📥", fontSize = 22.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_drawer_backup_restore),
+                                contentDescription = null,
+                                tint = Color(0xFF388E3C),
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
                     }
 
@@ -664,7 +699,14 @@ fun VaultBackupRestoreDialog(
     if (restoreSuccessMessage != null) {
         AlertDialog(
             onDismissRequest = { restoreSuccessMessage = null },
-            icon = { Text(text = "🎉", fontSize = 28.sp) },
+            icon = {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_checklist),
+                    contentDescription = null,
+                    tint = Color(0xFF10B981),
+                    modifier = Modifier.size(28.dp)
+                )
+            },
             title = {
                 Text(
                     text = stringResource(R.string.vault_restore_success_title),

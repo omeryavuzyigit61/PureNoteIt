@@ -120,30 +120,19 @@ private fun NotionListRow(
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon or default note icon
-            if (!note.icon.isNullOrBlank()) {
-                Text(text = note.icon!!, fontSize = 18.sp)
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(SoftOrangeLight),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.note),
-                        contentDescription = null,
-                        tint = VibrantOrange,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
+            // Modern Material Vector Icon Badge
+            val isProtected = note.isPassword == true || note.isEncrypted || category?.isPassword == true
+            ModernNoteIconBadge(
+                iconKey = note.icon,
+                isProtected = isProtected,
+                size = 30.dp,
+                iconSize = 16.dp,
+                shape = RoundedCornerShape(8.dp)
+            )
 
             Spacer(modifier = Modifier.width(10.dp))
 
             // Title + tasks count + search snippet
-            val isProtected = note.isPassword == true || note.isEncrypted || category?.isPassword == true
             Column(modifier = Modifier.weight(1f)) {
                 val displayTitle = when {
                     isProtected -> "******"

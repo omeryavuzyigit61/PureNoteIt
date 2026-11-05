@@ -97,35 +97,13 @@ fun NotionNoteCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!note.icon.isNullOrBlank()) {
-                        // Prominent Notion Page Emoji
-                        Text(
-                            text = note.icon ?: "",
-                            fontSize = 22.sp
-                        )
-                    } else {
-                        // Category icon pill in PureNoteIt signature orange
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(VibrantOrange),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val iconRes = when (note.categoryId) {
-                                1 -> R.drawable.note
-                                2 -> R.drawable.diary
-                                3 -> R.drawable.important
-                                else -> R.drawable.other
-                            }
-                            Icon(
-                                painter = painterResource(id = iconRes),
-                                contentDescription = null,
-                                tint = PureWhite,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
+                    ModernNoteIconBadge(
+                        iconKey = note.icon,
+                        isProtected = isProtected,
+                        size = 28.dp,
+                        iconSize = 16.dp,
+                        shape = RoundedCornerShape(8.dp)
+                    )
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -533,7 +511,12 @@ fun NotionNoteCard(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "📄", fontSize = 10.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_subpage_doc),
+                                    contentDescription = null,
+                                    tint = Color(0xFF5E35B1),
+                                    modifier = Modifier.size(11.dp)
+                                )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = "$subpageCount " + stringResource(R.string.subpage_badge),

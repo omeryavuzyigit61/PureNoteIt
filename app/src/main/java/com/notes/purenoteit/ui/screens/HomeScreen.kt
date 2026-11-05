@@ -126,6 +126,7 @@ import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.ui.components.LanguageSelectionSheet
+import com.notes.purenoteit.ui.components.ModernNoteIconBadge
 import com.notes.purenoteit.ui.components.NotionCalendarView
 import com.notes.purenoteit.ui.components.NotionGraphView
 import com.notes.purenoteit.ui.components.NotionKanbanBoard
@@ -1323,7 +1324,12 @@ fun HomeScreen(
             onDismissRequest = { showAgendaConfirmDialog = false },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "📅", fontSize = 20.sp)
+                    Icon(
+                        painter = painterResource(id = R.drawable.calendar),
+                        contentDescription = null,
+                        tint = VibrantOrange,
+                        modifier = Modifier.size(20.dp)
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (existingTodayAgendaNote != null) stringResource(R.string.agenda_already_exists) else stringResource(R.string.agenda_title),
@@ -1982,36 +1988,21 @@ private fun NotionRecentCoverCard(
                     .background(coverColor)
             )
 
-            // Overlapping Emoji Badge + Title + Date
+            // Overlapping Modern Material Vector Icon Badge + Title + Date
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 8.dp)
             ) {
-                // Emoji Icon Badge positioned at the boundary
-                Box(
-                    modifier = Modifier
-                        .offset(y = (-13).dp)
-                        .size(26.dp)
-                        .clip(RoundedCornerShape(7.dp))
-                        .background(if (isDark) Color(0xFF26262B) else PureWhite)
-                        .border(
-                            1.dp,
-                            if (isDark) Color(0xFF36363E) else BorderLight.copy(alpha = 0.5f),
-                            RoundedCornerShape(7.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val isProtectedRecent = note.isPassword == true || note.isEncrypted || cat?.isPassword == true
-                    Text(
-                        text = when {
-                            isProtectedRecent -> "🔒"
-                            !note.icon.isNullOrBlank() -> note.icon!!
-                            else -> "📄"
-                        },
-                        fontSize = 13.sp
-                    )
-                }
+                // Modern Material Vector Icon Badge positioned at the boundary
+                val isProtectedRecent = note.isPassword == true || note.isEncrypted || cat?.isPassword == true
+                ModernNoteIconBadge(
+                    iconKey = note.icon,
+                    isProtected = isProtectedRecent,
+                    modifier = Modifier.offset(y = (-13).dp),
+                    size = 26.dp,
+                    iconSize = 14.dp
+                )
 
                 // Title and Date (Bottom row is unweighted so Compose measures it first and never clips it)
                 val isProtectedTitle = note.isPassword == true || note.isEncrypted || cat?.isPassword == true

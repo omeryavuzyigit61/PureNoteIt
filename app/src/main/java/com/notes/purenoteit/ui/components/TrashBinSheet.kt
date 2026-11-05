@@ -169,7 +169,12 @@ fun TrashBinSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "✨", fontSize = 44.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.delete),
+                            contentDescription = null,
+                            tint = VibrantOrange.copy(alpha = 0.6f),
+                            modifier = Modifier.size(44.dp)
+                        )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = stringResource(R.string.trash_empty_title),
@@ -252,7 +257,14 @@ fun TrashBinSheet(
     if (showEmptyConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showEmptyConfirmDialog = false },
-            icon = { Text(text = "⚠️", fontSize = 28.sp) },
+            icon = {
+                Icon(
+                    painter = painterResource(id = R.drawable.delete),
+                    contentDescription = null,
+                    tint = Color(0xFFFF5252),
+                    modifier = Modifier.size(28.dp)
+                )
+            },
             title = {
                 Text(
                     text = stringResource(R.string.trash_empty_confirm_title),
@@ -322,9 +334,12 @@ private fun TrashNoteItem(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (!note.icon.isNullOrBlank()) note.icon!! else "📝",
-                        fontSize = 18.sp
+                    ModernNoteIconBadge(
+                        iconKey = note.icon,
+                        isProtected = false,
+                        size = 28.dp,
+                        iconSize = 15.dp,
+                        shape = RoundedCornerShape(7.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -385,7 +400,12 @@ private fun TrashNoteItem(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "♻️", fontSize = 12.sp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_undo),
+                            contentDescription = null,
+                            tint = Color(0xFF2E7D32),
+                            modifier = Modifier.size(13.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = stringResource(R.string.trash_restore_btn),

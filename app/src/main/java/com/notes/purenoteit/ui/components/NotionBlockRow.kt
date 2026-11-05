@@ -536,9 +536,8 @@ fun NotionBlockRow(
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = block.calloutIcon,
-                            fontSize = 18.sp,
+                        ModernCalloutIconBadge(
+                            calloutKey = block.calloutIcon,
                             modifier = Modifier.padding(end = 10.dp)
                         )
 
@@ -704,7 +703,12 @@ fun NotionBlockRow(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "📊", fontSize = 14.sp)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_table),
+                                    contentDescription = null,
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(15.dp)
+                                )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = stringResource(R.string.block_dynamic_table),
@@ -921,8 +925,15 @@ fun NotionBlockRow(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        Icon(
+                                            painter = painterResource(id = if (isCopied) R.drawable.ic_checklist else R.drawable.ic_subpage_doc),
+                                            contentDescription = null,
+                                            tint = if (isCopied) PureWhite else Color(0xFFE0E0E0),
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = if (isCopied) stringResource(R.string.code_copied) else ("📋 " + stringResource(R.string.code_copy)),
+                                            text = if (isCopied) stringResource(R.string.code_copied) else stringResource(R.string.code_copy),
                                             fontSize = 10.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isCopied) PureWhite else Color(0xFFE0E0E0)
@@ -1750,7 +1761,12 @@ fun NotionBlockRow(
                                 .background(SoftOrangeLight),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "🌐", fontSize = 18.sp)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_tpl_globe),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
 
                         Spacer(modifier = Modifier.width(10.dp))
@@ -1811,7 +1827,20 @@ fun NotionBlockRow(
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "📄", fontSize = 20.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(SoftOrangeLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_subpage_doc),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(10.dp))
 
                         BasicTextField(
@@ -1916,10 +1945,15 @@ fun NotionBlockRow(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(text = "🔗", fontSize = 10.sp)
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_link_hub),
+                                            contentDescription = null,
+                                            tint = VibrantOrange,
+                                            modifier = Modifier.size(11.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = "$link ↗",
+                                            text = link,
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = VibrantOrange

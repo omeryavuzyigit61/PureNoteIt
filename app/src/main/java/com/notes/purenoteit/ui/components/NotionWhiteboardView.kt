@@ -384,9 +384,12 @@ private fun WhiteboardCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(
-                            text = if (isProtected) "🔒" else (note.icon ?: "📝"),
-                            fontSize = 15.sp
+                        ModernNoteIconBadge(
+                            iconKey = note.icon,
+                            isProtected = isProtected,
+                            size = 24.dp,
+                            iconSize = 13.dp,
+                            shape = RoundedCornerShape(6.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
