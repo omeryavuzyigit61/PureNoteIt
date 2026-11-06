@@ -144,16 +144,16 @@ object AppUpdateHelper {
                     availableVersionCode = availableVerCode,
                     availableVersionName = dynamicTargetVersion,
                     releaseNotesTr = listOf(
-                        "🪟 Cam Navigasyon Çubuğu (Glassy Tabs V7): 3D kapı rotasyonu (door-flip animation) ve buğulu cam (glassmorphism) üst kategori filtreleme menüsü.",
-                        "🛡️ Donanım Destekli Veri Güvenliği: SQLCipher 256-bit AES şifreli veritabanı motoru ve modern Jetpack DataStore mimarisi.",
-                        "⚡ Clean Architecture & MVI: %100 Kotlin Coroutines & Flow tabanlı reaktif durum yönetimi ile maksimum hız ve kararlılık.",
-                        "🎨 Modern Material 3 Arayüzü: Yenilenen ızgara görünüm butonu, ekranda listelenen gerçek not sayısı senkronizasyonu ve akıcı sayfa geçişleri."
+                        "🪟 Cam Kategori Menüsü: 3D kapı açılma animasyonlu buğulu cam (glassmorphism) üst menü.",
+                        "🛡️ Güçlü Güvenlik: Donanım destekli 256-bit AES SQLCipher ve Jetpack DataStore altyapısı.",
+                        "⚡ Clean Architecture & MVI: %100 Coroutines ve Flow ile daha hızlı, reaktif performans.",
+                        "🎨 Material 3 Tasarım: Yenilenen ızgara simgesi ve ekranda görünen net not sayımı."
                     ),
                     releaseNotesEn = listOf(
-                        "🪟 Glassy Navigation Tabs V7: 3D door-flip hinge rotation animation and frosted glassmorphism category navigation bar.",
-                        "🛡️ Hardware-Backed Security: SQLCipher 256-bit AES encrypted database engine and modern asynchronous Jetpack DataStore.",
-                        "⚡ Clean Architecture & MVI: 100% Kotlin Coroutines & Flow reactive unidirectional state management for top performance.",
-                        "🎨 Modern Material 3 UI: Refined grid view selector, accurate on-screen note counter synchronization, and fluid transitions."
+                        "🪟 Glassy Tabs V7: 3D door-flip animation and frosted glassmorphism category bar.",
+                        "🛡️ Enhanced Security: Hardware-backed 256-bit AES SQLCipher and Jetpack DataStore.",
+                        "⚡ Clean Architecture & MVI: 100% Coroutines & Flow for fast reactive performance.",
+                        "🎨 Material 3 UI: Modern grid view icon and accurate visible note count."
                     ),
                     playUpdateInfo = appUpdateInfo
                 )
@@ -223,16 +223,16 @@ object AppUpdateHelper {
             availableVersionCode = curCode,
             availableVersionName = "v$curName",
             releaseNotesTr = listOf(
-                "🪟 Cam Navigasyon Çubuğu (Glassy Tabs V7): 3D kapı rotasyonu (door-flip animation) ve buğulu cam (glassmorphism) üst kategori filtreleme menüsü.",
-                "🛡️ Donanım Destekli Veri Güvenliği: SQLCipher 256-bit AES şifreli veritabanı motoru ve modern Jetpack DataStore mimarisi.",
-                "⚡ Clean Architecture & MVI: %100 Kotlin Coroutines & Flow tabanlı reaktif durum yönetimi ile maksimum hız ve kararlılık.",
-                "🎨 Modern Material 3 Arayüzü: Yenilenen ızgara görünüm butonu, ekranda listelenen gerçek not sayısı senkronizasyonu ve akıcı sayfa geçişleri."
+                "🪟 Cam Kategori Menüsü: 3D kapı açılma animasyonlu buğulu cam (glassmorphism) üst menü.",
+                "🛡️ Güçlü Güvenlik: Donanım destekli 256-bit AES SQLCipher ve Jetpack DataStore altyapısı.",
+                "⚡ Clean Architecture & MVI: %100 Coroutines ve Flow ile daha hızlı, reaktif performans.",
+                "🎨 Material 3 Tasarım: Yenilenen ızgara simgesi ve ekranda görünen net not sayımı."
             ),
             releaseNotesEn = listOf(
-                "🪟 Glassy Navigation Tabs V7: 3D door-flip hinge rotation animation and frosted glassmorphism category navigation bar.",
-                "🛡️ Hardware-Backed Security: SQLCipher 256-bit AES encrypted database engine and modern asynchronous Jetpack DataStore.",
-                "⚡ Clean Architecture & MVI: 100% Kotlin Coroutines & Flow reactive unidirectional state management for top performance.",
-                "🎨 Modern Material 3 UI: Refined grid view selector, accurate on-screen note counter synchronization, and fluid transitions."
+                "🪟 Glassy Tabs V7: 3D door-flip animation and frosted glassmorphism category bar.",
+                "🛡️ Enhanced Security: Hardware-backed 256-bit AES SQLCipher and Jetpack DataStore.",
+                "⚡ Clean Architecture & MVI: 100% Coroutines & Flow for fast reactive performance.",
+                "🎨 Material 3 UI: Modern grid view icon and accurate visible note count."
             )
         )
     }
