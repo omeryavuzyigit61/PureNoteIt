@@ -316,6 +316,7 @@ fun HomeScreen(
                 categoryViewModel.getAllCategories()
                 noteViewModel.getAllLinks()
                 noteViewModel.loadStreamItems()
+                SecurityUtil.lockVault()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -1362,7 +1363,17 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 1. Şifrele Pill Button
+                            val selectedNotes = remember(selectedNoteIds, activeNotes) {
+                                activeNotes.filter { it.id in selectedNoteIds }
+                            }
+                            val shouldLock = selectedNotes.any { it.isPassword != true && !it.isEncrypted }
+                            val lockIconRes = if (shouldLock) R.drawable.lock else R.drawable.unlock
+                            val lockText = if (shouldLock) stringResource(R.string.lock) else stringResource(R.string.unlock)
+                            val lockContentDesc = stringResource(if (shouldLock) R.string.batch_lock_notes else R.string.batch_unlock_notes)
+                            val lockTint = if (shouldLock) VibrantOrange else Color(0xFF2E7D32)
+                            val lockBg = if (shouldLock) VibrantOrange.copy(alpha = 0.12f) else Color(0xFFE8F5E9)
+
+                            // 1. Şifrele / Kilidi Aç Dynamic Pill Button
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
@@ -1371,39 +1382,25 @@ fun HomeScreen(
                                         if (!SecurityUtil.isPasswordSet(context)) {
                                             showPinSetupAlert = true
                                         } else {
-                                            val selectedNotes = activeNotes.filter { it.id in selectedNoteIds }
-                                            val shouldLock = selectedNotes.any { it.isPassword != true && !it.isEncrypted }
-                                            if (!SecurityUtil.isVaultUnlocked) {
-                                                pendingBatchLock = true
-                                                showPinDialog = true
-                                            } else {
-                                                noteViewModel.batchToggleLock(context, selectedNotes, shouldLock) {
-                                                    val msg = if (shouldLock) {
-                                                        context.getString(R.string.batch_lock_success, selectedNotes.size)
-                                                    } else {
-                                                        context.getString(R.string.batch_unlock_success, selectedNotes.size)
-                                                    }
-                                                    context.showToastShort(msg)
-                                                    selectedNoteIds = emptySet()
-                                                }
-                                            }
+                                            pendingBatchLock = true
+                                            showPinDialog = true
                                         }
                                     }
-                                    .background(VibrantOrange.copy(alpha = 0.12f))
+                                    .background(lockBg)
                                     .padding(horizontal = 16.dp, vertical = 9.dp)
                             ) {
                                 Icon(
-                                    painter = painterResource(id = R.drawable.lock),
-                                    contentDescription = stringResource(R.string.batch_lock_notes),
-                                    tint = VibrantOrange,
+                                    painter = painterResource(id = lockIconRes),
+                                    contentDescription = lockContentDesc,
+                                    tint = lockTint,
                                     modifier = Modifier.size(17.dp)
                                 )
                                 Spacer(modifier = Modifier.width(7.dp))
                                 Text(
-                                    text = stringResource(R.string.lock),
+                                    text = lockText,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = VibrantOrange
+                                    color = lockTint
                                 )
                             }
 
@@ -1443,19 +1440,41 @@ fun HomeScreen(
 
     // PIN Verification Dialog for Bitwarden Protection
     if (showPinDialog) {
+        val selectedNotes = remember(selectedNoteIds, activeNotes) {
+            activeNotes.filter { it.id in selectedNoteIds }
+        }
+        val isBatchLocking = pendingBatchLock && selectedNotes.any { it.isPassword != true && !it.isEncrypted }
+
         AlertDialog(
             onDismissRequest = {
                 showPinDialog = false
                 pendingUnlockNoteId = null
+                pendingBatchLock = false
                 enteredPin = ""
             },
             title = {
-                Text(text = "Not Kilidini Aç", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(
+                    text = if (pendingBatchLock) {
+                        if (isBatchLocking) stringResource(R.string.batch_lock_notes) else stringResource(R.string.batch_unlock_notes)
+                    } else {
+                        "Not Kilidini Aç"
+                    },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
             },
             text = {
                 Column {
                     Text(
-                        text = "Bu not Bitwarden düzeyinde şifrelenmiştir. Erişim sağlamak için 6 haneli ana PIN kodunuzu girin:",
+                        text = if (pendingBatchLock) {
+                            if (isBatchLocking) {
+                                "Seçilen notları güvenli şekilde şifrelemek için 6 haneli ana PIN kodunuzu girin:"
+                            } else {
+                                "Seçilen notların şifresini kaldırmak için 6 haneli ana PIN kodunuzu girin:"
+                            }
+                        } else {
+                            "Bu not Bitwarden düzeyinde şifrelenmiştir. Erişim sağlamak için 6 haneli ana PIN kodunuzu girin:"
+                        },
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1476,10 +1495,8 @@ fun HomeScreen(
                 TextButton(
                     onClick = {
                         if (SecurityUtil.verifyPassword(context, enteredPin)) {
-                            SecurityUtil.unlockVault()
                             if (pendingBatchLock) {
                                 pendingBatchLock = false
-                                val selectedNotes = activeNotes.filter { it.id in selectedNoteIds }
                                 val shouldLock = selectedNotes.any { it.isPassword != true && !it.isEncrypted }
                                 noteViewModel.batchToggleLock(context, selectedNotes, shouldLock) {
                                     val msg = if (shouldLock) {
@@ -1490,6 +1507,10 @@ fun HomeScreen(
                                     context.showToastShort(msg)
                                     selectedNoteIds = emptySet()
                                 }
+                                // Lock the vault session so that newly locked notes require authentication to open
+                                SecurityUtil.lockVault()
+                            } else {
+                                SecurityUtil.unlockVault()
                             }
                             val targetId = pendingUnlockNoteId
                             showPinDialog = false
@@ -1503,7 +1524,11 @@ fun HomeScreen(
                         }
                     }
                 ) {
-                    Text("Kilidi Aç", color = VibrantOrange, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (pendingBatchLock && isBatchLocking) "Şifrele" else "Kilidi Aç",
+                        color = VibrantOrange,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {

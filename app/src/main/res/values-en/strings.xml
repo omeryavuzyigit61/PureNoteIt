@@ -349,6 +349,8 @@
     <string name="batch_select_all">Select All</string>
     <string name="batch_deselect_all">Deselect All</string>
     <string name="batch_lock_notes">Batch Encrypt</string>
+    <string name="batch_unlock_notes">Unlock</string>
+    <string name="unlock">Unlock</string>
     <string name="batch_delete_notes">Batch Delete</string>
     <string name="batch_delete_confirm_title">Move Selected Notes to Trash?</string>
     <string name="batch_delete_confirm_desc">%1$d selected notes will be moved to the Trash. You can restore them anytime.</string>
