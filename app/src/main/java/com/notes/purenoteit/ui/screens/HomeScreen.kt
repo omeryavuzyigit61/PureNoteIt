@@ -790,7 +790,7 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Left: Drawer menu button
+                                // Left: Drawer menu button (Soft squircle, borderless)
                                 IconButton(
                                     onClick = {
                                         val currentTime = System.currentTimeMillis()
@@ -808,8 +808,7 @@ fun HomeScreen(
                                     modifier = Modifier
                                         .size(42.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(MaterialTheme.colorScheme.surface)
-                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 ) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.menu),
@@ -819,17 +818,39 @@ fun HomeScreen(
                                     )
                                 }
 
-                                // Center: App Title
-                                Text(
-                                    text = "PureNoteIt",
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp,
-                                        color = MaterialTheme.colorScheme.onBackground
+                                // Center: App Title with Accent Dot & Note Count
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = "PureNoteIt",
+                                            style = MaterialTheme.typography.titleLarge.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 20.sp,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .size(7.dp)
+                                                .clip(CircleShape)
+                                                .background(VibrantOrange)
+                                        )
+                                    }
+                                    Text(
+                                        text = stringResource(R.string.topbar_note_count, activeNotes.size),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                                     )
-                                )
+                                }
 
-                                // Right: View Mode Selector Menu Button
+                                // Right: View Mode Selector Menu Button (Soft peach accent squircle, borderless)
                                 Box {
                                     IconButton(
                                         onClick = {
@@ -840,8 +861,7 @@ fun HomeScreen(
                                         modifier = Modifier
                                             .size(42.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.surface)
-                                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                            .background(VibrantOrange.copy(alpha = 0.12f))
                                     ) {
                                         Icon(
                                             painter = painterResource(id = currentViewMode.iconRes),
@@ -891,7 +911,7 @@ fun HomeScreen(
 
                         // Tek Satır Birleşik Filtreleme Çubuğu (Unified Single Filter Bar)
                         if (currentViewMode != NotionViewMode.CALENDAR && currentViewMode != NotionViewMode.GRAPH && currentViewMode != NotionViewMode.STREAM && currentViewMode != NotionViewMode.WHITEBOARD) {
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             Row(
                                 modifier = Modifier
@@ -904,21 +924,20 @@ fun HomeScreen(
                                         (if (selectedSmartFilter != SmartFilter.ALL) 1 else 0) +
                                         (if (selectedHashtag != null) 1 else 0)
 
-                                // 1. Filtrele Butonu (Bottom Sheet Açıcı)
+                                // 1. Filtrele Butonu (Bottom Sheet Açıcı) - Full Capsule Pill, borderless
                                 Surface(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(50))
                                         .clickable {
                                             focusManager.clearFocus()
                                             keyboardController?.hide()
                                             showFilterSheet = true
                                         },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (activeFilterCount > 0) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                                    border = if (activeFilterCount == 0) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)) else null
+                                    shape = RoundedCornerShape(50),
+                                    color = if (activeFilterCount > 0) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(
@@ -941,14 +960,13 @@ fun HomeScreen(
                                 if (selectedSmartFilter != SmartFilter.ALL) {
                                     Surface(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(12.dp))
+                                            .clip(RoundedCornerShape(50))
                                             .clickable { selectedSmartFilter = SmartFilter.ALL },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = SoftOrangeLight,
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
+                                        shape = RoundedCornerShape(50),
+                                        color = SoftOrangeLight
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
@@ -957,7 +975,7 @@ fun HomeScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 color = VibrantOrange
                                             )
-                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Spacer(modifier = Modifier.width(5.dp))
                                             Text(text = "✕", fontSize = 10.sp, color = VibrantOrange, fontWeight = FontWeight.Bold)
                                         }
                                     }
@@ -966,14 +984,13 @@ fun HomeScreen(
                                 if (selectedHashtag != null) {
                                     Surface(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(12.dp))
+                                            .clip(RoundedCornerShape(50))
                                             .clickable { selectedHashtag = null },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = SoftOrangeLight,
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
+                                        shape = RoundedCornerShape(50),
+                                        color = SoftOrangeLight
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
@@ -982,16 +999,18 @@ fun HomeScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 color = VibrantOrange
                                             )
-                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Spacer(modifier = Modifier.width(5.dp))
                                             Text(text = "✕", fontSize = 10.sp, color = VibrantOrange, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
 
                                 // 3. Hızlı Kategori Seçimi (Tüm Kategoriler + Kategori Çipleri)
+                                val isAllSelected = selectedCategory == null && selectedSmartFilter == SmartFilter.ALL && selectedHashtag == null
                                 CategoryChip(
                                     label = stringResource(R.string.all_categories),
-                                    isSelected = selectedCategory == null && selectedSmartFilter == SmartFilter.ALL && selectedHashtag == null,
+                                    isSelected = isAllSelected,
+                                    count = activeNotes.size,
                                     onClick = {
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
@@ -1002,10 +1021,15 @@ fun HomeScreen(
                                 )
 
                                 categoryList.forEach { category ->
+                                    val catCount = remember(activeNotes, category.id) {
+                                        activeNotes.count { it.categoryId == category.id }
+                                    }
                                     CategoryChip(
                                         label = category.name,
                                         isSelected = selectedCategory == category.name,
                                         isLocked = category.isPassword == true,
+                                        count = catCount,
+                                        dotColor = getCategoryDotColor(category.name),
                                         onClick = {
                                             focusManager.clearFocus()
                                             keyboardController?.hide()
@@ -2140,27 +2164,46 @@ private fun DrawerMenuTile(
     }
 }
 
+private fun getCategoryDotColor(categoryName: String): Color {
+    val colors = listOf(
+        Color(0xFF3B82F6), // Blue
+        Color(0xFF10B981), // Emerald
+        Color(0xFFF59E0B), // Amber
+        Color(0xFF8B5CF6), // Purple
+        Color(0xFFEC4899), // Pink
+        Color(0xFF06B6D4), // Cyan
+        Color(0xFFF97316), // Orange
+        Color(0xFF6366F1), // Indigo
+        Color(0xFF14B8A6)  // Teal
+    )
+    val hash = kotlin.math.abs(categoryName.hashCode())
+    return colors[hash % colors.size]
+}
+
 @Composable
 private fun CategoryChip(
     label: String,
     isSelected: Boolean,
     isLocked: Boolean = false,
+    count: Int? = null,
+    dotColor: Color? = null,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-            .border(
-                1.dp,
-                if (isSelected) VibrantOrange else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                RoundedCornerShape(14.dp)
+            .clip(RoundedCornerShape(50))
+            .background(
+                if (isSelected) VibrantOrange
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             )
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
             if (isLocked) {
                 Icon(
                     painter = painterResource(id = R.drawable.lock),
@@ -2168,14 +2211,49 @@ private fun CategoryChip(
                     tint = if (isSelected) PureWhite else VibrantOrange,
                     modifier = Modifier.size(12.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(5.dp))
+            } else if (dotColor != null && !isSelected) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(dotColor)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
             }
+
             Text(
                 text = label,
-                fontSize = 13.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                 color = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface
             )
+
+            if (count != null) {
+                Spacer(modifier = Modifier.width(6.dp))
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(PureWhite.copy(alpha = 0.25f))
+                            .padding(horizontal = 6.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = count.toString(),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PureWhite
+                        )
+                    }
+                } else {
+                    Text(
+                        text = count.toString(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                }
+            }
         }
     }
 }
