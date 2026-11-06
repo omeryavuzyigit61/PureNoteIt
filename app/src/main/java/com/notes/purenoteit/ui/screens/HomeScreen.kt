@@ -886,7 +886,7 @@ fun HomeScreen(
                                     )
                                 }
 
-                                // Right: View Mode Selector Menu Button (Soft peach accent squircle, borderless)
+                                // Right: View Mode Selector Menu Button (Modern Material 3 Squircle)
                                 Box {
                                     IconButton(
                                         onClick = {
@@ -897,12 +897,12 @@ fun HomeScreen(
                                         modifier = Modifier
                                             .size(42.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(VibrantOrange.copy(alpha = 0.12f))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                     ) {
                                         Icon(
                                             painter = painterResource(id = currentViewMode.iconRes),
                                             contentDescription = stringResource(currentViewMode.titleRes),
-                                            tint = VibrantOrange,
+                                            tint = MaterialTheme.colorScheme.onSurface,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
