@@ -63,7 +63,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
                     val noteRepository = entryPoint.getNoteRepository()
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
-                            noteRepository.updateReminderTime(noteId, newReminderTime).blockingAwait()
+                            noteRepository.updateReminderTimeSuspend(noteId, newReminderTime)
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }

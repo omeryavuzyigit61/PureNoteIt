@@ -42,6 +42,14 @@ android {
         viewBinding = true
         compose = true
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        unitTests.all {
+            it.testLogging {
+                events("passed", "skipped", "failed", "standardOut", "standardError")
+            }
+        }
+    }
 }
 
 dependencies {
@@ -55,6 +63,9 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.androidx.biometric)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
+    testImplementation(libs.mockk)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
@@ -68,12 +79,9 @@ dependencies {
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.compose.runtime.livedata)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.coil.compose)
-
-    // RXJava 2
-    implementation(libs.androidx.room.rxjava2)
-    implementation(libs.rxandroid)
 
     // Dagger Hilt
     implementation(libs.google.dagger.hilt)
@@ -81,11 +89,8 @@ dependencies {
 
     // Room
     implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-
-    // Glide
-    implementation(libs.glide)
-    ksp(libs.glide.compiler)
 
     // ML Kit Text Recognition (OCR)
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")

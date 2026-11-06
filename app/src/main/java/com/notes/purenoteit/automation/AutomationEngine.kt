@@ -8,8 +8,10 @@ import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.repository.CategoryRepository
 import com.notes.purenoteit.repository.KnowledgeRepository
 import com.notes.purenoteit.repository.NoteRepository
-import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -27,21 +29,23 @@ class AutomationEngine @Inject constructor(
      * E.g.: Auto-completes note status when all checklist tasks are done.
      */
     fun onNoteUpdated(note: NoteData, onStatusUpdated: ((String) -> Unit)? = null) {
-        knowledgeRepository.getRulesByTrigger("ALL_TASKS_COMPLETED")
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ rules ->
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val rules = knowledgeRepository.getRulesByTriggerSuspend("ALL_TASKS_COMPLETED")
                 val activeRule = rules.firstOrNull { it.isEnabled }
                 if (activeRule != null) {
                     if (note.totalTasks > 0 && note.completedTasks == note.totalTasks && note.status != "DONE") {
                         note.status = "DONE"
-                        noteRepository.upsert(note).subscribeOn(Schedulers.io()).subscribe()
-                        onStatusUpdated?.invoke("DONE")
+                        noteRepository.upsertSuspend(note)
+                        withContext(Dispatchers.Main) {
+                            onStatusUpdated?.invoke("DONE")
+                        }
                     }
                 }
-            }, { error ->
+            } catch (error: Exception) {
                 Log.e("AutomationEngine", "Error checking rules: ${error.message}")
-            })
+            }
+        }
     }
 
     /**
@@ -89,9 +93,9 @@ class AutomationEngine @Inject constructor(
             )
         )
 
-        categoryRepository.getAllCategories()
-            .subscribeOn(Schedulers.io())
-            .flatMap { categories ->
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val categories = categoryRepository.getAllCategoriesSuspend()
                 val dailyCat = categories.firstOrNull { it.name.equals("Günlük", ignoreCase = true) }
                 val targetCategoryId = dailyCat?.id ?: categories.firstOrNull()?.id
 
@@ -106,16 +110,15 @@ class AutomationEngine @Inject constructor(
                     completedTasks = 0
                 )
 
-                noteRepository.insertNote(newNote).map { generatedId ->
-                    newNote.id = generatedId.toInt()
-                    newNote
+                val generatedId = noteRepository.insertNoteSuspend(newNote)
+                newNote.id = generatedId.toInt()
+
+                withContext(Dispatchers.Main) {
+                    onSuccess(newNote)
                 }
-            }
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ savedNote ->
-                onSuccess(savedNote)
-            }, { error ->
+            } catch (error: Exception) {
                 Log.e("AutomationEngine", "Error creating daily agenda note: ${error.message}", error)
-            })
+            }
+        }
     }
 }

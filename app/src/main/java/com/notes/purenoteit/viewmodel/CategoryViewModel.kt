@@ -4,181 +4,144 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.notes.purenoteit.data.db.CategoryData
+import com.notes.purenoteit.di.IoDispatcher
 import com.notes.purenoteit.repository.CategoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.reactivex.Single
-import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.disposables.CompositeDisposable
-import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
-class CategoryViewModel @Inject constructor(private val repository: CategoryRepository) :
-    ViewModel() {
-    private val compositeDisposable = CompositeDisposable()
+class CategoryViewModel @Inject constructor(
+    private val repository: CategoryRepository,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) : ViewModel() {
     private val _categoryList = MutableLiveData<List<CategoryData>>()
     val categoryList: LiveData<List<CategoryData>> = _categoryList
 
-    fun seedDefaultCategories() {
-        repository.areDefaultCategoriesPresent()
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ present ->
-                if (!present) {
-                    upsert(CategoryData("Not", false, id = 1))
-                    upsert(CategoryData("Günlük", false, id = 2))
-                    upsert(CategoryData("Önemli", false, id = 3))
-                } else {
-                    getAllCategories()
-                }
-            }, {
-                upsert(CategoryData("Not", false, id = 1))
-                upsert(CategoryData("Günlük", false, id = 2))
-                upsert(CategoryData("Önemli", false, id = 3))
-            }).let {
-                compositeDisposable.add(it)
-            }
-    }
-    fun getAllCategories() {
-        repository.getAllCategories()
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({
-                _categoryList.value = it
-            }, {
+    // Modern StateFlow API (Compose collectAsStateWithLifecycle için)
+    private val _categoryListFlow = MutableStateFlow<List<CategoryData>>(emptyList())
+    val categoryListFlow: StateFlow<List<CategoryData>> = _categoryListFlow.asStateFlow()
 
-            }).let {
-                compositeDisposable.add(it)
+    fun seedDefaultCategories() {
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                val present = runCatching { repository.areDefaultCategoriesPresentSuspend() }.getOrDefault(false)
+                if (!present) {
+                    repository.categoryUpsertSuspend(CategoryData("Not", false, id = 1))
+                    repository.categoryUpsertSuspend(CategoryData("Günlük", false, id = 2))
+                    repository.categoryUpsertSuspend(CategoryData("Önemli", false, id = 3))
+                }
+                getAllCategories()
+            } catch (_: Exception) {
+                runCatching {
+                    repository.categoryUpsertSuspend(CategoryData("Not", false, id = 1))
+                    repository.categoryUpsertSuspend(CategoryData("Günlük", false, id = 2))
+                    repository.categoryUpsertSuspend(CategoryData("Önemli", false, id = 3))
+                }
+                getAllCategories()
             }
+        }
+    }
+
+    fun getAllCategories() {
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                val list = repository.getAllCategoriesSuspend()
+                withContext(Dispatchers.Main) {
+                    _categoryListFlow.value = list
+                    runCatching { _categoryList.value = list }
+                }
+            } catch (e: Exception) {
+                Log.e("CategoryViewModel", "Error fetching categories: ${e.message}")
+            }
+        }
     }
 
     fun upsert(item: CategoryData) {
-        repository.categoryUpsert(item).subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread()).subscribe({
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                repository.categoryUpsertSuspend(item)
                 getAllCategories()
-                Log.i("CategoryViewModel", "Note upserted successfully")
-            }, { error ->
-                Log.i("CategoryViewModel", "Error upserting note: ${error.message}")
-            }).let {
-                compositeDisposable.add(it)
+                Log.i("CategoryViewModel", "Category upserted successfully via Coroutines")
+            } catch (error: Exception) {
+                Log.e("CategoryViewModel", "Error upserting category: ${error.message}")
             }
-
+        }
     }
 
     fun update(item: CategoryData) {
-        repository.categoryUpdate(item).subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread()).subscribe({
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                repository.categoryUpdateSuspend(item)
                 getAllCategories()
-            }, {
-
-            }).let {
-                compositeDisposable.add(it)
+            } catch (e: Exception) {
+                Log.e("CategoryViewModel", "Error updating category: ${e.message}")
             }
+        }
     }
 
     fun delete(item: CategoryData) {
-        repository.categoryDelete(item).subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread()).subscribe({
-
-            }, {
-
-            }).let {
-                compositeDisposable.add(it)
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                repository.categoryDeleteSuspend(item)
+                getAllCategories()
+            } catch (e: Exception) {
+                Log.e("CategoryViewModel", "Error deleting category: ${e.message}")
             }
+        }
     }
 
     fun deleteCategoryById(id: Int) {
-        repository.deleteCategoryById(id).subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread()).subscribe({
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                repository.deleteCategoryByIdSuspend(id)
                 getAllCategories()
-                Log.i("NoteViewModel", "Note deleted successfully")
-            }, { error ->
-                Log.e("NoteViewModel", "Error deleting note: ${error.message}")
-            }).let {
-                compositeDisposable.add(it)
+                Log.i("CategoryViewModel", "Category deleted successfully via Coroutines")
+            } catch (error: Exception) {
+                Log.e("CategoryViewModel", "Error deleting category: ${error.message}")
             }
+        }
     }
 
     fun searchCategory(query: String) {
-        repository.searchCategory(query).subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread()).subscribe({ notes ->
-                _categoryList.value = notes
-            }, { error ->
-                Log.e("NoteViewModel", "Error fetching notes by category: $error")
-            }).let {
-                compositeDisposable.add(it)
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                val list = repository.searchCategorySuspend(query)
+                withContext(Dispatchers.Main) {
+                    _categoryListFlow.value = list
+                    runCatching { _categoryList.value = list }
+                }
+            } catch (error: Exception) {
+                Log.e("CategoryViewModel", "Error searching categories: ${error.message}")
             }
+        }
     }
 
-    fun getCategoryById(id: Int): Single<CategoryData> {
-        return repository.getCategoryById(id).subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
+    suspend fun getCategoryById(id: Int): CategoryData? = withContext(ioDispatcher) {
+        repository.getCategoryByIdSuspend(id)
     }
 
-    fun isCategoryExists(name: String): LiveData<Boolean> {
-        val result = MutableLiveData<Boolean>()
-        repository.isCategoryExists(name)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ exists ->
-                result.value = exists
-            }, {
-
-            }).let {
-                compositeDisposable.add(it)
-            }
-        return result
+    suspend fun isCategoryExists(name: String): Boolean = withContext(ioDispatcher) {
+        repository.isCategoryExistsSuspend(name)
     }
 
-    fun isPasswordSet(categoryName: String): LiveData<Boolean> {
-        val result = MutableLiveData<Boolean>()
-        repository.isPasswordSet(categoryName)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ exists ->
-                result.value = exists
-                Log.i("CategoryViewModel", "Şifre ayarlandı mı?: $result")
-            }, {
-                Log.i("CategoryViewModel", "Şifre ayarlandı mı?: $result")
-            }).let {
-                compositeDisposable.add(it)
-            }
-        return result
+    suspend fun isPasswordSet(categoryName: String): Boolean = withContext(ioDispatcher) {
+        repository.isPasswordSetSuspend(categoryName) ?: false
     }
 
-    fun areDefaultCategoriesPresent(): LiveData<Boolean> {
-        val result = MutableLiveData<Boolean>()
-        repository.areDefaultCategoriesPresent()
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ exists ->
-                result.value = exists
-            }, {
-
-            }).let {
-                compositeDisposable.add(it)
-            }
-        return result
+    suspend fun areDefaultCategoriesPresent(): Boolean = withContext(ioDispatcher) {
+        repository.areDefaultCategoriesPresentSuspend()
     }
 
-    fun getCategoryIdByName(categoryName: String): LiveData<Int> {
-        val result = MutableLiveData<Int>()
-        repository.getCategoryIdByName(categoryName)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ id ->
-                result.value = id
-            }, { error ->
-                Log.e("CategoryViewModel", "Error fetching category id: $error")
-            }).let {
-                compositeDisposable.add(it)
-            }
-        return result
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        compositeDisposable.clear()
+    suspend fun getCategoryIdByName(categoryName: String): Int? = withContext(ioDispatcher) {
+        repository.getCategoryIdByNameSuspend(categoryName)
     }
 }

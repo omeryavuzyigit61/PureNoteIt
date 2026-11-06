@@ -559,12 +559,12 @@ fun NoteDetailScreen(
 
     val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
 
-    // Load existing note data with managed RxJava Disposable
-    DisposableEffect(noteId) {
-        var disposable: io.reactivex.disposables.Disposable? = null
+    // Load existing note data with Kotlin Coroutines LaunchedEffect
+    LaunchedEffect(noteId) {
         val targetIdToLoad = if (noteId != -1) noteId else currentNoteId
         if (targetIdToLoad != -1) {
-            disposable = noteViewModel.getNoteById(targetIdToLoad).subscribe({ note ->
+            val note = noteViewModel.getNoteByIdSuspend(targetIdToLoad)
+            if (note != null) {
                 loadedNoteRef = note
                 currentNoteId = note.id
                 noteRichBlocksJson = note.richBlocksJson
@@ -597,17 +597,13 @@ fun NoteDetailScreen(
                     populateNoteBlocks(note)
                     isInitialLoadCompleted = true
                 }
-            }, { _ ->
-            })
+            }
         } else {
             currentNoteId = -1
             isAccessGranted = true
             blocks.clear()
             blocks.add(NoteBlock())
             isInitialLoadCompleted = true
-        }
-        onDispose {
-            disposable?.dispose()
         }
     }
 

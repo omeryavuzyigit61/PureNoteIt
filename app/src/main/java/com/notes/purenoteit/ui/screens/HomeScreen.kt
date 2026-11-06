@@ -3,6 +3,7 @@ package com.notes.purenoteit.ui.screens
 import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -210,8 +211,8 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
-    val noteList by noteViewModel.noteList.observeAsState(emptyList())
-    val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
+    val noteList by noteViewModel.noteListFlow.collectAsStateWithLifecycle()
+    val categoryList by categoryViewModel.categoryListFlow.collectAsStateWithLifecycle()
     val allLinks by noteViewModel.allLinks.observeAsState(emptyList())
     val streamItems by noteViewModel.streamItems.observeAsState(emptyList())
 

@@ -15,7 +15,9 @@ import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.repository.CategoryRepository
 import com.notes.purenoteit.repository.KnowledgeRepository
 import com.notes.purenoteit.repository.NoteRepository
-import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -97,13 +99,13 @@ object VaultBackupManager {
         onSuccess: (File) -> Unit,
         onError: (Exception) -> Unit
     ) {
-        Schedulers.io().scheduleDirect {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
-                val rawNotes = noteRepository.getAllNotes().blockingGet() ?: emptyList()
-                val categories = categoryRepository.getAllCategories().blockingGet() ?: emptyList()
-                val links = knowledgeRepository.getAllLinks().blockingGet() ?: emptyList()
+                val rawNotes = noteRepository.getAllNotesSuspend()
+                val categories = categoryRepository.getAllCategoriesSuspend()
+                val links = runCatching { knowledgeRepository.getAllLinksSuspend() }.getOrDefault(emptyList())
                 val streamItems = runCatching {
-                    knowledgeRepository.getAllStreamItems().blockingGet()
+                    knowledgeRepository.getAllStreamItemsSuspend()
                 }.getOrDefault(emptyList())
                 val lockedCategoryIds = categories.filter { it.isPassword == true }.map { it.id }.toSet()
 
@@ -205,7 +207,7 @@ object VaultBackupManager {
         onSuccess: (restoredNotesCount: Int, restoredCategoriesCount: Int) -> Unit,
         onError: (Exception) -> Unit
     ) {
-        Schedulers.io().scheduleDirect {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 var manifestRawOrEncrypted: String? = null
                 val filesDir = context.filesDir.canonicalFile
@@ -269,16 +271,16 @@ object VaultBackupManager {
 
                 // 1. Restore categories via CategoryRepository and guarantee a valid fallback category for ForeignKey integrity
                 payload.categories.forEach { cat ->
-                    categoryRepository.categoryUpsert(cat).onErrorComplete().blockingAwait()
+                    runCatching { categoryRepository.categoryUpsertSuspend(cat) }
                 }
                 var currentCategories = runCatching {
-                    categoryRepository.getAllCategories().blockingGet()
+                    categoryRepository.getAllCategoriesSuspend()
                 }.getOrDefault(emptyList())
                 if (currentCategories.isEmpty()) {
                     val defaultCat = CategoryData(name = "Genel", isPassword = false).also { it.id = 1 }
-                    categoryRepository.categoryUpsert(defaultCat).onErrorComplete().blockingAwait()
+                    runCatching { categoryRepository.categoryUpsertSuspend(defaultCat) }
                     currentCategories = runCatching {
-                        categoryRepository.getAllCategories().blockingGet()
+                        categoryRepository.getAllCategoriesSuspend()
                     }.getOrDefault(listOf(defaultCat))
                 }
                 val validCategoryIds = currentCategories.map { it.id }.toSet()
@@ -382,12 +384,12 @@ object VaultBackupManager {
                     note.images = note.images?.mapNotNull { normalizeMediaPath(it, filesDir) }
                     note.sounds = note.sounds?.mapNotNull { normalizeMediaPath(it, filesDir) }
 
-                    noteRepository.upsert(note).onErrorComplete().blockingAwait()
+                    runCatching { noteRepository.upsertSuspend(note) }
                 }
 
                 // 3. Restore and verify note links via KnowledgeRepository
                 val allExistingNoteIds = runCatching {
-                    noteRepository.getAllNotes().blockingGet()?.map { it.id }?.toSet()
+                    noteRepository.getAllNotesSuspend().map { it.id }.toSet()
                 }.getOrNull() ?: noteIdsInBackup
 
                 val mergedLinks = (payload.links + reconstructedLinks)
@@ -395,7 +397,7 @@ object VaultBackupManager {
                     .distinctBy { Triple(it.sourceNoteId, it.targetNoteId, it.linkText.trim().lowercase()) }
 
                 if (mergedLinks.isNotEmpty()) {
-                    knowledgeRepository.insertAllLinks(mergedLinks).onErrorComplete().blockingAwait()
+                    runCatching { knowledgeRepository.insertAllLinksSuspend(mergedLinks) }
                 }
 
                 // 4. Restore Quick Thought Stream items with normalized media paths
@@ -407,7 +409,7 @@ object VaultBackupManager {
                             imagePath = normalizeMediaPath(item.imagePath, filesDir)
                         ).also { it.id = item.id }
                     }
-                    knowledgeRepository.insertAllStreamItems(normalizedStream).onErrorComplete().blockingAwait()
+                    runCatching { knowledgeRepository.insertAllStreamItemsSuspend(normalizedStream) }
                 }
 
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
@@ -569,7 +571,7 @@ object VaultBackupManager {
             categoryRepository = categoryRepository,
             knowledgeRepository = knowledgeRepository,
             onSuccess = { backupFile ->
-                Schedulers.io().scheduleDirect {
+                CoroutineScope(Dispatchers.IO).launch {
                     var success = false
                     try {
                         success = saveBackupToTreeUri(context, backupFile, treeUri)

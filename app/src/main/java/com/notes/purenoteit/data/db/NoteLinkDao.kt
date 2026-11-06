@@ -5,35 +5,33 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import io.reactivex.Completable
-import io.reactivex.Single
 
 @Dao
 interface NoteLinkDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(link: NoteLinkData): Single<Long>
+    suspend fun insertSuspend(link: NoteLinkData): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertAll(links: List<NoteLinkData>): Completable
+    suspend fun insertAllSuspend(links: List<NoteLinkData>)
 
     @Delete
-    fun delete(link: NoteLinkData): Completable
+    suspend fun deleteSuspend(link: NoteLinkData)
 
     @Query("DELETE FROM note_links WHERE sourceNoteId = :noteId")
-    fun deleteLinksFromSource(noteId: Int): Completable
+    suspend fun deleteLinksFromSourceSuspend(noteId: Int)
 
     @Query("DELETE FROM note_links WHERE sourceNoteId = :noteId OR targetNoteId = :noteId")
-    fun deleteLinksForNote(noteId: Int): Completable
+    suspend fun deleteLinksForNoteSuspend(noteId: Int)
 
     @Query("SELECT * FROM note_links WHERE sourceNoteId = :sourceNoteId")
-    fun getOutgoingLinks(sourceNoteId: Int): Single<List<NoteLinkData>>
+    suspend fun getOutgoingLinksSuspend(sourceNoteId: Int): List<NoteLinkData>
 
     @Query("SELECT * FROM note_links WHERE targetNoteId = :targetNoteId")
-    fun getBacklinks(targetNoteId: Int): Single<List<NoteLinkData>>
+    suspend fun getBacklinksSuspend(targetNoteId: Int): List<NoteLinkData>
 
     @Query("UPDATE note_links SET linkText = :newTitle WHERE targetNoteId = :targetNoteId")
-    fun updateTargetLinkText(targetNoteId: Int, newTitle: String): Completable
+    suspend fun updateTargetLinkTextSuspend(targetNoteId: Int, newTitle: String)
 
     @Query("SELECT * FROM note_links")
-    fun getAllLinks(): Single<List<NoteLinkData>>
+    suspend fun getAllLinksSuspend(): List<NoteLinkData>
 }

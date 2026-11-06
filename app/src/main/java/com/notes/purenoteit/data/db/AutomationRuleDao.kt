@@ -6,26 +6,24 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import io.reactivex.Completable
-import io.reactivex.Single
 
 @Dao
 interface AutomationRuleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(rule: AutomationRuleData): Single<Long>
+    suspend fun insertSuspend(rule: AutomationRuleData): Long
 
     @Update
-    fun update(rule: AutomationRuleData): Completable
+    suspend fun updateSuspend(rule: AutomationRuleData)
 
     @Delete
-    fun delete(rule: AutomationRuleData): Completable
+    suspend fun deleteSuspend(rule: AutomationRuleData)
 
     @Query("SELECT * FROM automation_rules ORDER BY createdAt DESC")
-    fun getAllRules(): Single<List<AutomationRuleData>>
+    suspend fun getAllRulesSuspend(): List<AutomationRuleData>
 
     @Query("SELECT * FROM automation_rules WHERE isEnabled = 1")
-    fun getActiveRules(): Single<List<AutomationRuleData>>
+    suspend fun getActiveRulesSuspend(): List<AutomationRuleData>
 
     @Query("SELECT * FROM automation_rules WHERE triggerType = :triggerType AND isEnabled = 1")
-    fun getRulesByTrigger(triggerType: String): Single<List<AutomationRuleData>>
+    suspend fun getRulesByTriggerSuspend(triggerType: String): List<AutomationRuleData>
 }

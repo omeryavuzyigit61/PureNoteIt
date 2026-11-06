@@ -6,8 +6,6 @@ import com.notes.purenoteit.data.db.NoteLinkDao
 import com.notes.purenoteit.data.db.NoteLinkData
 import com.notes.purenoteit.data.db.StreamItemDao
 import com.notes.purenoteit.data.db.StreamItemData
-import io.reactivex.Completable
-import io.reactivex.Single
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,32 +16,32 @@ class KnowledgeRepository @Inject constructor(
     private val streamItemDao: StreamItemDao
 ) {
     // --- Note Links & Graph Data ---
-    fun insertLink(link: NoteLinkData): Single<Long> = noteLinkDao.insert(link)
-    fun insertAllLinks(links: List<NoteLinkData>): Completable = noteLinkDao.insertAll(links)
-    fun deleteLinksFromSource(noteId: Int): Completable = noteLinkDao.deleteLinksFromSource(noteId)
-    fun deleteLinksForNote(noteId: Int): Completable = noteLinkDao.deleteLinksForNote(noteId)
-    fun getOutgoingLinks(noteId: Int): Single<List<NoteLinkData>> = noteLinkDao.getOutgoingLinks(noteId)
-    fun getBacklinks(noteId: Int): Single<List<NoteLinkData>> = noteLinkDao.getBacklinks(noteId)
-    fun updateTargetLinkText(targetNoteId: Int, newTitle: String): Completable =
-        noteLinkDao.updateTargetLinkText(targetNoteId, newTitle)
-    fun getAllLinks(): Single<List<NoteLinkData>> = noteLinkDao.getAllLinks()
+    suspend fun insertLinkSuspend(link: NoteLinkData): Long = noteLinkDao.insertSuspend(link)
+    suspend fun insertAllLinksSuspend(links: List<NoteLinkData>) = noteLinkDao.insertAllSuspend(links)
+    suspend fun deleteLinksFromSourceSuspend(noteId: Int) = noteLinkDao.deleteLinksFromSourceSuspend(noteId)
+    suspend fun deleteLinksForNoteSuspend(noteId: Int) = noteLinkDao.deleteLinksForNoteSuspend(noteId)
+    suspend fun getOutgoingLinksSuspend(noteId: Int): List<NoteLinkData> = noteLinkDao.getOutgoingLinksSuspend(noteId)
+    suspend fun getBacklinksSuspend(noteId: Int): List<NoteLinkData> = noteLinkDao.getBacklinksSuspend(noteId)
+    suspend fun updateTargetLinkTextSuspend(targetNoteId: Int, newTitle: String) =
+        noteLinkDao.updateTargetLinkTextSuspend(targetNoteId, newTitle)
+    suspend fun getAllLinksSuspend(): List<NoteLinkData> = noteLinkDao.getAllLinksSuspend()
 
     // --- Automation Rules ---
-    fun insertRule(rule: AutomationRuleData): Single<Long> = automationRuleDao.insert(rule)
-    fun updateRule(rule: AutomationRuleData): Completable = automationRuleDao.update(rule)
-    fun deleteRule(rule: AutomationRuleData): Completable = automationRuleDao.delete(rule)
-    fun getAllRules(): Single<List<AutomationRuleData>> = automationRuleDao.getAllRules()
-    fun getActiveRules(): Single<List<AutomationRuleData>> = automationRuleDao.getActiveRules()
-    fun getRulesByTrigger(triggerType: String): Single<List<AutomationRuleData>> =
-        automationRuleDao.getRulesByTrigger(triggerType)
+    suspend fun insertRuleSuspend(rule: AutomationRuleData): Long = automationRuleDao.insertSuspend(rule)
+    suspend fun updateRuleSuspend(rule: AutomationRuleData) = automationRuleDao.updateSuspend(rule)
+    suspend fun deleteRuleSuspend(rule: AutomationRuleData) = automationRuleDao.deleteSuspend(rule)
+    suspend fun getAllRulesSuspend(): List<AutomationRuleData> = automationRuleDao.getAllRulesSuspend()
+    suspend fun getActiveRulesSuspend(): List<AutomationRuleData> = automationRuleDao.getActiveRulesSuspend()
+    suspend fun getRulesByTriggerSuspend(triggerType: String): List<AutomationRuleData> =
+        automationRuleDao.getRulesByTriggerSuspend(triggerType)
 
     // --- Quick Inbox Stream ---
-    fun insertStreamItem(item: StreamItemData): Single<Long> = streamItemDao.insert(item)
-    fun insertAllStreamItems(items: List<StreamItemData>): Completable = streamItemDao.insertAll(items)
-    fun deleteStreamItem(item: StreamItemData): Completable = streamItemDao.delete(item)
-    fun getAllStreamItems(): Single<List<StreamItemData>> = streamItemDao.getAllItems()
-    fun getUnprocessedStreamItems(): Single<List<StreamItemData>> = streamItemDao.getUnprocessedItems()
-    fun markStreamItemsProcessed(ids: List<Int>, noteId: Int): Completable =
-        streamItemDao.markAsProcessed(ids, noteId)
-    fun deleteStreamItemById(id: Int): Completable = streamItemDao.deleteById(id)
+    suspend fun insertStreamItemSuspend(item: StreamItemData): Long = streamItemDao.insertSuspend(item)
+    suspend fun insertAllStreamItemsSuspend(items: List<StreamItemData>) = streamItemDao.insertAllSuspend(items)
+    suspend fun deleteStreamItemSuspend(item: StreamItemData) = streamItemDao.deleteSuspend(item)
+    suspend fun getAllStreamItemsSuspend(): List<StreamItemData> = streamItemDao.getAllItemsSuspend()
+    suspend fun getUnprocessedStreamItemsSuspend(): List<StreamItemData> = streamItemDao.getUnprocessedItemsSuspend()
+    suspend fun markStreamItemsProcessedSuspend(ids: List<Int>, noteId: Int) =
+        streamItemDao.markAsProcessedSuspend(ids, noteId)
+    suspend fun deleteStreamItemByIdSuspend(id: Int) = streamItemDao.deleteByIdSuspend(id)
 }

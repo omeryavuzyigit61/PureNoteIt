@@ -16,8 +16,10 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import io.reactivex.Single
-import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PureNoteWidgetProvider : AppWidgetProvider() {
 
@@ -125,10 +127,10 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
                 val noteRepository = entryPoint.getNoteRepository()
                 val categoryRepository = entryPoint.getCategoryRepository()
 
-                Single.zip(
-                    noteRepository.getAllNotes(),
-                    categoryRepository.getAllCategories(),
-                    io.reactivex.functions.BiFunction { notes, categories ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val notes = noteRepository.getAllNotesSuspend()
+                        val categories = categoryRepository.getAllCategoriesSuspend()
                         val lockedCategoryIds = categories.filter { it.isPassword == true }.map { it.id }.toSet()
                         val publicNotes = notes.filter { note ->
                             note.status != "TRASH" &&
@@ -139,7 +141,7 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
                         }
                         val latestPublicNote = publicNotes.maxByOrNull { it.date }
 
-                        if (latestPublicNote != null) {
+                        val data = if (latestPublicNote != null) {
                             val title = if (!latestPublicNote.title.isNullOrBlank()) latestPublicNote.title!! else "Başlıksız Not"
                             val snippet = try {
                                 val blocks = com.notes.purenoteit.model.BlockParser.parse(latestPublicNote.description)
@@ -168,38 +170,38 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
                                 noteId = null
                             )
                         }
-                    }
-                )
-                    .subscribeOn(Schedulers.io())
-                    .subscribe({ data ->
-                        views.setTextViewText(R.id.widget_recent_note_text, data.headerSubtext)
-                        views.setTextViewText(R.id.widget_note_card_title, data.noteTitle)
-                        views.setTextViewText(R.id.widget_note_card_snippet, data.noteSnippet)
 
-                        val previewIntent = Intent(context, MainActivity::class.java).apply {
-                            if (data.noteId != null) {
-                                putExtra("OPEN_NOTE_ID", data.noteId)
-                            } else {
-                                action = ACTION_NEW_NOTE
-                                putExtra(EXTRA_ACTION, "NEW_NOTE")
+                        withContext(Dispatchers.Main) {
+                            views.setTextViewText(R.id.widget_recent_note_text, data.headerSubtext)
+                            views.setTextViewText(R.id.widget_note_card_title, data.noteTitle)
+                            views.setTextViewText(R.id.widget_note_card_snippet, data.noteSnippet)
+
+                            val previewIntent = Intent(context, MainActivity::class.java).apply {
+                                if (data.noteId != null) {
+                                    putExtra("OPEN_NOTE_ID", data.noteId)
+                                } else {
+                                    action = ACTION_NEW_NOTE
+                                    putExtra(EXTRA_ACTION, "NEW_NOTE")
+                                }
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                             }
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        }
-                        val previewPending = PendingIntent.getActivity(
-                            context,
-                            4,
-                            previewIntent,
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                        )
-                        views.setOnClickPendingIntent(R.id.widget_note_preview_card, previewPending)
+                            val previewPending = PendingIntent.getActivity(
+                                context,
+                                4,
+                                previewIntent,
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                            )
+                            views.setOnClickPendingIntent(R.id.widget_note_preview_card, previewPending)
 
-                        appWidgetManager.updateAppWidget(appWidgetId, views)
-                    }, {
+                            appWidgetManager.updateAppWidget(appWidgetId, views)
+                        }
+                    } catch (e: Exception) {
                         views.setTextViewText(R.id.widget_recent_note_text, "Aklındakileri anında yakala...")
                         views.setTextViewText(R.id.widget_note_card_title, "PureNoteIt")
                         views.setTextViewText(R.id.widget_note_card_snippet, "Hızlı not almak için dokunun ✨")
                         appWidgetManager.updateAppWidget(appWidgetId, views)
-                    })
+                    }
+                }
             } catch (e: Exception) {
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             }

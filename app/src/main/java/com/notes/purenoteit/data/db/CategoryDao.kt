@@ -6,41 +6,43 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import io.reactivex.Completable
-import io.reactivex.Single
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CategoryDao {
-    @Insert(onConflict = OnConflictStrategy.ABORT)
-    fun upsertCategory(category: CategoryData): Completable
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCategorySuspend(category: CategoryData)
 
     @Update
-    fun updateCategory(category: CategoryData): Completable
-
-    @Query("SELECT * FROM categories ORDER BY name ASC")
-    fun getAllCategories(): Single<List<CategoryData>>
+    suspend fun updateCategorySuspend(category: CategoryData)
 
     @Delete
-    fun deleteCategory(category: CategoryData): Completable
+    suspend fun deleteCategorySuspend(category: CategoryData)
 
     @Query("DELETE FROM categories WHERE id = :id")
-    fun deleteCategoryById(id: Int): Completable
+    suspend fun deleteCategoryByIdSuspend(id: Int)
 
-    @Query("SELECT * FROM categories WHERE name LIKE '%' || :query || '%'")
-    fun searchCategory(query: String): Single<List<CategoryData>>
+    @Query("SELECT * FROM categories ORDER BY name ASC")
+    fun getAllCategoriesFlow(): Flow<List<CategoryData>>
+
+    @Query("SELECT * FROM categories ORDER BY name ASC")
+    suspend fun getAllCategoriesSuspend(): List<CategoryData>
 
     @Query("SELECT * FROM categories WHERE id = :id")
-    fun getCategoryById(id: Int): Single<CategoryData>
+    suspend fun getCategoryByIdSuspend(id: Int): CategoryData?
+
+    @Query("SELECT * FROM categories WHERE name LIKE '%' || :query || '%'")
+    suspend fun searchCategorySuspend(query: String): List<CategoryData>
 
     @Query("SELECT COUNT(*) > 0 FROM categories WHERE name = :name")
-    fun isCategoryExists(name: String): Single<Boolean>
+    suspend fun isCategoryExistsSuspend(name: String): Boolean
 
     @Query("SELECT (SELECT COUNT(*) FROM categories WHERE name IN ('Not', 'Önemli', 'Günlük')) = 3")
-    fun areDefaultCategoriesPresent(): Single<Boolean>
+    suspend fun areDefaultCategoriesPresentSuspend(): Boolean
 
     @Query("SELECT isPassword FROM categories WHERE name = :categoryName")
-    fun isPasswordSet(categoryName: String): Single<Boolean>
+    suspend fun isPasswordSetSuspend(categoryName: String): Boolean?
 
     @Query("SELECT id FROM categories WHERE name = :categoryName")
-    fun getCategoryIdByName(categoryName: String): Single<Int>
+    suspend fun getCategoryIdByNameSuspend(categoryName: String): Int?
 }

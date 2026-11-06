@@ -7,35 +7,33 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import androidx.room.Upsert
-import io.reactivex.Completable
-import io.reactivex.Flowable
-import io.reactivex.Single
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface NoteDao {
     @Upsert
-    fun upsert(note: NoteData): Completable
+    suspend fun upsertNote(note: NoteData)
 
     @Update
-    fun update(note: NoteData): Completable
+    suspend fun updateNote(note: NoteData)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    fun insertNote(note: NoteData): Single<Long>
-
-    @Query("SELECT * FROM notes ORDER BY isPinned DESC, date DESC")
-    fun getAllNotes(): Single<List<NoteData>>
+    suspend fun insertNoteSuspend(note: NoteData): Long
 
     @Delete
-    fun delete(note: NoteData): Completable
+    suspend fun deleteNote(note: NoteData)
 
-    @Query(
-        """
-    SELECT notes.*
-    FROM notes
-    ORDER BY notes.isPinned DESC, notes.date DESC
-"""
-    )
-    fun getNotes(): Single<List<NoteData>>
+    @Query("DELETE FROM notes WHERE id = :id")
+    suspend fun deleteNoteByIdSuspend(id: Int)
+
+    @Query("SELECT * FROM notes ORDER BY isPinned DESC, date DESC")
+    fun getAllNotesFlow(): Flow<List<NoteData>>
+
+    @Query("SELECT * FROM notes ORDER BY isPinned DESC, date DESC")
+    suspend fun getAllNotesSuspend(): List<NoteData>
+
+    @Query("SELECT * FROM notes WHERE id = :id")
+    suspend fun getNoteByIdSuspend(id: Int): NoteData?
 
     @Query(
         """
@@ -48,13 +46,18 @@ interface NoteDao {
     ORDER BY notes.isPinned DESC, notes.date DESC
     """
     )
-    fun searchNote(query: String): Flowable<List<NoteData>>
+    fun searchNoteFlow(query: String): Flow<List<NoteData>>
 
-    @Query("SELECT * FROM notes WHERE id = :id")
-    fun getNoteById(id: Int): Single<NoteData>
-
-    @Query("DELETE FROM notes WHERE id = :id")
-    fun deleteNoteById(id: Int): Completable
+    @Query(
+        """
+    SELECT notes.*
+    FROM notes
+    INNER JOIN categories ON notes.categoryId = categories.id
+    WHERE categories.name = :categoryName
+    ORDER BY notes.isPinned DESC, notes.date DESC
+    """
+    )
+    fun getNotesByCategoryFlow(categoryName: String): Flow<List<NoteData>>
 
     @Query(
         """
@@ -66,28 +69,17 @@ interface NoteDao {
     ORDER BY notes.isPinned DESC, notes.date DESC
     """
     )
-    fun getNotesBetweenDates(startDate: Long, endDate: Long): Single<List<NoteData>>
-
-    @Query(
-        """
-    SELECT notes.*
-    FROM notes
-    INNER JOIN categories ON notes.categoryId = categories.id
-    WHERE categories.name = :categoryName
-    ORDER BY notes.isPinned DESC, notes.date DESC
-    """
-    )
-    fun getNotesByCategory(categoryName: String): Flowable<List<NoteData>>
-
-    @Query("UPDATE notes SET isPinned = :isPinned WHERE id = :id")
-    fun updatePinStatus(id: Int, isPinned: Boolean): Completable
+    suspend fun getNotesBetweenDatesSuspend(startDate: Long, endDate: Long): List<NoteData>
 
     @Query("SELECT * FROM notes WHERE reminderTime IS NOT NULL AND reminderTime > :now AND isReminderDone = 0")
-    fun getActiveReminders(now: Long): Single<List<NoteData>>
+    suspend fun getActiveRemindersSuspend(now: Long): List<NoteData>
+
+    @Query("UPDATE notes SET isPinned = :isPinned WHERE id = :id")
+    suspend fun updatePinStatusSuspend(id: Int, isPinned: Boolean)
 
     @Query("UPDATE notes SET isReminderDone = :isDone WHERE id = :id")
-    fun updateReminderDone(id: Int, isDone: Boolean): Completable
+    suspend fun updateReminderDoneSuspend(id: Int, isDone: Boolean)
 
     @Query("UPDATE notes SET reminderTime = :reminderTime, isReminderDone = 0 WHERE id = :id")
-    fun updateReminderTime(id: Int, reminderTime: Long): Completable
+    suspend fun updateReminderTimeSuspend(id: Int, reminderTime: Long)
 }

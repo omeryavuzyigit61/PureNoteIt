@@ -34,7 +34,7 @@ class BootReceiver : BroadcastReceiver() {
 
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        val activeNotes = noteRepository.getActiveReminders(System.currentTimeMillis()).blockingGet()
+                        val activeNotes = noteRepository.getActiveRemindersSuspend(System.currentTimeMillis())
                         activeNotes.forEach { note ->
                             val remTime = note.reminderTime
                             if (remTime != null && remTime > System.currentTimeMillis() && note.status != "TRASH") {

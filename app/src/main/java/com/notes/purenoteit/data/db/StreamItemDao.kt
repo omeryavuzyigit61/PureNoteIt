@@ -5,29 +5,27 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import io.reactivex.Completable
-import io.reactivex.Single
 
 @Dao
 interface StreamItemDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(item: StreamItemData): Single<Long>
+    suspend fun insertSuspend(item: StreamItemData): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertAll(items: List<StreamItemData>): Completable
+    suspend fun insertAllSuspend(items: List<StreamItemData>)
 
     @Delete
-    fun delete(item: StreamItemData): Completable
+    suspend fun deleteSuspend(item: StreamItemData)
 
     @Query("SELECT * FROM stream_items ORDER BY timestamp DESC")
-    fun getAllItems(): Single<List<StreamItemData>>
+    suspend fun getAllItemsSuspend(): List<StreamItemData>
 
     @Query("SELECT * FROM stream_items WHERE isProcessed = 0 ORDER BY timestamp DESC")
-    fun getUnprocessedItems(): Single<List<StreamItemData>>
+    suspend fun getUnprocessedItemsSuspend(): List<StreamItemData>
 
     @Query("UPDATE stream_items SET isProcessed = 1, mergedNoteId = :noteId WHERE id IN (:ids)")
-    fun markAsProcessed(ids: List<Int>, noteId: Int): Completable
+    suspend fun markAsProcessedSuspend(ids: List<Int>, noteId: Int)
 
     @Query("DELETE FROM stream_items WHERE id = :id")
-    fun deleteById(id: Int): Completable
+    suspend fun deleteByIdSuspend(id: Int)
 }

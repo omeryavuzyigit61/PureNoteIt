@@ -56,7 +56,7 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
             val noteRepository = entryPoint.getNoteRepository()
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    noteRepository.updateReminderDone(noteId, true).blockingAwait()
+                    noteRepository.updateReminderDoneSuspend(noteId, true)
                 } catch (e: Exception) {
                     Log.e("ReminderReceiver", "Error marking reminder done", e)
                 }
