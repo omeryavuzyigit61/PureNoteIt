@@ -48,9 +48,9 @@ object AppUpdateHelper {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val pInfo = getPackageInfo(context)
-            pInfo.versionName ?: "1.0.9"
+            pInfo.versionName ?: "1.1.0"
         } catch (e: Exception) {
-            "1.0.9"
+            "1.1.0"
         }
     }
 
@@ -144,16 +144,16 @@ object AppUpdateHelper {
                     availableVersionCode = availableVerCode,
                     availableVersionName = dynamicTargetVersion,
                     releaseNotesTr = listOf(
-                        "📑 Sayfa Dizini & İlişkiler Merkezi: Alt sayfalar, giden bağlantılar ve gelen referansların tek bir panelde birleştirilmesi.",
-                        "📂 Üst Sayfa (Ebeveyn Not) Hiyerarşisi: Alt sayfalarda ebeveyn nota kolay erişim sağlayan özel hiyerarşi kartı ve rozeti.",
-                        "✨ Kayan Not Başlığı (Sticky TopAppBar): Notu aşağı kaydırdığınızda üst barda beliren akıllı başlık ve tek dokunuşla en üste sarma.",
-                        "🔗 Akıllı Not Bağlantısı: Mevcut ve mükerrer notların bağlantı listesinden elenmesi ile temiz ilişki yönetimi."
+                        "🪟 Cam Navigasyon Çubuğu (Glassy Tabs V7): 3D kapı rotasyonu (door-flip animation) ve buğulu cam (glassmorphism) üst kategori filtreleme menüsü.",
+                        "🛡️ Donanım Destekli Veri Güvenliği: SQLCipher 256-bit AES şifreli veritabanı motoru ve modern Jetpack DataStore mimarisi.",
+                        "⚡ Clean Architecture & MVI: %100 Kotlin Coroutines & Flow tabanlı reaktif durum yönetimi ile maksimum hız ve kararlılık.",
+                        "🎨 Modern Material 3 Arayüzü: Yenilenen ızgara görünüm butonu, ekranda listelenen gerçek not sayısı senkronizasyonu ve akıcı sayfa geçişleri."
                     ),
                     releaseNotesEn = listOf(
-                        "📑 Unified Page Index & Relations: Sub-pages, outgoing links, and incoming backlinks organized in a single hub.",
-                        "📂 Distinct Parent Page Hierarchy: Dedicated breadcrumb hierarchy card separating parent pages from regular links.",
-                        "✨ Sticky TopAppBar Title: Smooth collapsing note header in top bar with quick tap-to-top navigation.",
-                        "🔗 Smart Note Linking: Automatic exclusion of self-notes and duplicates from the link suggestion picker."
+                        "🪟 Glassy Navigation Tabs V7: 3D door-flip hinge rotation animation and frosted glassmorphism category navigation bar.",
+                        "🛡️ Hardware-Backed Security: SQLCipher 256-bit AES encrypted database engine and modern asynchronous Jetpack DataStore.",
+                        "⚡ Clean Architecture & MVI: 100% Kotlin Coroutines & Flow reactive unidirectional state management for top performance.",
+                        "🎨 Modern Material 3 UI: Refined grid view selector, accurate on-screen note counter synchronization, and fluid transitions."
                     ),
                     playUpdateInfo = appUpdateInfo
                 )
@@ -223,16 +223,16 @@ object AppUpdateHelper {
             availableVersionCode = curCode,
             availableVersionName = "v$curName",
             releaseNotesTr = listOf(
-                "📑 Sayfa Dizini & İlişkiler Merkezi: Alt sayfalar, giden bağlantılar ve gelen referansların tek bir panelde birleştirilmesi.",
-                "📂 Üst Sayfa (Ebeveyn Not) Hiyerarşisi: Alt sayfalarda ebeveyn nota kolay erişim sağlayan özel hiyerarşi kartı ve rozeti.",
-                "✨ Kayan Not Başlığı (Sticky TopAppBar): Notu aşağı kaydırdığınızda üst barda beliren akıllı başlık ve tek dokunuşla en üste sarma.",
-                "🔗 Akıllı Not Bağlantısı: Mevcut ve mükerrer notların bağlantı listesinden elenmesi ile temiz ilişki yönetimi."
+                "🪟 Cam Navigasyon Çubuğu (Glassy Tabs V7): 3D kapı rotasyonu (door-flip animation) ve buğulu cam (glassmorphism) üst kategori filtreleme menüsü.",
+                "🛡️ Donanım Destekli Veri Güvenliği: SQLCipher 256-bit AES şifreli veritabanı motoru ve modern Jetpack DataStore mimarisi.",
+                "⚡ Clean Architecture & MVI: %100 Kotlin Coroutines & Flow tabanlı reaktif durum yönetimi ile maksimum hız ve kararlılık.",
+                "🎨 Modern Material 3 Arayüzü: Yenilenen ızgara görünüm butonu, ekranda listelenen gerçek not sayısı senkronizasyonu ve akıcı sayfa geçişleri."
             ),
             releaseNotesEn = listOf(
-                "📑 Unified Page Index & Relations: Sub-pages, outgoing links, and incoming backlinks organized in a single hub.",
-                "📂 Distinct Parent Page Hierarchy: Dedicated breadcrumb hierarchy card separating parent pages from regular links.",
-                "✨ Sticky TopAppBar Title: Smooth collapsing note header in top bar with quick tap-to-top navigation.",
-                "🔗 Smart Note Linking: Automatic exclusion of self-notes and duplicates from the link suggestion picker."
+                "🪟 Glassy Navigation Tabs V7: 3D door-flip hinge rotation animation and frosted glassmorphism category navigation bar.",
+                "🛡️ Hardware-Backed Security: SQLCipher 256-bit AES encrypted database engine and modern asynchronous Jetpack DataStore.",
+                "⚡ Clean Architecture & MVI: 100% Kotlin Coroutines & Flow reactive unidirectional state management for top performance.",
+                "🎨 Modern Material 3 UI: Refined grid view selector, accurate on-screen note counter synchronization, and fluid transitions."
             )
         )
     }
