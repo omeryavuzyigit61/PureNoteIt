@@ -346,14 +346,6 @@ fun HomeScreen(
         noteList.filter { it.status == "TRASH" }
     }
 
-    // Sort categories dynamically by note count (descending) then by name
-    val sortedCategories = remember(categoryList, activeNotes) {
-        categoryList.sortedWith(
-            compareByDescending<CategoryData> { cat -> activeNotes.count { it.categoryId == cat.id } }
-                .thenBy { it.name }
-        )
-    }
-
     // Dynamic Trash Retention Auto-Purge (Configurable in Settings)
     LaunchedEffect(trashedNotes.size) {
         val prefs = SharedPrefencesUtil(context)
@@ -417,6 +409,24 @@ fun HomeScreen(
                 emptyList()
             }
         }.toSet()
+    }
+
+    // Ekranda gösterilen ana/kök notlar (Notion tarzı alt sayfalar ana ekranda gizlendiği için sadece ekranda listelenenler)
+    val activeRootNotes = remember(activeNotes, subpageIds, subpageTitles) {
+        activeNotes.filter { note ->
+            val isSubpageByMetadata = note.richBlocksJson?.contains("\"isSubPage\":true") == true || note.richBlocksJson?.contains("\"parentNoteId\"") == true
+            val isSubpageById = note.id in subpageIds
+            val isSubpageByTitle = note.title?.trim()?.lowercase() in subpageTitles
+            !(isSubpageByMetadata || isSubpageById || isSubpageByTitle)
+        }
+    }
+
+    // Sort categories dynamically by root note count (descending) then by name
+    val sortedCategories = remember(categoryList, activeRootNotes) {
+        categoryList.sortedWith(
+            compareByDescending<CategoryData> { cat -> activeRootNotes.count { it.categoryId == cat.id } }
+                .thenBy { it.name }
+        )
     }
 
     // Helper function to compute filtered notes for a given category (used for directional animation)
@@ -869,7 +879,7 @@ fun HomeScreen(
                                         )
                                     }
                                     Text(
-                                        text = stringResource(R.string.topbar_note_count, activeNotes.size),
+                                        text = stringResource(R.string.topbar_note_count, filteredNotes.size),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
@@ -1035,8 +1045,8 @@ fun HomeScreen(
                                 GlassyCategoryBar(
                                     categories = sortedCategories,
                                     selectedCategory = if (selectedSmartFilter == SmartFilter.ALL && selectedHashtag == null) selectedCategory else "__CUSTOM_FILTER__",
-                                    totalNotesCount = activeNotes.size,
-                                    activeNotes = activeNotes,
+                                    totalNotesCount = activeRootNotes.size,
+                                    activeNotes = activeRootNotes,
                                     isDarkTheme = isDarkTheme,
                                     getCategoryDotColor = { catName -> getCategoryDotColor(catName) },
                                     onAllSelected = {
