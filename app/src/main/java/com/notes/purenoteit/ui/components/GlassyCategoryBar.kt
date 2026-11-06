@@ -71,15 +71,15 @@ fun GlassyCategoryBar(
     val glassBgBrush = if (isDarkTheme) {
         Brush.verticalGradient(
             colors = listOf(
-                Color(0x38FFFFFF),
-                Color(0x18FFFFFF)
+                Color(0x35FFFFFF),
+                Color(0x15FFFFFF)
             )
         )
     } else {
         Brush.verticalGradient(
             colors = listOf(
-                Color(0xEAFFFFFF),
-                Color(0xC8ECECF2)
+                Color(0xE6FFFFFF),
+                Color(0xB3E5E5ED)
             )
         )
     }
@@ -94,8 +94,8 @@ fun GlassyCategoryBar(
         } else {
             listOf(
                 Color.White,
-                Color.White.copy(alpha = 0.70f),
-                Color(0x15000000)
+                Color.White.copy(alpha = 0.75f),
+                Color(0x22000000)
             )
         }
     )
@@ -105,8 +105,8 @@ fun GlassyCategoryBar(
             .shadow(
                 elevation = 3.dp,
                 shape = RoundedCornerShape(26.dp),
-                spotColor = if (isDarkTheme) Color.Black.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.08f),
-                ambientColor = if (isDarkTheme) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.04f)
+                spotColor = if (isDarkTheme) Color.Black.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.12f),
+                ambientColor = if (isDarkTheme) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.06f)
             )
             .clip(RoundedCornerShape(26.dp))
             .background(brush = glassBgBrush)
@@ -251,13 +251,6 @@ fun GlassyDoorFlipChip(
         )
     }
 
-    // Videodaki difüz alt ışık / gölge halesi (Ambient Underglow)
-    val activeUnderglowColor = if (isDarkTheme) {
-        Color.White.copy(alpha = 0.14f)
-    } else {
-        Color(0x18000000)
-    }
-
     Box(
         modifier = modifier
             .graphicsLayer {
@@ -268,20 +261,11 @@ fun GlassyDoorFlipChip(
                 cameraDistance = 14f * density // 3D alan derinliği
                 transformOrigin = TransformOrigin(0.12f, 0.5f) // Sol menteşe kapı ekseni
             }
-            .drawBehind {
-                if (isSelected) {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(activeUnderglowColor, Color.Transparent),
-                            radius = size.maxDimension * 0.90f
-                        )
-                    )
-                }
-            }
             .shadow(
-                elevation = if (isSelected) 2.dp else 0.dp,
+                elevation = if (isSelected) 3.dp else 0.dp,
                 shape = RoundedCornerShape(20.dp),
-                spotColor = if (isDarkTheme) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.10f)
+                spotColor = if (isDarkTheme) Color.Black.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.14f),
+                ambientColor = if (isDarkTheme) Color.Black.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.06f)
             )
             .clip(RoundedCornerShape(20.dp))
             .background(
