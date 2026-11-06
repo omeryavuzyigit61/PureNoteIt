@@ -64,6 +64,8 @@ fun SettingsScreen(
     onThemeModeChange: (ThemeMode) -> Unit,
     isDarkTheme: Boolean,
     onShowUpdateDialog: (AppUpdateData, Boolean) -> Unit,
+    onNavigateToPasswordSettings: () -> Unit = {},
+    onOpenVaultBackupRestore: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -314,7 +316,149 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // SECTION 2: Çöp Kutusu & Veri Saklama
+            // SECTION 2: Güvenlik & Kasa
+            Text(
+                text = stringResource(R.string.settings_section_security),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = VibrantOrange
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 1. PIN & Kasa Kilidi Card
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable {
+                        onDismiss()
+                        onNavigateToPasswordSettings()
+                    },
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.6f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(SoftOrangeLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.lock),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.drawer_pin_vault),
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.drawer_pin_vault_sub),
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+
+                    Icon(
+                        painter = painterResource(id = R.drawable.arrow_right),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // SECTION 3: Yedekleme & Veri
+            Text(
+                text = stringResource(R.string.settings_section_backup),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = VibrantOrange
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 1. Yedekle ve Geri Yükle Card
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable {
+                        onDismiss()
+                        onOpenVaultBackupRestore()
+                    },
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.6f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(SoftOrangeLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_drawer_backup_restore),
+                                contentDescription = null,
+                                tint = VibrantOrange,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.drawer_vault_center),
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.drawer_vault_center_sub),
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+
+                    Icon(
+                        painter = painterResource(id = R.drawable.arrow_right),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // SECTION 4: Çöp Kutusu & Veri Saklama
             Text(
                 text = stringResource(R.string.settings_section_trash),
                 fontSize = 12.sp,

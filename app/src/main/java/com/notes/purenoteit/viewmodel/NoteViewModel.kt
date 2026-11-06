@@ -587,6 +587,77 @@ class NoteViewModel @Inject constructor(
             }
     }
 
+    fun batchMoveToTrash(notes: List<NoteData>, onComplete: () -> Unit = {}) {
+        io.reactivex.Completable.fromAction {
+            for (note in notes) {
+                val previousNote = runCatching { repository.getNoteById(note.id).blockingGet() }.getOrNull()
+                val trashed = note.copy(status = "TRASH").apply {
+                    id = note.id
+                    if (richBlocksJson == null && !previousNote?.richBlocksJson.isNullOrBlank()) {
+                        richBlocksJson = previousNote?.richBlocksJson
+                    }
+                }
+                repository.update(trashed).blockingAwait()
+                purgeDeletedNoteReferencesSync(trashed.id, trashed.title)
+            }
+        }.subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({
+                getAllNotes()
+                getAllLinks()
+                notifyWidgetSync()
+                triggerAutoSync()
+                onComplete()
+            }, { error ->
+                Log.e("NoteViewModel", "Error in batchMoveToTrash: ${error.message}")
+            }).let {
+                compositeDisposable.add(it)
+            }
+    }
+
+    fun batchToggleLock(
+        context: Context,
+        notes: List<NoteData>,
+        shouldLock: Boolean,
+        onComplete: () -> Unit = {}
+    ) {
+        io.reactivex.Completable.fromAction {
+            for (note in notes) {
+                val previousNote = runCatching { repository.getNoteById(note.id).blockingGet() }.getOrNull()
+                val currentDesc = note.description ?: ""
+                val updatedDesc = if (shouldLock) {
+                    if (note.isEncrypted || SecurityUtil.isEncryptedPayload(currentDesc)) currentDesc else SecurityUtil.encrypt(currentDesc)
+                } else {
+                    if (note.isEncrypted || SecurityUtil.isEncryptedPayload(currentDesc)) SecurityUtil.decrypt(currentDesc) else currentDesc
+                }
+
+                val updatedNote = note.copy(
+                    isPassword = shouldLock,
+                    isEncrypted = shouldLock,
+                    description = updatedDesc
+                ).apply {
+                    id = note.id
+                    if (richBlocksJson == null && !previousNote?.richBlocksJson.isNullOrBlank()) {
+                        richBlocksJson = previousNote?.richBlocksJson
+                    }
+                }
+                repository.update(updatedNote).blockingAwait()
+            }
+        }.subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({
+                getAllNotes()
+                getAllLinks()
+                notifyWidgetSync()
+                triggerAutoSync()
+                onComplete()
+            }, { error ->
+                Log.e("NoteViewModel", "Error in batchToggleLock: ${error.message}")
+            }).let {
+                compositeDisposable.add(it)
+            }
+    }
+
     fun togglePinStatus(id: Int, currentPinned: Boolean) {
         repository.updatePinStatus(id, !currentPinned)
             .subscribeOn(Schedulers.io())

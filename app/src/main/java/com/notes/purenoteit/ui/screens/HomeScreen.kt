@@ -232,6 +232,17 @@ fun HomeScreen(
     var pendingUnlockNoteId by remember { mutableStateOf<Int?>(null) }
     var showPinDialog by remember { mutableStateOf(false) }
     var enteredPin by remember { mutableStateOf("") }
+    var pendingBatchLock by remember { mutableStateOf(false) }
+
+    // Multi-Selection / Batch Mode State
+    var selectedNoteIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    val isSelectionMode = selectedNoteIds.isNotEmpty()
+    var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+    var showPinSetupAlert by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = isSelectionMode) {
+        selectedNoteIds = emptySet()
+    }
 
     // Dedicated Vault Backup & Restore Center Modal (Feature 5)
     var showVaultRestoreDialog by remember { mutableStateOf(false) }
@@ -568,19 +579,6 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Menu Item: PIN & Vault Settings
-                    DrawerMenuTile(
-                        iconRes = R.drawable.lock,
-                        title = stringResource(R.string.drawer_pin_vault),
-                        subtitle = stringResource(R.string.drawer_pin_vault_sub),
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onNavigateToPasswordSettings()
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
                     // Menu Item: Daily Agenda Automation (Paket 2)
                     DrawerMenuTile(
                         iconRes = R.drawable.ic_drawer_agenda,
@@ -661,19 +659,6 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Menu Item: Vault Backup & Restore Center (Feature 5)
-                    DrawerMenuTile(
-                        iconRes = R.drawable.ic_drawer_backup_restore,
-                        title = stringResource(R.string.drawer_vault_center),
-                        subtitle = stringResource(R.string.drawer_vault_center_sub),
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            showVaultRestoreDialog = true
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
                     // Menu Item: Trash Bin (Feature 2)
                     DrawerMenuTile(
                         iconRes = R.drawable.delete,
@@ -728,57 +713,129 @@ fun HomeScreen(
                             .statusBarsPadding()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Left: Drawer menu button
-                            IconButton(
-                                onClick = {
-                                    val currentTime = System.currentTimeMillis()
-                                    if (currentTime - lastMenuPressTime > 400L) {
-                                        lastMenuPressTime = currentTime
-                                        focusManager.clearFocus()
-                                        keyboardController?.hide()
-                                        scope.launch {
-                                            if (drawerState.isClosed) {
-                                                drawerState.open()
-                                            }
-                                        }
-                                    }
-                                },
+                        if (isSelectionMode) {
+                            // Multi-Select Batch Action Bar
+                            Row(
                                 modifier = Modifier
-                                    .size(42.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(MaterialTheme.colorScheme.surface)
-                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                    .border(1.dp, VibrantOrange.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.menu),
-                                    contentDescription = "Menü",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = { selectedNoteIds = emptySet() },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.cancel),
+                                            contentDescription = stringResource(R.string.close),
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = stringResource(R.string.batch_selected_count, selectedNoteIds.size),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    val currentVisibleIds = remember(filteredNotes) { filteredNotes.map { it.id }.toSet() }
+                                    val isAllSelected = currentVisibleIds.isNotEmpty() && selectedNoteIds.containsAll(currentVisibleIds)
+
+                                    // Select All Toggle Button
+                                    IconButton(
+                                        onClick = {
+                                            selectedNoteIds = if (isAllSelected) emptySet() else currentVisibleIds
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_checklist),
+                                            contentDescription = if (isAllSelected) stringResource(R.string.batch_deselect_all) else stringResource(R.string.batch_select_all),
+                                            tint = if (isAllSelected) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    // Batch Lock/Unlock Button
+                                    IconButton(
+                                        onClick = {
+                                            if (!SecurityUtil.isPasswordSet(context)) {
+                                                showPinSetupAlert = true
+                                            } else {
+                                                val selectedNotes = activeNotes.filter { it.id in selectedNoteIds }
+                                                val shouldLock = selectedNotes.any { it.isPassword != true && !it.isEncrypted }
+                                                if (!SecurityUtil.isVaultUnlocked) {
+                                                    pendingBatchLock = true
+                                                    showPinDialog = true
+                                                } else {
+                                                    noteViewModel.batchToggleLock(context, selectedNotes, shouldLock) {
+                                                        val msg = if (shouldLock) {
+                                                            context.getString(R.string.batch_lock_success, selectedNotes.size)
+                                                        } else {
+                                                            context.getString(R.string.batch_unlock_success, selectedNotes.size)
+                                                        }
+                                                        context.showToastShort(msg)
+                                                        selectedNoteIds = emptySet()
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.lock),
+                                            contentDescription = stringResource(R.string.batch_lock_notes),
+                                            tint = VibrantOrange,
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
+
+                                    // Batch Delete Button
+                                    IconButton(
+                                        onClick = { showBatchDeleteConfirm = true },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.delete),
+                                            contentDescription = stringResource(R.string.batch_delete_notes),
+                                            tint = Color(0xFFFF5252),
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
+                                }
                             }
-
-                            // Center: App Title
-                            Text(
-                                text = "PureNoteIt",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                            )
-
-                            // Right: View Mode Selector Menu Button
-                            Box {
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Left: Drawer menu button
                                 IconButton(
                                     onClick = {
-                                        focusManager.clearFocus()
-                                        keyboardController?.hide()
-                                        showViewModeMenu = true
+                                        val currentTime = System.currentTimeMillis()
+                                        if (currentTime - lastMenuPressTime > 400L) {
+                                            lastMenuPressTime = currentTime
+                                            focusManager.clearFocus()
+                                            keyboardController?.hide()
+                                            scope.launch {
+                                                if (drawerState.isClosed) {
+                                                    drawerState.open()
+                                                }
+                                            }
+                                        }
                                     },
                                     modifier = Modifier
                                         .size(42.dp)
@@ -787,45 +844,78 @@ fun HomeScreen(
                                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
                                 ) {
                                     Icon(
-                                        painter = painterResource(id = currentViewMode.iconRes),
-                                        contentDescription = stringResource(currentViewMode.titleRes),
-                                        tint = VibrantOrange,
+                                        painter = painterResource(id = R.drawable.menu),
+                                        contentDescription = "Menü",
+                                        tint = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
 
-                                DropdownMenu(
-                                    expanded = showViewModeMenu,
-                                    onDismissRequest = { showViewModeMenu = false },
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(MaterialTheme.colorScheme.surface)
-                                ) {
-                                    for (mode in NotionViewMode.values()) {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(
-                                                        painter = painterResource(id = mode.iconRes),
-                                                        contentDescription = null,
-                                                        tint = if (currentViewMode == mode) VibrantOrange else MaterialTheme.colorScheme.onSurface,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(10.dp))
-                                                    Text(
-                                                        text = stringResource(mode.titleRes),
-                                                        fontWeight = if (currentViewMode == mode) FontWeight.Bold else FontWeight.Normal,
-                                                        color = if (currentViewMode == mode) VibrantOrange else MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                }
-                                            },
-                                            onClick = {
-                                                showViewModeMenu = false
-                                                focusManager.clearFocus()
-                                                keyboardController?.hide()
-                                                currentViewMode = mode
-                                            }
+                                // Center: App Title
+                                Text(
+                                    text = "PureNoteIt",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 20.sp,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                )
+
+                                // Right: View Mode Selector Menu Button
+                                Box {
+                                    IconButton(
+                                        onClick = {
+                                            focusManager.clearFocus()
+                                            keyboardController?.hide()
+                                            showViewModeMenu = true
+                                        },
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(MaterialTheme.colorScheme.surface)
+                                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = currentViewMode.iconRes),
+                                            contentDescription = stringResource(currentViewMode.titleRes),
+                                            tint = VibrantOrange,
+                                            modifier = Modifier.size(20.dp)
                                         )
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = showViewModeMenu,
+                                        onDismissRequest = { showViewModeMenu = false },
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(MaterialTheme.colorScheme.surface)
+                                    ) {
+                                        for (mode in NotionViewMode.values()) {
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            painter = painterResource(id = mode.iconRes),
+                                                            contentDescription = null,
+                                                            tint = if (currentViewMode == mode) VibrantOrange else MaterialTheme.colorScheme.onSurface,
+                                                            modifier = Modifier.size(18.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(10.dp))
+                                                        Text(
+                                                            text = stringResource(mode.titleRes),
+                                                            fontWeight = if (currentViewMode == mode) FontWeight.Bold else FontWeight.Normal,
+                                                            color = if (currentViewMode == mode) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    }
+                                                },
+                                                onClick = {
+                                                    showViewModeMenu = false
+                                                    focusManager.clearFocus()
+                                                    keyboardController?.hide()
+                                                    currentViewMode = mode
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1154,7 +1244,19 @@ fun HomeScreen(
                                         onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
                                         onDeleteClick = { handleSoftDeleteNote(note) },
                                         isCategoryLocked = note.categoryId in lockedCategoryIds,
-                                        searchQuery = searchQuery
+                                        searchQuery = searchQuery,
+                                        isSelectionMode = isSelectionMode,
+                                        isSelected = note.id in selectedNoteIds,
+                                        onToggleSelect = {
+                                            selectedNoteIds = if (note.id in selectedNoteIds) {
+                                                selectedNoteIds - note.id
+                                            } else {
+                                                selectedNoteIds + note.id
+                                            }
+                                        },
+                                        onLongClick = {
+                                            selectedNoteIds = selectedNoteIds + note.id
+                                        }
                                     )
                                 }
 
@@ -1188,7 +1290,19 @@ fun HomeScreen(
                                     onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
                                     onDeleteClick = { handleSoftDeleteNote(note) },
                                     isCategoryLocked = note.categoryId in lockedCategoryIds,
-                                    searchQuery = searchQuery
+                                    searchQuery = searchQuery,
+                                    isSelectionMode = isSelectionMode,
+                                    isSelected = note.id in selectedNoteIds,
+                                    onToggleSelect = {
+                                        selectedNoteIds = if (note.id in selectedNoteIds) {
+                                            selectedNoteIds - note.id
+                                        } else {
+                                            selectedNoteIds + note.id
+                                        }
+                                    },
+                                    onLongClick = {
+                                        selectedNoteIds = selectedNoteIds + note.id
+                                    }
                                 )
                             }
                         }
@@ -1221,7 +1335,7 @@ fun HomeScreen(
             val navBottom = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
             val bottomDockInset = maxOf(imeBottom, navBottom)
 
-            if (currentViewMode != NotionViewMode.STREAM && currentViewMode != NotionViewMode.WHITEBOARD) {
+            if (currentViewMode != NotionViewMode.STREAM && currentViewMode != NotionViewMode.WHITEBOARD && !isSelectionMode) {
                 NotionMobileBottomDock(
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
@@ -1288,6 +1402,20 @@ fun HomeScreen(
                     onClick = {
                         if (SecurityUtil.verifyPassword(context, enteredPin)) {
                             SecurityUtil.unlockVault()
+                            if (pendingBatchLock) {
+                                pendingBatchLock = false
+                                val selectedNotes = activeNotes.filter { it.id in selectedNoteIds }
+                                val shouldLock = selectedNotes.any { it.isPassword != true && !it.isEncrypted }
+                                noteViewModel.batchToggleLock(context, selectedNotes, shouldLock) {
+                                    val msg = if (shouldLock) {
+                                        context.getString(R.string.batch_lock_success, selectedNotes.size)
+                                    } else {
+                                        context.getString(R.string.batch_unlock_success, selectedNotes.size)
+                                    }
+                                    context.showToastShort(msg)
+                                    selectedNoteIds = emptySet()
+                                }
+                            }
                             val targetId = pendingUnlockNoteId
                             showPinDialog = false
                             pendingUnlockNoteId = null
@@ -1308,6 +1436,7 @@ fun HomeScreen(
                     onClick = {
                         showPinDialog = false
                         pendingUnlockNoteId = null
+                        pendingBatchLock = false
                         enteredPin = ""
                     }
                 ) {
@@ -1458,6 +1587,106 @@ fun HomeScreen(
         )
     }
 
+    // Multi-Select Batch Delete Confirmation Dialog
+    if (showBatchDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBatchDeleteConfirm = false },
+            title = {
+                Text(
+                    text = stringResource(R.string.batch_delete_confirm_title),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.batch_delete_confirm_desc, selectedNoteIds.size),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val notesToTrash = activeNotes.filter { it.id in selectedNoteIds }
+                        noteViewModel.batchMoveToTrash(notesToTrash) {
+                            context.showToastShort(context.getString(R.string.batch_delete_success, notesToTrash.size))
+                            selectedNoteIds = emptySet()
+                            showBatchDeleteConfirm = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.yes_delete),
+                        color = PureWhite,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchDeleteConfirm = false }) {
+                    Text(
+                        text = stringResource(R.string.cancel),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    // Vault PIN Required Alert Dialog
+    if (showPinSetupAlert) {
+        AlertDialog(
+            onDismissRequest = { showPinSetupAlert = false },
+            title = {
+                Text(
+                    text = stringResource(R.string.batch_pin_required_title),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.batch_pin_required_desc),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPinSetupAlert = false
+                        onNavigateToPasswordSettings()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = VibrantOrange),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.drawer_settings),
+                        color = PureWhite,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPinSetupAlert = false }) {
+                    Text(
+                        text = stringResource(R.string.cancel),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
     // Vault Backup & Restore Modal Management Center (Feature 5)
     if (showVaultRestoreDialog) {
         VaultBackupRestoreDialog(
@@ -1501,6 +1730,8 @@ fun HomeScreen(
                 isManualReleaseNotesView = isReleaseOnly
                 showUpdateDialog = true
             },
+            onNavigateToPasswordSettings = onNavigateToPasswordSettings,
+            onOpenVaultBackupRestore = { showVaultRestoreDialog = true },
             onDismiss = { showSettingsScreen = false }
         )
     }

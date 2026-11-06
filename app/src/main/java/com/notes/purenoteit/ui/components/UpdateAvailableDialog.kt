@@ -237,27 +237,59 @@ fun UpdateAvailableDialog(
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 160.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                .heightIn(max = 220.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(notesList) { noteItem ->
+                                val (title, description) = parseReleaseNote(noteItem)
+                                val iconRes = resolveReleaseNoteIcon(noteItem)
+
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f))
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .padding(horizontal = 10.dp, vertical = 9.dp),
                                     verticalAlignment = Alignment.Top
                                 ) {
-                                    Text(
-                                        text = "•",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = VibrantOrange,
-                                        modifier = Modifier.padding(end = 6.dp)
-                                    )
-                                    Text(
-                                        text = noteItem,
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-                                        lineHeight = 17.sp
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(VibrantOrange.copy(alpha = 0.12f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = iconRes),
+                                            contentDescription = null,
+                                            tint = VibrantOrange,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        if (title.isNotBlank()) {
+                                            Text(
+                                                text = title,
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                lineHeight = 16.sp
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                        }
+                                        Text(
+                                            text = description,
+                                            fontSize = 11.5.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            lineHeight = 15.sp
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -341,5 +373,49 @@ fun UpdateAvailableDialog(
                 }
             }
         }
+    }
+}
+
+private fun resolveReleaseNoteIcon(text: String): Int {
+    return when {
+        text.contains("Sayfa Dizini", ignoreCase = true) ||
+        text.contains("Page Index", ignoreCase = true) ||
+        text.contains("📑") -> R.drawable.ic_hub_index
+
+        text.contains("Üst Sayfa", ignoreCase = true) ||
+        text.contains("Parent Page", ignoreCase = true) ||
+        text.contains("Hiyerarşi", ignoreCase = true) ||
+        text.contains("📂") -> R.drawable.ic_move_up
+
+        text.contains("Kayan Not", ignoreCase = true) ||
+        text.contains("Sticky", ignoreCase = true) ||
+        text.contains("✨") -> R.drawable.ic_drawer_release_notes
+
+        text.contains("Bağlantı", ignoreCase = true) ||
+        text.contains("Linking", ignoreCase = true) ||
+        text.contains("🔗") -> R.drawable.ic_link_hub
+
+        text.contains("Kilit", ignoreCase = true) ||
+        text.contains("Kasa", ignoreCase = true) ||
+        text.contains("Lock", ignoreCase = true) -> R.drawable.lock
+
+        text.contains("Yedek", ignoreCase = true) ||
+        text.contains("Backup", ignoreCase = true) -> R.drawable.ic_drawer_backup_restore
+
+        else -> R.drawable.ic_drawer_release_notes
+    }
+}
+
+private fun parseReleaseNote(rawText: String): Pair<String, String> {
+    var clean = rawText.trimStart('•', ' ', '-', '*', ':').trim()
+    // Strip any leading emoji or symbol (surrogate pairs or unicode symbols)
+    clean = clean.replace(Regex("^[\\p{So}\\p{Sk}\\p{Cn}\\p{Cs}\\s]+"), "").trim()
+    val colonIdx = clean.indexOf(':')
+    return if (colonIdx > 0) {
+        val title = clean.substring(0, colonIdx).trim()
+        val desc = clean.substring(colonIdx + 1).trim()
+        Pair(title, desc)
+    } else {
+        Pair("", clean)
     }
 }
