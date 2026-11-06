@@ -1,9 +1,12 @@
 package com.notes.purenoteit.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -45,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -89,23 +94,44 @@ fun NotionNoteCard(
     val isProtected = note.isPassword == true || note.isEncrypted || isCategoryLocked
     val haptic = LocalHapticFeedback.current
 
-    val cardScale by animateFloatAsState(
-        targetValue = if (isSelected) 0.95f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "note_card_scale"
+    // Smooth liquid color transitions (Water tint wash)
+    val animatedBgColor by animateColorAsState(
+        targetValue = if (isSelected) VibrantOrange.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+        animationSpec = tween(durationMillis = 260),
+        label = "note_card_bg"
+    )
+
+    val animatedBorderColor by animateColorAsState(
+        targetValue = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+        animationSpec = tween(durationMillis = 260),
+        label = "note_card_border"
+    )
+
+    // Water droplet ripple progression on selection
+    val rippleProgress by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0f,
+        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        label = "water_ripple"
     )
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = cardScale
-                scaleY = cardScale
-            }
             .clip(RoundedCornerShape(20.dp))
+            .drawBehind {
+                if (rippleProgress > 0.01f && rippleProgress < 0.99f) {
+                    val originX = size.width - 24.dp.toPx()
+                    val originY = 24.dp.toPx()
+                    val maxRadius = size.width.coerceAtLeast(size.height) * 1.15f
+                    val currentRadius = rippleProgress * maxRadius
+                    val alpha = (1f - rippleProgress) * 0.22f
+                    drawCircle(
+                        color = VibrantOrange.copy(alpha = alpha),
+                        radius = currentRadius,
+                        center = Offset(originX, originY)
+                    )
+                }
+            }
             .combinedClickable(
                 onClick = {
                     if (isSelectionMode) {
@@ -126,13 +152,13 @@ fun NotionNoteCard(
             ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) VibrantOrange.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
+            containerColor = animatedBgColor
         ),
         border = BorderStroke(
-            if (isSelected) 2.dp else 1.dp,
-            if (isSelected) VibrantOrange else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            if (isSelected) 1.5.dp else 1.dp,
+            animatedBorderColor
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 3.dp else 1.5.dp)
     ) {
         Column(
             modifier = Modifier
@@ -168,15 +194,28 @@ fun NotionNoteCard(
                     }
 
                     if (isSelectionMode) {
-                        // Multi-selection checkmark badge with sweet bouncy spring animation
+                        // Multi-selection checkmark bead with water droplet spring bounce
+                        val badgeScale by animateFloatAsState(
+                            targetValue = if (isSelected) 1f else 0.82f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "badge_scale"
+                        )
+
                         Box(
                             modifier = Modifier
                                 .size(24.dp)
+                                .graphicsLayer {
+                                    scaleX = badgeScale
+                                    scaleY = badgeScale
+                                }
                                 .clip(CircleShape)
-                                .background(if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                                .background(if (isSelected) VibrantOrange else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
                                 .border(
-                                    1.5.dp,
-                                    if (isSelected) VibrantOrange else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f),
+                                    1.2.dp,
+                                    if (isSelected) VibrantOrange else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
                                     CircleShape
                                 ),
                             contentAlignment = Alignment.Center

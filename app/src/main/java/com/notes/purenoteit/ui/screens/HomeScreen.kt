@@ -11,6 +11,9 @@ import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -714,14 +717,14 @@ fun HomeScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         if (isSelectionMode) {
-                            // Multi-Select Batch Action Bar
+                            // Clean Multi-Select Header Bar (Count & Quick Select All)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(16.dp))
                                     .background(MaterialTheme.colorScheme.surface)
-                                    .border(1.dp, VibrantOrange.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
-                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -741,77 +744,41 @@ fun HomeScreen(
                                     Text(
                                         text = stringResource(R.string.batch_selected_count, selectedNoteIds.size),
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 14.5.sp,
+                                        fontSize = 15.sp,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
 
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    val currentVisibleIds = remember(filteredNotes) { filteredNotes.map { it.id }.toSet() }
-                                    val isAllSelected = currentVisibleIds.isNotEmpty() && selectedNoteIds.containsAll(currentVisibleIds)
+                                val currentVisibleIds = remember(filteredNotes) { filteredNotes.map { it.id }.toSet() }
+                                val isAllSelected = currentVisibleIds.isNotEmpty() && selectedNoteIds.containsAll(currentVisibleIds)
 
-                                    // Select All Toggle Button
-                                    IconButton(
-                                        onClick = {
+                                // Quick Select All Chip with Icon and Label
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
                                             selectedNoteIds = if (isAllSelected) emptySet() else currentVisibleIds
                                         },
-                                        modifier = Modifier.size(36.dp)
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isAllSelected) VibrantOrange.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    border = BorderStroke(1.dp, if (isAllSelected) VibrantOrange else Color.Transparent)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(
                                             painter = painterResource(id = R.drawable.ic_checklist),
-                                            contentDescription = if (isAllSelected) stringResource(R.string.batch_deselect_all) else stringResource(R.string.batch_select_all),
+                                            contentDescription = null,
                                             tint = if (isAllSelected) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(16.dp)
                                         )
-                                    }
-
-                                    // Batch Lock/Unlock Button
-                                    IconButton(
-                                        onClick = {
-                                            if (!SecurityUtil.isPasswordSet(context)) {
-                                                showPinSetupAlert = true
-                                            } else {
-                                                val selectedNotes = activeNotes.filter { it.id in selectedNoteIds }
-                                                val shouldLock = selectedNotes.any { it.isPassword != true && !it.isEncrypted }
-                                                if (!SecurityUtil.isVaultUnlocked) {
-                                                    pendingBatchLock = true
-                                                    showPinDialog = true
-                                                } else {
-                                                    noteViewModel.batchToggleLock(context, selectedNotes, shouldLock) {
-                                                        val msg = if (shouldLock) {
-                                                            context.getString(R.string.batch_lock_success, selectedNotes.size)
-                                                        } else {
-                                                            context.getString(R.string.batch_unlock_success, selectedNotes.size)
-                                                        }
-                                                        context.showToastShort(msg)
-                                                        selectedNoteIds = emptySet()
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.lock),
-                                            contentDescription = stringResource(R.string.batch_lock_notes),
-                                            tint = VibrantOrange,
-                                            modifier = Modifier.size(19.dp)
-                                        )
-                                    }
-
-                                    // Batch Delete Button
-                                    IconButton(
-                                        onClick = { showBatchDeleteConfirm = true },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.delete),
-                                            contentDescription = stringResource(R.string.batch_delete_notes),
-                                            tint = Color(0xFFFF5252),
-                                            modifier = Modifier.size(19.dp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isAllSelected) stringResource(R.string.batch_deselect_all) else stringResource(R.string.batch_select_all),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isAllSelected) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -1362,6 +1329,134 @@ fun HomeScreen(
                         .padding(bottom = bottomDockInset + 6.dp)
                         .padding(horizontal = 16.dp)
                 )
+            }
+
+            // Multi-Select Dedicated Bottom Action Dock (Thumb-Friendly, Clear & Labeled)
+            AnimatedVisibility(
+                visible = isSelectionMode,
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f)
+                ) + fadeIn(),
+                exit = slideOutVertically(
+                    targetOffsetY = { it }
+                ) + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = bottomDockInset + 8.dp)
+                    .padding(horizontal = 24.dp)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp)),
+                    shape = RoundedCornerShape(22.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 8.dp,
+                    shadowElevation = 8.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 1. Toplu Şifrele Button
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    if (!SecurityUtil.isPasswordSet(context)) {
+                                        showPinSetupAlert = true
+                                    } else {
+                                        val selectedNotes = activeNotes.filter { it.id in selectedNoteIds }
+                                        val shouldLock = selectedNotes.any { it.isPassword != true && !it.isEncrypted }
+                                        if (!SecurityUtil.isVaultUnlocked) {
+                                            pendingBatchLock = true
+                                            showPinDialog = true
+                                        } else {
+                                            noteViewModel.batchToggleLock(context, selectedNotes, shouldLock) {
+                                                val msg = if (shouldLock) {
+                                                    context.getString(R.string.batch_lock_success, selectedNotes.size)
+                                                } else {
+                                                    context.getString(R.string.batch_unlock_success, selectedNotes.size)
+                                                }
+                                                context.showToastShort(msg)
+                                                selectedNoteIds = emptySet()
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(horizontal = 20.dp, vertical = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(VibrantOrange.copy(alpha = 0.14f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.lock),
+                                    contentDescription = stringResource(R.string.batch_lock_notes),
+                                    tint = VibrantOrange,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.batch_lock_notes),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Elegant Vertical Divider
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(36.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                        )
+
+                        // 2. Toplu Sil Button (Red)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    showBatchDeleteConfirm = true
+                                }
+                                .padding(horizontal = 20.dp, vertical = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFFFFEBEE)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.delete),
+                                    contentDescription = stringResource(R.string.batch_delete_notes),
+                                    tint = Color(0xFFD32F2F),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.batch_delete_notes),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFD32F2F)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
