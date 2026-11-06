@@ -691,14 +691,14 @@ fun HomeScreen(
 
                     // Footer
                     Text(
-                        text = "PureNoteIt v${AppUpdateHelper.getCurrentVersionName(context)}\nModern & Yumuşak Tasarım",
+                        text = "PureNoteIt v${AppUpdateHelper.getCurrentVersionName(context)}\nfrom Pandafy",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         lineHeight = 16.sp,
                         modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(36.dp))
                 }
             }
         }
