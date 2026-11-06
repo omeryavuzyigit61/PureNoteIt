@@ -8,11 +8,20 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -207,6 +216,8 @@ fun HomeScreen(
     val streamItems by noteViewModel.streamItems.observeAsState(emptyList())
 
     var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var prevCategoryIndex by remember { mutableIntStateOf(0) }
+    var categoryTransitionDirection by remember { mutableIntStateOf(1) } // 1: right/forward, -1: left/backward
     var searchQuery by remember { mutableStateOf("") }
     var currentViewMode by remember { mutableStateOf(NotionViewMode.GRID) }
     var isSearchFocused by remember { mutableStateOf(false) }
@@ -398,14 +409,14 @@ fun HomeScreen(
         }.toSet()
     }
 
-    // Filter notes
-    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles, subpageIds, selectedSmartFilter, lockedCategoryIds) {
-        activeNotes.filter { note ->
+    // Helper function to compute filtered notes for a given category (used for directional animation)
+    fun computeFilteredNotesForCategory(targetCat: String?): List<NoteData> {
+        return activeNotes.filter { note ->
             val isNoteProtected = note.isPassword == true || note.isEncrypted || (note.categoryId in lockedCategoryIds)
-            val matchesCategory = if (selectedCategory == null) {
+            val matchesCategory = if (targetCat == null) {
                 true
             } else {
-                val cat = categoryList.find { it.name == selectedCategory }
+                val cat = categoryList.find { it.name == targetCat }
                 note.categoryId == cat?.id
             }
             val matchesQuery = if (searchQuery.isBlank()) {
@@ -456,6 +467,11 @@ fun HomeScreen(
 
             matchesCategory && matchesQuery && matchesHashtag && matchesSubpageHierarchy && matchesSmartFilter
         }
+    }
+
+    // Filter notes
+    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles, subpageIds, selectedSmartFilter, lockedCategoryIds) {
+        computeFilteredNotesForCategory(selectedCategory)
     }
 
     val pinnedNotes = remember(filteredNotes) { filteredNotes.filter { it.isPinned } }
@@ -1014,16 +1030,21 @@ fun HomeScreen(
                                     onClick = {
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
+                                        if (selectedCategory != null) {
+                                            categoryTransitionDirection = -1
+                                            prevCategoryIndex = 0
+                                        }
                                         selectedCategory = null
                                         selectedSmartFilter = SmartFilter.ALL
                                         selectedHashtag = null
                                     }
                                 )
 
-                                categoryList.forEach { category ->
+                                categoryList.forEachIndexed { index, category ->
                                     val catCount = remember(activeNotes, category.id) {
                                         activeNotes.count { it.categoryId == category.id }
                                     }
+                                    val targetIndex = index + 1
                                     CategoryChip(
                                         label = category.name,
                                         isSelected = selectedCategory == category.name,
@@ -1033,7 +1054,15 @@ fun HomeScreen(
                                         onClick = {
                                             focusManager.clearFocus()
                                             keyboardController?.hide()
-                                            selectedCategory = if (selectedCategory == category.name) null else category.name
+                                            if (selectedCategory == category.name) {
+                                                categoryTransitionDirection = -1
+                                                prevCategoryIndex = 0
+                                                selectedCategory = null
+                                            } else {
+                                                categoryTransitionDirection = if (targetIndex >= prevCategoryIndex) 1 else -1
+                                                prevCategoryIndex = targetIndex
+                                                selectedCategory = category.name
+                                            }
                                         }
                                     )
                                 }
@@ -1109,127 +1138,248 @@ fun HomeScreen(
                 }
 
                 NotionViewMode.LIST -> {
-                    if (filteredNotes.isEmpty()) {
-                        EmptyStateContent(
-                            searchQuery = searchQuery,
-                            onNavigateToAddNote = onNavigateToAddNote,
-                            paddingValues = paddingValues
-                        )
-                    } else {
-                        NotionListView(
-                            notes = filteredNotes,
-                            categories = categoryList,
-                            onNoteClick = handleNoteClick,
-                            onPinClick = { note -> noteViewModel.togglePinStatus(note.id, note.isPinned) },
-                            onDeleteClick = { note -> handleSoftDeleteNote(note) },
-                            onStatusChange = { note, newStatus -> noteViewModel.updateNoteStatus(note, newStatus) },
-                            searchQuery = searchQuery,
-                            modifier = Modifier.padding(paddingValues)
-                        )
+                    AnimatedContent(
+                        targetState = selectedCategory,
+                        transitionSpec = {
+                            val categorySpringSpec = spring<IntOffset>(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                            if (categoryTransitionDirection > 0) {
+                                (slideInHorizontally(animationSpec = categorySpringSpec) { fullWidth -> (fullWidth * 0.35f).toInt() } +
+                                        fadeIn(animationSpec = tween(220))).togetherWith(
+                                    slideOutHorizontally(animationSpec = tween(180)) { fullWidth -> (-fullWidth * 0.35f).toInt() } +
+                                            fadeOut(animationSpec = tween(180))
+                                )
+                            } else {
+                                (slideInHorizontally(animationSpec = categorySpringSpec) { fullWidth -> (-fullWidth * 0.35f).toInt() } +
+                                        fadeIn(animationSpec = tween(220))).togetherWith(
+                                    slideOutHorizontally(animationSpec = tween(180)) { fullWidth -> (fullWidth * 0.35f).toInt() } +
+                                            fadeOut(animationSpec = tween(180))
+                                )
+                            }
+                        },
+                        label = "CategoryListTransition"
+                    ) { targetCat ->
+                        val currentCategoryNotes = remember(
+                            targetCat,
+                            activeNotes,
+                            searchQuery,
+                            selectedHashtag,
+                            subpageTitles,
+                            subpageIds,
+                            selectedSmartFilter,
+                            lockedCategoryIds
+                        ) {
+                            computeFilteredNotesForCategory(targetCat)
+                        }
+
+                        if (currentCategoryNotes.isEmpty()) {
+                            EmptyStateContent(
+                                searchQuery = searchQuery,
+                                onNavigateToAddNote = onNavigateToAddNote,
+                                paddingValues = paddingValues
+                            )
+                        } else {
+                            NotionListView(
+                                notes = currentCategoryNotes,
+                                categories = categoryList,
+                                onNoteClick = handleNoteClick,
+                                onPinClick = { note -> noteViewModel.togglePinStatus(note.id, note.isPinned) },
+                                onDeleteClick = { note -> handleSoftDeleteNote(note) },
+                                onStatusChange = { note, newStatus -> noteViewModel.updateNoteStatus(note, newStatus) },
+                                searchQuery = searchQuery,
+                                modifier = Modifier.padding(paddingValues)
+                            )
+                        }
                     }
                 }
 
                 NotionViewMode.GRID -> {
-                    if (filteredNotes.isEmpty()) {
-                        EmptyStateContent(
-                            searchQuery = searchQuery,
-                            onNavigateToAddNote = onNavigateToAddNote,
-                            paddingValues = paddingValues
-                        )
-                    } else {
-                        val staggeredGridState = rememberLazyStaggeredGridState()
-                        LaunchedEffect(staggeredGridState.isScrollInProgress) {
-                            if (staggeredGridState.isScrollInProgress) {
-                                focusManager.clearFocus()
-                                keyboardController?.hide()
+                    AnimatedContent(
+                        targetState = selectedCategory,
+                        transitionSpec = {
+                            val categorySpringSpec = spring<IntOffset>(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                            if (categoryTransitionDirection > 0) {
+                                (slideInHorizontally(animationSpec = categorySpringSpec) { fullWidth -> (fullWidth * 0.35f).toInt() } +
+                                        fadeIn(animationSpec = tween(220))).togetherWith(
+                                    slideOutHorizontally(animationSpec = tween(180)) { fullWidth -> (-fullWidth * 0.35f).toInt() } +
+                                            fadeOut(animationSpec = tween(180))
+                                )
+                            } else {
+                                (slideInHorizontally(animationSpec = categorySpringSpec) { fullWidth -> (-fullWidth * 0.35f).toInt() } +
+                                        fadeIn(animationSpec = tween(220))).togetherWith(
+                                    slideOutHorizontally(animationSpec = tween(180)) { fullWidth -> (fullWidth * 0.35f).toInt() } +
+                                            fadeOut(animationSpec = tween(180))
+                                )
                             }
-                        }
-
-                        LazyVerticalStaggeredGrid(
-                            state = staggeredGridState,
-                            columns = StaggeredGridCells.Fixed(2),
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(paddingValues)
-                                .padding(horizontal = 12.dp),
-                            verticalItemSpacing = 10.dp,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)
+                        },
+                        label = "CategoryGridTransition"
+                    ) { targetCat ->
+                        val currentCategoryNotes = remember(
+                            targetCat,
+                            activeNotes,
+                            searchQuery,
+                            selectedHashtag,
+                            subpageTitles,
+                            subpageIds,
+                            selectedSmartFilter,
+                            lockedCategoryIds
                         ) {
-                            // Notion Mobile: "Son Kullanılanlar" (Recents) Cover Carousel (Görsel 5)
-                            if (searchQuery.isBlank() && filteredNotes.isNotEmpty()) {
-                                item(span = StaggeredGridItemSpan.FullLine) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 10.dp)
-                                    ) {
-                                        Row(
+                            computeFilteredNotesForCategory(targetCat)
+                        }
+                        val currentPinnedNotes = remember(currentCategoryNotes) { currentCategoryNotes.filter { it.isPinned } }
+                        val currentRegularNotes = remember(currentCategoryNotes) { currentCategoryNotes.filter { !it.isPinned } }
+
+                        if (currentCategoryNotes.isEmpty()) {
+                            EmptyStateContent(
+                                searchQuery = searchQuery,
+                                onNavigateToAddNote = onNavigateToAddNote,
+                                paddingValues = paddingValues
+                            )
+                        } else {
+                            val staggeredGridState = rememberLazyStaggeredGridState()
+                            LaunchedEffect(staggeredGridState.isScrollInProgress) {
+                                if (staggeredGridState.isScrollInProgress) {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                }
+                            }
+
+                            LazyVerticalStaggeredGrid(
+                                state = staggeredGridState,
+                                columns = StaggeredGridCells.Fixed(2),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(paddingValues)
+                                    .padding(horizontal = 12.dp),
+                                verticalItemSpacing = 10.dp,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)
+                            ) {
+                                // Notion Mobile: "Son Kullanılanlar" (Recents) Cover Carousel (Görsel 5)
+                                if (searchQuery.isBlank() && currentCategoryNotes.isNotEmpty()) {
+                                    item(span = StaggeredGridItemSpan.FullLine) {
+                                        Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 4.dp, vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                .padding(bottom = 10.dp)
                                         ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = "Son Kullanılanlar",
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(
-                                                    text = "›",
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                                )
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = "Son Kullanılanlar",
+                                                        fontSize = 13.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = "›",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                                    )
+                                                }
                                             }
-                                        }
 
-                                        LazyRow(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
-                                        ) {
-                                            val recentList = filteredNotes.take(6)
-                                            items(recentList, key = { "recent_${it.id}" }) { note ->
-                                                NotionRecentCoverCard(
-                                                    note = note,
-                                                    categoryList = categoryList,
-                                                    onClick = { handleNoteClick(note) },
-                                                    isDark = isDarkTheme
-                                                )
+                                            LazyRow(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
+                                            ) {
+                                                val recentList = currentCategoryNotes.take(6)
+                                                items(recentList, key = { "recent_${it.id}" }) { note ->
+                                                    NotionRecentCoverCard(
+                                                        note = note,
+                                                        categoryList = categoryList,
+                                                        onClick = { handleNoteClick(note) },
+                                                        isDark = isDarkTheme
+                                                    )
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            if (pinnedNotes.isNotEmpty()) {
-                                item(span = StaggeredGridItemSpan.FullLine) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.ic_pin),
-                                            contentDescription = null,
-                                            tint = VibrantOrange,
-                                            modifier = Modifier.size(14.dp)
+                                if (currentPinnedNotes.isNotEmpty()) {
+                                    item(span = StaggeredGridItemSpan.FullLine) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.ic_pin),
+                                                contentDescription = null,
+                                                tint = VibrantOrange,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = stringResource(R.string.pinned_notes),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    items(currentPinnedNotes, key = { it.id }) { note ->
+                                        NotionNoteCard(
+                                            note = note,
+                                            onClick = { handleNoteClick(note) },
+                                            onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
+                                            onDeleteClick = { handleSoftDeleteNote(note) },
+                                            isCategoryLocked = note.categoryId in lockedCategoryIds,
+                                            searchQuery = searchQuery,
+                                            isSelectionMode = isSelectionMode,
+                                            isSelected = note.id in selectedNoteIds,
+                                            onToggleSelect = {
+                                                selectedNoteIds = if (note.id in selectedNoteIds) {
+                                                    selectedNoteIds - note.id
+                                                } else {
+                                                    selectedNoteIds + note.id
+                                                }
+                                            },
+                                            onLongClick = {
+                                                selectedNoteIds = selectedNoteIds + note.id
+                                            }
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+
+                                    if (currentRegularNotes.isNotEmpty()) {
+                                        item(span = StaggeredGridItemSpan.FullLine) {
+                                            Text(
+                                                text = "Tüm Notlar",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(top = 10.dp, bottom = 4.dp, start = 4.dp)
+                                            )
+                                        }
+                                    }
+                                } else if (searchQuery.isBlank() && currentCategoryNotes.isNotEmpty()) {
+                                    item(span = StaggeredGridItemSpan.FullLine) {
                                         Text(
-                                            text = stringResource(R.string.pinned_notes),
+                                            text = "Tüm Notlar",
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
                                         )
                                     }
                                 }
 
-                                items(pinnedNotes, key = { it.id }) { note ->
+                                items(currentRegularNotes, key = { it.id }) { note ->
                                     NotionNoteCard(
                                         note = note,
                                         onClick = { handleNoteClick(note) },
@@ -1251,51 +1401,6 @@ fun HomeScreen(
                                         }
                                     )
                                 }
-
-                                if (regularNotes.isNotEmpty()) {
-                                    item(span = StaggeredGridItemSpan.FullLine) {
-                                        Text(
-                                            text = "Tüm Notlar",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp, start = 4.dp)
-                                        )
-                                    }
-                                }
-                            } else if (searchQuery.isBlank() && filteredNotes.isNotEmpty()) {
-                                item(span = StaggeredGridItemSpan.FullLine) {
-                                    Text(
-                                        text = "Tüm Notlar",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
-                                    )
-                                }
-                            }
-
-                            items(regularNotes, key = { it.id }) { note ->
-                                NotionNoteCard(
-                                    note = note,
-                                    onClick = { handleNoteClick(note) },
-                                    onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
-                                    onDeleteClick = { handleSoftDeleteNote(note) },
-                                    isCategoryLocked = note.categoryId in lockedCategoryIds,
-                                    searchQuery = searchQuery,
-                                    isSelectionMode = isSelectionMode,
-                                    isSelected = note.id in selectedNoteIds,
-                                    onToggleSelect = {
-                                        selectedNoteIds = if (note.id in selectedNoteIds) {
-                                            selectedNoteIds - note.id
-                                        } else {
-                                            selectedNoteIds + note.id
-                                        }
-                                    },
-                                    onLongClick = {
-                                        selectedNoteIds = selectedNoteIds + note.id
-                                    }
-                                )
                             }
                         }
                     }
