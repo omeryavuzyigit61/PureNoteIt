@@ -138,6 +138,7 @@ import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
+import com.notes.purenoteit.ui.components.GlassyCategoryBar
 import com.notes.purenoteit.ui.components.LanguageSelectionSheet
 import com.notes.purenoteit.ui.components.ModernNoteIconBadge
 import com.notes.purenoteit.ui.components.NotionCalendarView
@@ -1030,13 +1031,15 @@ fun HomeScreen(
                                     }
                                 }
 
-                                // 3. Hızlı Kategori Seçimi (Tüm Kategoriler + Kategori Çipleri)
-                                val isAllSelected = selectedCategory == null && selectedSmartFilter == SmartFilter.ALL && selectedHashtag == null
-                                CategoryChip(
-                                    label = stringResource(R.string.all_categories),
-                                    isSelected = isAllSelected,
-                                    count = activeNotes.size,
-                                    onClick = {
+                                // 3. Hızlı Kategori Seçimi (Glassy Navigation Tabs V7 - 3D Door Flip & Cam Efekti)
+                                GlassyCategoryBar(
+                                    categories = sortedCategories,
+                                    selectedCategory = if (selectedSmartFilter == SmartFilter.ALL && selectedHashtag == null) selectedCategory else "__CUSTOM_FILTER__",
+                                    totalNotesCount = activeNotes.size,
+                                    activeNotes = activeNotes,
+                                    isDarkTheme = isDarkTheme,
+                                    getCategoryDotColor = { catName -> getCategoryDotColor(catName) },
+                                    onAllSelected = {
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
                                         if (selectedCategory != null) {
@@ -1046,35 +1049,22 @@ fun HomeScreen(
                                         selectedCategory = null
                                         selectedSmartFilter = SmartFilter.ALL
                                         selectedHashtag = null
+                                    },
+                                    onCategorySelected = { catName, isSame ->
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        val targetIndex = sortedCategories.indexOfFirst { it.name == catName } + 1
+                                        if (isSame) {
+                                            categoryTransitionDirection = -1
+                                            prevCategoryIndex = 0
+                                            selectedCategory = null
+                                        } else {
+                                            categoryTransitionDirection = if (targetIndex >= prevCategoryIndex) 1 else -1
+                                            prevCategoryIndex = targetIndex
+                                            selectedCategory = catName
+                                        }
                                     }
                                 )
-
-                                sortedCategories.forEachIndexed { index, category ->
-                                    val catCount = remember(activeNotes, category.id) {
-                                        activeNotes.count { it.categoryId == category.id }
-                                    }
-                                    val targetIndex = index + 1
-                                    CategoryChip(
-                                        label = category.name,
-                                        isSelected = selectedCategory == category.name,
-                                        isLocked = category.isPassword == true,
-                                        count = catCount,
-                                        dotColor = getCategoryDotColor(category.name),
-                                        onClick = {
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                            if (selectedCategory == category.name) {
-                                                categoryTransitionDirection = -1
-                                                prevCategoryIndex = 0
-                                                selectedCategory = null
-                                            } else {
-                                                categoryTransitionDirection = if (targetIndex >= prevCategoryIndex) 1 else -1
-                                                prevCategoryIndex = targetIndex
-                                                selectedCategory = category.name
-                                            }
-                                        }
-                                    )
-                                }
                             }
                         }
                     }
