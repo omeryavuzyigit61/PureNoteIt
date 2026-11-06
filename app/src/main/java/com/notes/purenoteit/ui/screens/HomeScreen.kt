@@ -1346,114 +1346,94 @@ fun HomeScreen(
                     .padding(bottom = bottomDockInset + 8.dp)
                     .padding(horizontal = 24.dp)
             ) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(22.dp)),
-                    shape = RoundedCornerShape(22.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 8.dp,
-                    shadowElevation = 8.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        shape = RoundedCornerShape(26.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 6.dp,
+                        shadowElevation = 8.dp,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     ) {
-                        // 1. Toplu Şifrele Button
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    if (!SecurityUtil.isPasswordSet(context)) {
-                                        showPinSetupAlert = true
-                                    } else {
-                                        val selectedNotes = activeNotes.filter { it.id in selectedNoteIds }
-                                        val shouldLock = selectedNotes.any { it.isPassword != true && !it.isEncrypted }
-                                        if (!SecurityUtil.isVaultUnlocked) {
-                                            pendingBatchLock = true
-                                            showPinDialog = true
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 1. Şifrele Pill Button
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable {
+                                        if (!SecurityUtil.isPasswordSet(context)) {
+                                            showPinSetupAlert = true
                                         } else {
-                                            noteViewModel.batchToggleLock(context, selectedNotes, shouldLock) {
-                                                val msg = if (shouldLock) {
-                                                    context.getString(R.string.batch_lock_success, selectedNotes.size)
-                                                } else {
-                                                    context.getString(R.string.batch_unlock_success, selectedNotes.size)
+                                            val selectedNotes = activeNotes.filter { it.id in selectedNoteIds }
+                                            val shouldLock = selectedNotes.any { it.isPassword != true && !it.isEncrypted }
+                                            if (!SecurityUtil.isVaultUnlocked) {
+                                                pendingBatchLock = true
+                                                showPinDialog = true
+                                            } else {
+                                                noteViewModel.batchToggleLock(context, selectedNotes, shouldLock) {
+                                                    val msg = if (shouldLock) {
+                                                        context.getString(R.string.batch_lock_success, selectedNotes.size)
+                                                    } else {
+                                                        context.getString(R.string.batch_unlock_success, selectedNotes.size)
+                                                    }
+                                                    context.showToastShort(msg)
+                                                    selectedNoteIds = emptySet()
                                                 }
-                                                context.showToastShort(msg)
-                                                selectedNoteIds = emptySet()
                                             }
                                         }
                                     }
-                                }
-                                .padding(horizontal = 20.dp, vertical = 6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(VibrantOrange.copy(alpha = 0.14f)),
-                                contentAlignment = Alignment.Center
+                                    .background(VibrantOrange.copy(alpha = 0.12f))
+                                    .padding(horizontal = 16.dp, vertical = 9.dp)
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.lock),
                                     contentDescription = stringResource(R.string.batch_lock_notes),
                                     tint = VibrantOrange,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(modifier = Modifier.width(7.dp))
+                                Text(
+                                    text = stringResource(R.string.lock),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VibrantOrange
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.batch_lock_notes),
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
 
-                        // Elegant Vertical Divider
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(36.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                        )
+                            Spacer(modifier = Modifier.width(8.dp))
 
-                        // 2. Toplu Sil Button (Red)
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    showBatchDeleteConfirm = true
-                                }
-                                .padding(horizontal = 20.dp, vertical = 6.dp)
-                        ) {
-                            Box(
+                            // 2. Sil Pill Button
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFFFFEBEE)),
-                                contentAlignment = Alignment.Center
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable {
+                                        showBatchDeleteConfirm = true
+                                    }
+                                    .background(Color(0xFFFFEBEE))
+                                    .padding(horizontal = 16.dp, vertical = 9.dp)
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.delete),
                                     contentDescription = stringResource(R.string.batch_delete_notes),
                                     tint = Color(0xFFD32F2F),
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(modifier = Modifier.width(7.dp))
+                                Text(
+                                    text = stringResource(R.string.delete),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFD32F2F)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.batch_delete_notes),
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFD32F2F)
-                            )
                         }
                     }
                 }

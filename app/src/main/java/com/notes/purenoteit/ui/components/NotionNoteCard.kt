@@ -41,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,9 +95,30 @@ fun NotionNoteCard(
     val isProtected = note.isPassword == true || note.isEncrypted || isCategoryLocked
     val haptic = LocalHapticFeedback.current
 
+    // Gentle tactile micro-wiggle when selected
+    val wiggleRotation = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(isSelected) {
+        if (isSelected) {
+            wiggleRotation.snapTo(0f)
+            wiggleRotation.animateTo(
+                targetValue = 0f,
+                animationSpec = androidx.compose.animation.core.keyframes {
+                    durationMillis = 280
+                    0f at 0
+                    -2.0f at 60 using FastOutSlowInEasing
+                    1.8f at 130 using FastOutSlowInEasing
+                    -0.8f at 200 using FastOutSlowInEasing
+                    0f at 280 using FastOutSlowInEasing
+                }
+            )
+        } else {
+            wiggleRotation.snapTo(0f)
+        }
+    }
+
     // Smooth liquid color transitions (Water tint wash)
     val animatedBgColor by animateColorAsState(
-        targetValue = if (isSelected) VibrantOrange.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+        targetValue = if (isSelected) Color(0xFFFFF7EE) else MaterialTheme.colorScheme.surface,
         animationSpec = tween(durationMillis = 260),
         label = "note_card_bg"
     )
@@ -107,30 +129,18 @@ fun NotionNoteCard(
         label = "note_card_border"
     )
 
-    // Water droplet ripple progression on selection
+    // Gentle water droplet ripple progression, constrained strictly inside the card
     val rippleProgress by animateFloatAsState(
         targetValue = if (isSelected) 1f else 0f,
-        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
         label = "water_ripple"
     )
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .drawBehind {
-                if (rippleProgress > 0.01f && rippleProgress < 0.99f) {
-                    val originX = size.width - 24.dp.toPx()
-                    val originY = 24.dp.toPx()
-                    val maxRadius = size.width.coerceAtLeast(size.height) * 1.15f
-                    val currentRadius = rippleProgress * maxRadius
-                    val alpha = (1f - rippleProgress) * 0.22f
-                    drawCircle(
-                        color = VibrantOrange.copy(alpha = alpha),
-                        radius = currentRadius,
-                        center = Offset(originX, originY)
-                    )
-                }
+            .graphicsLayer {
+                rotationZ = wiggleRotation.value
             }
             .combinedClickable(
                 onClick = {
@@ -155,16 +165,34 @@ fun NotionNoteCard(
             containerColor = animatedBgColor
         ),
         border = BorderStroke(
-            if (isSelected) 1.5.dp else 1.dp,
+            if (isSelected) 2.dp else 1.dp,
             animatedBorderColor
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 3.dp else 1.5.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp)
+                .drawBehind {
+                    if (rippleProgress > 0.01f && rippleProgress < 0.99f) {
+                        val originX = size.width - 24.dp.toPx()
+                        val originY = 24.dp.toPx()
+                        val maxRadius = size.width * 0.75f
+                        val currentRadius = rippleProgress * maxRadius
+                        val alpha = (1f - rippleProgress) * 0.15f
+                        drawCircle(
+                            color = VibrantOrange.copy(alpha = alpha),
+                            radius = currentRadius,
+                            center = Offset(originX, originY)
+                        )
+                    }
+                }
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp)
+            ) {
             // Top Row: Primary Icon/Emoji, Pin indicator & Menu button
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -706,4 +734,5 @@ fun NotionNoteCard(
             }
         }
     }
+}
 }
