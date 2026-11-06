@@ -344,6 +344,14 @@ fun HomeScreen(
         noteList.filter { it.status == "TRASH" }
     }
 
+    // Sort categories dynamically by note count (descending) then by name
+    val sortedCategories = remember(categoryList, activeNotes) {
+        categoryList.sortedWith(
+            compareByDescending<CategoryData> { cat -> activeNotes.count { it.categoryId == cat.id } }
+                .thenBy { it.name }
+        )
+    }
+
     // Dynamic Trash Retention Auto-Purge (Configurable in Settings)
     LaunchedEffect(trashedNotes.size) {
         val prefs = SharedPrefencesUtil(context)
@@ -1040,7 +1048,7 @@ fun HomeScreen(
                                     }
                                 )
 
-                                categoryList.forEachIndexed { index, category ->
+                                sortedCategories.forEachIndexed { index, category ->
                                     val catCount = remember(activeNotes, category.id) {
                                         activeNotes.count { it.categoryId == category.id }
                                     }
@@ -2072,11 +2080,16 @@ fun HomeScreen(
                         isSelected = selectedCategory == null,
                         onClick = { selectedCategory = null }
                     )
-                    categoryList.forEach { cat ->
+                    sortedCategories.forEach { cat ->
+                        val catCount = remember(activeNotes, cat.id) {
+                            activeNotes.count { it.categoryId == cat.id }
+                        }
                         CategoryChip(
                             label = cat.name,
                             isSelected = selectedCategory == cat.name,
                             isLocked = cat.isPassword == true,
+                            count = catCount,
+                            dotColor = getCategoryDotColor(cat.name),
                             onClick = {
                                 selectedCategory = if (selectedCategory == cat.name) null else cat.name
                             }
