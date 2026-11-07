@@ -862,19 +862,19 @@ fun HomeScreen(
                                         }
                                     },
                                     modifier = Modifier
-                                        .size(42.dp)
+                                        .size(46.dp)
                                         .graphicsLayer {
                                             scaleX = menuIconScale.value
                                             scaleY = menuIconScale.value
                                         }
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(13.dp))
                                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 ) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_menu_notion_bars),
                                         contentDescription = "Menü",
                                         tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
 
@@ -924,20 +924,20 @@ fun HomeScreen(
                                             showViewModeMenu = true
                                         },
                                         modifier = Modifier
-                                            .size(42.dp)
+                                            .size(46.dp)
                                             .graphicsLayer {
                                                 scaleX = viewIconScale.value
                                                 scaleY = viewIconScale.value
                                                 rotationZ = animatedViewIconRotation
                                             }
-                                            .clip(RoundedCornerShape(12.dp))
+                                            .clip(RoundedCornerShape(13.dp))
                                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                     ) {
                                         Icon(
                                             painter = painterResource(id = currentViewMode.iconRes),
                                             contentDescription = stringResource(currentViewMode.titleRes),
                                             tint = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(23.dp)
                                         )
                                     }
 
