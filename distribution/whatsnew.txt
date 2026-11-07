@@ -1,0 +1,19 @@
+<tr-TR>
+PureNoteIt v1.1.1 ile güvenliği ve performansı zirveye taşıdık!
+
+🔒 SQLCipher 4.20.0: Veritabanı 256-bit AES ile disk düzeyinde şifrelendi.
+🛡️ Android Keystore & Biyometri: Donanım anahtarlı kasa koruması.
+🧭 Tip Güvenli Navigasyon: Yeni nesil Compose Navigation mimarisi.
+⚡ Sayfa İzolasyonu: Hızlı kaydırmalarda kart taşması ve gecikmeler giderildi.
+🚀 2026 Mimarisi: Android 17 (API 37), Compose 2026 ve Room 2.8.5 desteği.
+</tr-TR>
+
+<en-US>
+PureNoteIt v1.1.1 brings top-tier security and performance!
+
+🔒 SQLCipher 4.20.0: Full database disk-level 256-bit AES encryption.
+🛡️ Android Keystore & Biometrics: Hardware-backed vault security.
+🧭 Type-Safe Navigation: Migrated to official Compose Navigation.
+⚡ Page Isolation: Fixed mid-animation card bleed during rapid page swipes.
+🚀 2026 Modern Stack: Android 17 (API 37), Compose 2026, and Room 2.8.5.
+</en-US>
