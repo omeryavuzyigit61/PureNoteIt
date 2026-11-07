@@ -2254,28 +2254,28 @@ fun NoteDetailScreen(
                         }
                     )
 
-                    // Elevated Active Pill Brushes
-                    val activePillBrush = if (isDark) {
+                    // Glassy Pill Base Brushes (Her özelliğe eşit, bağımsız mikro cam hapı)
+                    val pillBgBrush = if (isDark) {
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x4DFFFFFF),
-                                Color(0x24FFFFFF)
+                                Color(0x38FFFFFF),
+                                Color(0x18FFFFFF)
                             )
                         )
                     } else {
                         Brush.verticalGradient(
                             listOf(
                                 Color(0xFFFFFFFF),
-                                Color(0xFFF7F7FA)
+                                Color(0xFFF2F2F7)
                             )
                         )
                     }
 
-                    val activePillBorderBrush = if (isDark) {
+                    val pillBorderBrush = if (isDark) {
                         Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.55f),
-                                Color.White.copy(alpha = 0.15f)
+                                Color.White.copy(alpha = 0.40f),
+                                Color.White.copy(alpha = 0.10f)
                             )
                         )
                     } else {
@@ -2303,24 +2303,24 @@ fun NoteDetailScreen(
                                 brush = glassBorderBrush,
                                 shape = RoundedCornerShape(26.dp)
                             )
-                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                            .padding(horizontal = 6.dp, vertical = 5.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            // 1. Status Chip (Elevated Glass Pill)
+                            // 1. Status Pill (Bağımsız Eşit Glassy Pill)
                             val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == noteStatus } ?: KANBAN_COLUMNS[0]
                             Box(
                                 modifier = Modifier
                                     .shadow(
-                                        elevation = 2.dp,
+                                        elevation = 1.5.dp,
                                         shape = RoundedCornerShape(20.dp),
-                                        spotColor = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.14f)
+                                        spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
                                     )
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(activePillBrush)
-                                    .border(1.dp, activePillBorderBrush, RoundedCornerShape(20.dp))
+                                    .background(pillBgBrush)
+                                    .border(1.dp, pillBorderBrush, RoundedCornerShape(20.dp))
                                     .clickable { showStatusMenu = true }
                                     .padding(horizontal = 11.dp, vertical = 6.dp)
                             ) {
@@ -2348,12 +2348,19 @@ fun NoteDetailScreen(
                                 }
                             }
 
-                            // 2. Category Chip
+                            // 2. Kategori Pill (Bağımsız Eşit Glassy Pill)
                             Box(
                                 modifier = Modifier
+                                    .shadow(
+                                        elevation = 1.5.dp,
+                                        shape = RoundedCornerShape(20.dp),
+                                        spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
+                                    )
                                     .clip(RoundedCornerShape(20.dp))
+                                    .background(pillBgBrush)
+                                    .border(1.dp, pillBorderBrush, RoundedCornerShape(20.dp))
                                     .clickable { showCategoryMenu = true }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(horizontal = 11.dp, vertical = 6.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
@@ -2366,24 +2373,31 @@ fun NoteDetailScreen(
                                     Text(
                                         text = selectedCategoryName,
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isDark) Color(0xFFF1F1F5) else MaterialTheme.colorScheme.onSurface
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_chevron_down),
                                         contentDescription = null,
-                                        tint = if (isDark) Color.White.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                        tint = if (isDark) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                         modifier = Modifier.size(13.dp)
                                     )
                                 }
                             }
 
-                            // 3. Reminder / Alarm Chip
+                            // 3. Hatırlatıcı / Alarm Pill (Bağımsız Eşit Glassy Pill)
                             val hasActiveReminder = reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone
                             Box(
                                 modifier = Modifier
+                                    .shadow(
+                                        elevation = 1.5.dp,
+                                        shape = RoundedCornerShape(20.dp),
+                                        spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
+                                    )
                                     .clip(RoundedCornerShape(20.dp))
+                                    .background(pillBgBrush)
+                                    .border(1.dp, pillBorderBrush, RoundedCornerShape(20.dp))
                                     .clickable {
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                             val hasNotifPermission = ContextCompat.checkSelfPermission(
@@ -2396,37 +2410,44 @@ fun NoteDetailScreen(
                                         }
                                         showReminderSheet = true
                                     }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(horizontal = 11.dp, vertical = 6.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_m3_schedule),
                                         contentDescription = stringResource(R.string.reminder_title),
-                                        tint = if (hasActiveReminder) VibrantOrange else if (isDark) Color(0xFFD4D4D8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = if (hasActiveReminder) VibrantOrange else if (isDark) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(5.dp))
                                     Text(
                                         text = if (hasActiveReminder) SimpleDateFormat("d MMM HH:mm", Locale.getDefault()).format(reminderTime) else stringResource(R.string.reminder_title),
                                         fontSize = 11.5.sp,
-                                        fontWeight = if (hasActiveReminder) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (hasActiveReminder) VibrantOrange else if (isDark) Color(0xFFE4E4E7) else MaterialTheme.colorScheme.onSurface
+                                        fontWeight = if (hasActiveReminder) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = if (hasActiveReminder) VibrantOrange else if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
 
-                            // 4. Live Word Count & Reading Time Stats Chip
+                            // 4. İstatistik / Sayaç Pill (Bağımsız Eşit Glassy Pill)
                             Box(
                                 modifier = Modifier
+                                    .shadow(
+                                        elevation = 1.5.dp,
+                                        shape = RoundedCornerShape(20.dp),
+                                        spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
+                                    )
                                     .clip(RoundedCornerShape(20.dp))
+                                    .background(pillBgBrush)
+                                    .border(1.dp, pillBorderBrush, RoundedCornerShape(20.dp))
                                     .clickable { showStatsDialog = true }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(horizontal = 11.dp, vertical = 6.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_m3_insights),
                                         contentDescription = null,
-                                        tint = if (isDark) Color(0xFFD4D4D8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = Color(0xFFFBBF24),
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(5.dp))
@@ -2434,12 +2455,12 @@ fun NoteDetailScreen(
                                         text = stringResource(R.string.zen_words, wordCount) + " • " + stringResource(R.string.zen_reading_time, readingTimeMinutes),
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Medium,
-                                        color = if (isDark) Color(0xFFE4E4E7) else MaterialTheme.colorScheme.onSurface
+                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
 
-                            // 5. Quick Table of Contents Jump Chip (TOC)
+                            // 5. İçindekiler (TOC - Bağımsız Eşit Glassy Pill)
                             val headingsCount = remember(blocks.size, blocks.map { it.content }) {
                                 blocks.count { (it.type == BlockType.HEADING_1 || it.type == BlockType.HEADING_2) && it.content.isNotBlank() }
                             }
@@ -2448,9 +2469,16 @@ fun NoteDetailScreen(
                                 Box {
                                     Box(
                                         modifier = Modifier
+                                            .shadow(
+                                                elevation = 1.5.dp,
+                                                shape = RoundedCornerShape(20.dp),
+                                                spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
+                                            )
                                             .clip(RoundedCornerShape(20.dp))
+                                            .background(pillBgBrush)
+                                            .border(1.dp, pillBorderBrush, RoundedCornerShape(20.dp))
                                             .clickable { showTocMenu = true }
-                                            .padding(horizontal = 9.dp, vertical = 6.dp)
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(
@@ -2463,8 +2491,8 @@ fun NoteDetailScreen(
                                             Text(
                                                 text = stringResource(R.string.toc_title) + " ($headingsCount)",
                                                 fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (isDark) Color(0xFFE4E4E7) else MaterialTheme.colorScheme.onSurface
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                                             )
                                         }
                                     }
@@ -2495,11 +2523,18 @@ fun NoteDetailScreen(
                                 }
                             }
 
-                            // 6. Quick Page Relations / Index Hub Toggle Chip
+                            // 6. Bağlantılar (Relations Hub - Bağımsız Eşit Glassy Pill)
                             val totalRelations = subPageBlocks.size + outgoingWikiLinks.size
                             Box(
                                 modifier = Modifier
+                                    .shadow(
+                                        elevation = 1.5.dp,
+                                        shape = RoundedCornerShape(20.dp),
+                                        spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
+                                    )
                                     .clip(RoundedCornerShape(20.dp))
+                                    .background(pillBgBrush)
+                                    .border(1.dp, pillBorderBrush, RoundedCornerShape(20.dp))
                                     .clickable {
                                         showRelationsHubManually = true
                                         isRelationsExpanded = true
@@ -2515,12 +2550,12 @@ fun NoteDetailScreen(
                                             }
                                         }
                                     }
-                                    .padding(horizontal = 9.dp, vertical = 6.dp)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
-                                            .size(6.dp)
+                                            .size(7.dp)
                                             .clip(CircleShape)
                                             .background(VibrantOrange)
                                     )
@@ -2528,15 +2563,15 @@ fun NoteDetailScreen(
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_m3_link),
                                         contentDescription = null,
-                                        tint = if (isDark) Color(0xFFD4D4D8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = VibrantOrange,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = stringResource(R.string.relations_hub_title) + if (totalRelations > 0) " ($totalRelations)" else "",
                                         fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = if (isDark) Color(0xFFE4E4E7) else MaterialTheme.colorScheme.onSurface
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }

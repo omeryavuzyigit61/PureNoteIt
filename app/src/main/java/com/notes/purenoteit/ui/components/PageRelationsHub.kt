@@ -342,18 +342,24 @@ fun PageRelationsHub(
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { onAddLink() },
                     shape = RoundedCornerShape(8.dp),
-                    color = SoftOrangeLight.copy(alpha = 0.7f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.35f))
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.6f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.relations_add_link),
+                            text = "+ ",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            color = VibrantOrange
+                        )
+                        Text(
+                            text = stringResource(R.string.relations_add_link).removePrefix("+ ").trim(),
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = VibrantOrange
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -374,7 +380,7 @@ fun PageRelationsHub(
                             text = stringResource(R.string.relations_parent_title),
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(6.dp))
 
@@ -435,17 +441,17 @@ fun PageRelationsHub(
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable { onOpenParentNote?.invoke(parentNote) },
                                     shape = RoundedCornerShape(8.dp),
-                                    color = SoftOrangeLight.copy(alpha = 0.7f)
+                                    color = VibrantOrange
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
                                             text = stringResource(R.string.block_subpage_open),
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = VibrantOrange
+                                            color = Color.White
                                         )
                                     }
                                 }
@@ -463,7 +469,7 @@ fun PageRelationsHub(
                             text = stringResource(R.string.relations_subpages_title) + " (${subPageBlocks.size})",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(6.dp))
 
@@ -529,17 +535,17 @@ fun PageRelationsHub(
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .clickable { onOpenSubPage(block) },
                                             shape = RoundedCornerShape(8.dp),
-                                            color = SoftOrangeLight.copy(alpha = 0.7f)
+                                            color = VibrantOrange
                                         ) {
                                             Row(
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
                                                     text = stringResource(R.string.block_subpage_open),
                                                     fontSize = 11.5.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = VibrantOrange
+                                                    color = Color.White
                                                 )
                                             }
                                         }
@@ -575,7 +581,7 @@ fun PageRelationsHub(
                             text = stringResource(R.string.relations_links_title) + " (${linkedNotes.size})",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(6.dp))
 
@@ -590,30 +596,30 @@ fun PageRelationsHub(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(10.dp)),
                                     shape = RoundedCornerShape(10.dp),
-                                    color = SoftOrangeLight.copy(alpha = 0.7f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.5f))
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                        modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 5.dp, bottom = 5.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(
-                                            painter = painterResource(id = R.drawable.ic_link_hub),
+                                            painter = painterResource(id = R.drawable.ic_m3_link),
                                             contentDescription = null,
                                             tint = VibrantOrange,
                                             modifier = Modifier.size(13.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = targetTitle,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = VibrantOrange,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             modifier = Modifier.clickable { onOpenLinkedNote(targetTitle) }
                                         )
                                         if (onRemoveLinkedNote != null) {
-                                            Spacer(modifier = Modifier.width(2.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
                                             IconButton(
                                                 onClick = { onRemoveLinkedNote(targetTitle) },
                                                 modifier = Modifier.size(20.dp)
@@ -621,7 +627,7 @@ fun PageRelationsHub(
                                                 Icon(
                                                     painter = painterResource(id = R.drawable.cancel),
                                                     contentDescription = "Bağlantıyı Kaldır",
-                                                    tint = VibrantOrange.copy(alpha = 0.7f),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.size(10.dp)
                                                 )
                                             }
@@ -643,7 +649,7 @@ fun PageRelationsHub(
                             text = stringResource(R.string.relations_backlinks_title) + " (${backlinks.size})",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(6.dp))
 
@@ -683,7 +689,7 @@ fun PageRelationsHub(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Icon(
-                                            painter = painterResource(id = R.drawable.ic_link_hub),
+                                            painter = painterResource(id = R.drawable.ic_m3_link),
                                             contentDescription = null,
                                             tint = VibrantOrange,
                                             modifier = Modifier.size(11.dp)
