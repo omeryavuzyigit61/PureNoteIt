@@ -1,6 +1,7 @@
 package com.notes.purenoteit.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -67,6 +68,8 @@ import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
+import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
+import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
@@ -76,7 +79,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun NotionNoteCard(
     note: NoteData,
@@ -136,8 +139,31 @@ fun NotionNoteCard(
         label = "water_ripple"
     )
 
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    val sharedBoundsModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                sharedContentState = rememberSharedContentState(key = "note_card_container_${note.id}"),
+                animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = { _, _ ->
+                    spring(
+                        dampingRatio = 0.82f,
+                        stiffness = 380f
+                    )
+                },
+                clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(20.dp))
+            )
+        }
+    } else {
+        Modifier
+    }
+
     Card(
         modifier = modifier
+            .then(sharedBoundsModifier)
             .fillMaxWidth()
             .graphicsLayer {
                 rotationZ = wiggleRotation.value

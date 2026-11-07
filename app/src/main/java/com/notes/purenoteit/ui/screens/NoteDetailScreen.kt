@@ -12,11 +12,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -123,6 +125,8 @@ import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.reminder.ReminderManager
+import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
+import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
 import com.notes.purenoteit.ui.components.DrawingCanvasSheet
 import com.notes.purenoteit.ui.components.EmojiPickerSheet
 import com.notes.purenoteit.ui.components.KANBAN_COLUMNS
@@ -157,7 +161,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun NoteDetailScreen(
     noteId: Int,
@@ -1418,8 +1422,36 @@ fun NoteDetailScreen(
         handleExitWithAutoSave()
     }
 
-    if (!isAccessGranted && isPassword) {
-        Scaffold(
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    val targetBoundsModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && noteId > 0) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                sharedContentState = rememberSharedContentState(key = "note_card_container_$noteId"),
+                animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = { _, _ ->
+                    spring(
+                        dampingRatio = 0.82f,
+                        stiffness = 380f
+                    )
+                },
+                clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(0.dp))
+            )
+        }
+    } else {
+        Modifier
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(targetBoundsModifier)
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        if (!isAccessGranted && isPassword) {
+            Scaffold(
             topBar = {
                 TopAppBar(
                     modifier = Modifier.statusBarsPadding(),
@@ -3787,5 +3819,6 @@ fun NoteDetailScreen(
                 }
             }
         )
+    }
     }
 }

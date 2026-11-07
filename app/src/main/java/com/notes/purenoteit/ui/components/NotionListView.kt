@@ -1,5 +1,7 @@
 package com.notes.purenoteit.ui.components
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +25,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
+import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -87,6 +91,7 @@ fun NotionListView(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun NotionListRow(
     note: NoteData,
@@ -104,8 +109,31 @@ private fun NotionListRow(
     val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == (note.status ?: "TODO") } ?: KANBAN_COLUMNS[0]
     val dateStr = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.date))
 
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    val sharedBoundsModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                sharedContentState = rememberSharedContentState(key = "note_card_container_${note.id}"),
+                animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = { _, _ ->
+                    spring(
+                        dampingRatio = 0.82f,
+                        stiffness = 380f
+                    )
+                },
+                clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(14.dp))
+            )
+        }
+    } else {
+        Modifier
+    }
+
     Surface(
         modifier = Modifier
+            .then(sharedBoundsModifier)
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .clickable { onNoteClick() },

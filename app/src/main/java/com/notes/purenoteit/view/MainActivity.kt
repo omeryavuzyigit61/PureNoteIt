@@ -8,12 +8,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +32,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.notes.purenoteit.reminder.AlarmSoundPlayer
 import com.notes.purenoteit.security.AppIntegrityGuard
+import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
+import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
 import com.notes.purenoteit.ui.screens.AnimatedSplashScreen
 import com.notes.purenoteit.ui.screens.CategoryManagementScreen
 import com.notes.purenoteit.ui.screens.HomeScreen
@@ -206,129 +212,152 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
 
-                        NavHost(
-                            navController = navController,
-                            startDestination = "home"
-                        ) {
-                            composable("home") {
-                                HomeScreen(
-                                    noteViewModel = noteViewModel,
-                                    categoryViewModel = categoryViewModel,
-                                    onNavigateToAddNote = { noteId ->
-                                        navController.navigate("note_detail/$noteId")
-                                    },
-                                    onNavigateToAddNoteWithDate = { noteId, date ->
-                                        navController.navigate("note_detail/$noteId?initialDate=$date")
-                                    },
-                                    onNavigateToAddNoteWithStatus = { status ->
-                                        navController.navigate("note_detail/-1?initialStatus=$status")
-                                    },
-                                    onNavigateToPasswordSettings = {
-                                        navController.navigate("password_settings")
-                                    },
-                                    onNavigateToCategorySettings = {
-                                        navController.navigate("category_settings")
-                                    },
-                                    currentThemeMode = themeMode,
-                                    onThemeModeChange = { newMode ->
-                                        themeMode = newMode
-                                        ThemeManager.setThemeMode(this@MainActivity, newMode)
-                                        val dark = ThemeManager.isDarkTheme(this@MainActivity, newMode)
-                                        val winColor = if (dark) 0xFF1A1A1C.toInt() else 0xFFF8F8FA.toInt()
-                                        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(winColor))
-                                    },
-                                    onToggleDarkTheme = { newTheme ->
-                                        val newMode = if (newTheme) ThemeMode.DARK else ThemeMode.LIGHT
-                                        themeMode = newMode
-                                        ThemeManager.setThemeMode(this@MainActivity, newMode)
-                                        val dark = ThemeManager.isDarkTheme(this@MainActivity, newMode)
-                                        val winColor = if (dark) 0xFF1A1A1C.toInt() else 0xFFF8F8FA.toInt()
-                                        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(winColor))
-                                    },
-                                    isDarkTheme = isDarkTheme
-                                )
-                            }
-
-                            composable(
-                                route = "note_detail/{noteId}?initialDate={initialDate}&autoVoice={autoVoice}&autoOcr={autoOcr}&initialStatus={initialStatus}",
-                                arguments = listOf(
-                                    navArgument("noteId") {
-                                        type = NavType.IntType
-                                        defaultValue = -1
-                                    },
-                                    navArgument("initialDate") {
-                                        type = NavType.LongType
-                                        defaultValue = -1L
-                                    },
-                                    navArgument("autoVoice") {
-                                        type = NavType.BoolType
-                                        defaultValue = false
-                                    },
-                                    navArgument("autoOcr") {
-                                        type = NavType.BoolType
-                                        defaultValue = false
-                                    },
-                                    navArgument("initialStatus") {
-                                        type = NavType.StringType
-                                        defaultValue = "TODO"
-                                    }
-                                )
-                            ) { backStackEntry ->
-                                val noteId = backStackEntry.arguments?.getInt("noteId") ?: -1
-                                val initialDate = backStackEntry.arguments?.getLong("initialDate") ?: -1L
-                                val autoVoice = backStackEntry.arguments?.getBoolean("autoVoice") ?: false
-                                val autoOcr = backStackEntry.arguments?.getBoolean("autoOcr") ?: false
-                                val initialStatus = backStackEntry.arguments?.getString("initialStatus") ?: "TODO"
-
-                                NoteDetailScreen(
-                                    noteId = noteId,
-                                    initialDate = initialDate,
-                                    initialStatus = initialStatus,
-                                    autoVoice = autoVoice,
-                                    autoOcr = autoOcr,
-                                    noteViewModel = noteViewModel,
-                                    categoryViewModel = categoryViewModel,
-                                    onNavigateBack = {
-                                        if (navController.previousBackStackEntry != null) {
-                                            navController.popBackStack()
-                                        }
-                                    },
-                                    onNavigateToNote = { targetId ->
-                                        val targetRoute = "note_detail/$targetId"
-                                        val existsInBackStack = try {
-                                            navController.getBackStackEntry(targetRoute)
-                                            true
-                                        } catch (e: Exception) {
-                                            false
-                                        }
-                                        if (existsInBackStack) {
-                                            navController.popBackStack(targetRoute, inclusive = false)
-                                        } else {
-                                            navController.navigate(targetRoute)
+                        @OptIn(ExperimentalSharedTransitionApi::class)
+                        SharedTransitionLayout {
+                            CompositionLocalProvider(
+                                LocalSharedTransitionScope provides this
+                            ) {
+                                NavHost(
+                                    navController = navController,
+                                    startDestination = "home"
+                                ) {
+                                    composable("home") {
+                                        CompositionLocalProvider(
+                                            LocalNavAnimatedVisibilityScope provides this
+                                        ) {
+                                            HomeScreen(
+                                                noteViewModel = noteViewModel,
+                                                categoryViewModel = categoryViewModel,
+                                                onNavigateToAddNote = { noteId ->
+                                                    navController.navigate("note_detail/$noteId") {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onNavigateToAddNoteWithDate = { noteId, date ->
+                                                    navController.navigate("note_detail/$noteId?initialDate=$date") {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onNavigateToAddNoteWithStatus = { status ->
+                                                    navController.navigate("note_detail/-1?initialStatus=$status") {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onNavigateToPasswordSettings = {
+                                                    navController.navigate("password_settings")
+                                                },
+                                                onNavigateToCategorySettings = {
+                                                    navController.navigate("category_settings")
+                                                },
+                                                currentThemeMode = themeMode,
+                                                onThemeModeChange = { newMode ->
+                                                    themeMode = newMode
+                                                    ThemeManager.setThemeMode(this@MainActivity, newMode)
+                                                    val dark = ThemeManager.isDarkTheme(this@MainActivity, newMode)
+                                                    val winColor = if (dark) 0xFF1A1A1C.toInt() else 0xFFF8F8FA.toInt()
+                                                    window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(winColor))
+                                                },
+                                                onToggleDarkTheme = { newTheme ->
+                                                    val newMode = if (newTheme) ThemeMode.DARK else ThemeMode.LIGHT
+                                                    themeMode = newMode
+                                                    ThemeManager.setThemeMode(this@MainActivity, newMode)
+                                                    val dark = ThemeManager.isDarkTheme(this@MainActivity, newMode)
+                                                    val winColor = if (dark) 0xFF1A1A1C.toInt() else 0xFFF8F8FA.toInt()
+                                                    window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(winColor))
+                                                },
+                                                isDarkTheme = isDarkTheme
+                                            )
                                         }
                                     }
-                                )
-                            }
 
-                            composable("category_settings") {
-                                CategoryManagementScreen(
-                                    categoryViewModel = categoryViewModel,
-                                    onNavigateBack = {
-                                        if (navController.previousBackStackEntry != null) {
-                                            navController.popBackStack()
+                                    composable(
+                                        route = "note_detail/{noteId}?initialDate={initialDate}&autoVoice={autoVoice}&autoOcr={autoOcr}&initialStatus={initialStatus}",
+                                        arguments = listOf(
+                                            navArgument("noteId") {
+                                                type = NavType.IntType
+                                                defaultValue = -1
+                                            },
+                                            navArgument("initialDate") {
+                                                type = NavType.LongType
+                                                defaultValue = -1L
+                                            },
+                                            navArgument("autoVoice") {
+                                                type = NavType.BoolType
+                                                defaultValue = false
+                                            },
+                                            navArgument("autoOcr") {
+                                                type = NavType.BoolType
+                                                defaultValue = false
+                                            },
+                                            navArgument("initialStatus") {
+                                                type = NavType.StringType
+                                                defaultValue = "TODO"
+                                            }
+                                        )
+                                    ) { backStackEntry ->
+                                        val noteId = backStackEntry.arguments?.getInt("noteId") ?: -1
+                                        val initialDate = backStackEntry.arguments?.getLong("initialDate") ?: -1L
+                                        val autoVoice = backStackEntry.arguments?.getBoolean("autoVoice") ?: false
+                                        val autoOcr = backStackEntry.arguments?.getBoolean("autoOcr") ?: false
+                                        val initialStatus = backStackEntry.arguments?.getString("initialStatus") ?: "TODO"
+
+                                        CompositionLocalProvider(
+                                            LocalNavAnimatedVisibilityScope provides this
+                                        ) {
+                                            NoteDetailScreen(
+                                                noteId = noteId,
+                                                initialDate = initialDate,
+                                                initialStatus = initialStatus,
+                                                autoVoice = autoVoice,
+                                                autoOcr = autoOcr,
+                                                noteViewModel = noteViewModel,
+                                                categoryViewModel = categoryViewModel,
+                                                onNavigateBack = {
+                                                    if (navController.previousBackStackEntry != null) {
+                                                        navController.popBackStack()
+                                                    }
+                                                },
+                                                onNavigateToNote = { targetId ->
+                                                    val targetRoute = "note_detail/$targetId"
+                                                    val existsInBackStack = try {
+                                                        navController.getBackStackEntry(targetRoute)
+                                                        true
+                                                    } catch (e: Exception) {
+                                                        false
+                                                    }
+                                                    if (existsInBackStack) {
+                                                        navController.popBackStack(targetRoute, inclusive = false)
+                                                    } else {
+                                                        navController.navigate(targetRoute) {
+                                                            launchSingleTop = true
+                                                        }
+                                                    }
+                                                }
+                                            )
                                         }
                                     }
-                                )
-                            }
 
-                            composable("password_settings") {
-                                PasswordSettingScreen(
-                                    onNavigateBack = {
-                                        if (navController.previousBackStackEntry != null) {
-                                            navController.popBackStack()
-                                        }
+                                    composable("category_settings") {
+                                        CategoryManagementScreen(
+                                            categoryViewModel = categoryViewModel,
+                                            onNavigateBack = {
+                                                if (navController.previousBackStackEntry != null) {
+                                                    navController.popBackStack()
+                                                }
+                                            }
+                                        )
                                     }
-                                )
+
+                                    composable("password_settings") {
+                                        PasswordSettingScreen(
+                                            onNavigateBack = {
+                                                if (navController.previousBackStackEntry != null) {
+                                                    navController.popBackStack()
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

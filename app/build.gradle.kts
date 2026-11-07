@@ -37,6 +37,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = "1.8"
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.animation.ExperimentalSharedTransitionApi"
+        )
     }
     buildFeatures {
         viewBinding = true
@@ -78,6 +81,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.compose.runtime.livedata)
+    implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.navigation.compose)
