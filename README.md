@@ -24,11 +24,11 @@
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026%2B)-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Platform" />
     <img src="https://img.shields.io/badge/Language-Kotlin%202.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
     <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose" />
-    <img src="https://img.shields.io/badge/Database-Room%20SQLite-FF8F00?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room" />
+    <img src="https://img.shields.io/badge/Database-Room%20%2B%20SQLCipher-FF8F00?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room SQLCipher" />
     <img src="https://img.shields.io/badge/DI-Dagger%20Hilt-00C853?style=for-the-badge&logo=dagger&logoColor=white" alt="Hilt" />
     <img src="https://img.shields.io/badge/Security-AES--256%20Vault-175DDC?style=for-the-badge&logo=bitwarden&logoColor=white" alt="Security" />
     <img src="https://img.shields.io/badge/Optimization-R8%20DEX%20Obfuscated-blueviolet?style=for-the-badge&logo=googleplay&logoColor=white" alt="R8 Obfuscation" />
-    <img src="https://img.shields.io/badge/Version-1.0.4-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-1.1.0-orange?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
   </p>
 
@@ -203,11 +203,11 @@ flowchart TD
 
 - **Programlama Dili:** [Kotlin 2.0](https://kotlinlang.org/)
 - **Kullanıcı Arayüzü:** [Jetpack Compose](https://developer.android.com/jetpack/compose) & [Material Design 3](https://m3.material.io/)
-- **Mimari:** MVVM + Clean Architecture + Repository Pattern
+- **Mimari:** Clean Architecture + MVI (Model-View-Intent) + Repository Pattern
 - **Bağımlılık Enjeksiyonu (DI):** [Dagger Hilt](https://dagger.dev/hilt/)
-- **Veritabanı & Kalıcılık:** [Room SQLite Database](https://developer.android.com/training/data-storage/room)
+- **Veritabanı & Kalıcılık:** [Room + SQLCipher (256-bit AES)](https://www.zetetic.net/sqlcipher/) & [Jetpack DataStore](https://developer.android.com/topic/libraries/architecture/datastore)
 - **Kriptografi & Güvenlik:** AES-256-GCM, Android Keystore, [AndroidX Biometric](https://developer.android.com/training/sign-in/biometric-auth)
-- **Asenkron & Reaktif:** Kotlin Coroutines, StateFlow, RxJava3
+- **Asenkron & Reaktif:** %100 Kotlin Coroutines, StateFlow, SharedFlow
 - **Yapay Zeka & Görüntü İşleme:** [Google ML Kit Text Recognition](https://developers.google.com/ml-kit/vision/text-recognition/android) (On-Device)
 - **Görsel Yükleme:** [Coil Compose](https://coil-kt.github.io/coil/)
 - **PDF & Medya:** Android Native PdfDocument API, MediaRecorder & AudioTrack
@@ -245,7 +245,13 @@ flowchart TD
 
 ## 📋 Sürüm Notları / Changelog
 
-### v1.0.4 (En Son Sürüm / Latest)
+### v1.1.0 (En Son Sürüm / Latest)
+- 🪟 **Cam Kategori Menüsü (Glassy Navigation Tabs V7):** 3D kapı açılma rotasyon animasyonlu (`rotationY`), buğulu cam dokulu (`glassmorphism`) üst kategori dock'u ve zarif sayfa geçişleri.
+- 🛡️ **Donanım Destekli SQLCipher & DataStore:** Veritabanının 256-bit AES donanım şifrelemesi ve senkron SharedPreferences yerine modern asenkron Preferences DataStore mimarisi.
+- ⚡ **Clean Architecture & MVI Migrasyonu:** %100 Kotlin Coroutines & Flow tek yönlü veri akışı (`UDF`), UseCase katmanı ve 18/18 birim test kapsamı.
+- 🎨 **Modern Material 3 Arayüzü & Senkron Sayaç:** Yenilenen simetrik `grid_view` görünüm butonu ve yalnızca ekranda listelenen gerçek notları sayan akıllı sayaç senkronizasyonu.
+
+### v1.0.4
 - 📐 **Gelişmiş Matematik Formül Motoru & Dikey Kesirler:** `\frac{a}{b}` dikey kesirli ifadeler, karekök/n. kök, integral, limit, matris ve 60+ kategorize matematik sembolü eklendi.
 - 🔄 **Notion/Obsidian Tarzı Formül Önizleme & Düzenleme Modu:** Çift kutu kalabalığı kaldırıldı; formüller doğrudan şık bir sunum kartında gösterilir ve tek dokunuşla düzenleme moduna geçilebilir.
 - 🔗 **Çift Yönlü Alt Sayfa (Subpage) Başlık Senkronizasyonu:** Alt sayfada başlık değiştirilip geri gelindiğinde ana sayfadaki alt sayfa bloğu anında güncellenir ve otomatik kaydedilir.
