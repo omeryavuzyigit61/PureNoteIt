@@ -221,7 +221,7 @@ fun NotionNoteCard(
                 scaleY = cardScale.value
                 rotationZ = wiggleRotation.value
             }
-            .combinedClickable(
+            .resilientCombinedClickable(
                 onClick = handleCardClick,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)

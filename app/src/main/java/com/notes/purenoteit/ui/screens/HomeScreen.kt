@@ -146,6 +146,7 @@ import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.ui.components.GlassyCategoryBar
+import com.notes.purenoteit.ui.components.resilientClickable
 import com.notes.purenoteit.ui.components.LanguageSelectionSheet
 import com.notes.purenoteit.ui.components.ModernNoteIconBadge
 import com.notes.purenoteit.ui.components.NotionCalendarView
@@ -559,7 +560,11 @@ fun HomeScreen(
         notePendingTrash = note
     }
 
-    val handleNoteClick: (NoteData) -> Unit = { note ->
+    var lastNoteClickTime by remember { mutableLongStateOf(0L) }
+    val handleNoteClick: (NoteData) -> Unit = handleNoteClickLabel@{ note ->
+        val now = System.currentTimeMillis()
+        if (now - lastNoteClickTime < 380L) return@handleNoteClickLabel
+        lastNoteClickTime = now
         focusManager.clearFocus()
         keyboardController?.hide()
         val isNoteProtected = note.isPassword == true || note.isEncrypted || (note.categoryId in lockedCategoryIds)
@@ -2568,7 +2573,7 @@ private fun NotionRecentCoverCard(
             .width(135.dp)
             .height(cardHeight)
             .clip(RoundedCornerShape(14.dp))
-            .clickable { onClick() },
+            .resilientClickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         color = if (isDark) Color(0xFF1E1E22) else PureWhite,
         border = androidx.compose.foundation.BorderStroke(

@@ -180,7 +180,7 @@ private fun NotionListRow(
                 scaleY = rowScale.value
             }
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = handleRowClick),
+            .resilientClickable(onClick = handleRowClick),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.6f)),
