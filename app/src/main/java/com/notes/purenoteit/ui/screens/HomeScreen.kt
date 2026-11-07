@@ -12,6 +12,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -102,6 +103,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -115,6 +117,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -224,6 +228,18 @@ fun HomeScreen(
     var currentViewMode by remember { mutableStateOf(NotionViewMode.GRID) }
     var isSearchFocused by remember { mutableStateOf(false) }
     var lastMenuPressTime by remember { mutableLongStateOf(0L) }
+    val menuIconScale = remember { androidx.compose.animation.core.Animatable(1f) }
+    var viewIconRotation by remember { mutableFloatStateOf(0f) }
+    val animatedViewIconRotation by animateFloatAsState(
+        targetValue = viewIconRotation,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "view_icon_rotation"
+    )
+    val viewIconScale = remember { androidx.compose.animation.core.Animatable(1f) }
+    var selectedMenuMode by remember { mutableStateOf<NotionViewMode?>(null) }
 
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -826,12 +842,16 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Left: Drawer menu button (Soft squircle, borderless)
+                                // Left: Drawer menu button (Modern Sidebar Dock Pill)
                                 IconButton(
                                     onClick = {
                                         val currentTime = System.currentTimeMillis()
                                         if (currentTime - lastMenuPressTime > 400L) {
                                             lastMenuPressTime = currentTime
+                                            scope.launch {
+                                                menuIconScale.animateTo(0.85f, spring(stiffness = Spring.StiffnessHigh))
+                                                menuIconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                                            }
                                             focusManager.clearFocus()
                                             keyboardController?.hide()
                                             scope.launch {
@@ -843,11 +863,15 @@ fun HomeScreen(
                                     },
                                     modifier = Modifier
                                         .size(42.dp)
+                                        .graphicsLayer {
+                                            scaleX = menuIconScale.value
+                                            scaleY = menuIconScale.value
+                                        }
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 ) {
                                     Icon(
-                                        painter = painterResource(id = R.drawable.menu),
+                                        painter = painterResource(id = R.drawable.ic_menu_sidebar),
                                         contentDescription = "Menü",
                                         tint = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.size(20.dp)
@@ -886,16 +910,26 @@ fun HomeScreen(
                                     )
                                 }
 
-                                // Right: View Mode Selector Menu Button (Modern Material 3 Squircle)
+                                // Right: View Mode Selector Menu Button (Modern Material 3 Squircle with Spring Flip)
                                 Box {
                                     IconButton(
                                         onClick = {
                                             focusManager.clearFocus()
                                             keyboardController?.hide()
+                                            viewIconRotation += 360f
+                                            scope.launch {
+                                                viewIconScale.animateTo(0.85f, spring(stiffness = Spring.StiffnessHigh))
+                                                viewIconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                                            }
                                             showViewModeMenu = true
                                         },
                                         modifier = Modifier
                                             .size(42.dp)
+                                            .graphicsLayer {
+                                                scaleX = viewIconScale.value
+                                                scaleY = viewIconScale.value
+                                                rotationZ = animatedViewIconRotation
+                                            }
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                     ) {
@@ -911,32 +945,53 @@ fun HomeScreen(
                                         expanded = showViewModeMenu,
                                         onDismissRequest = { showViewModeMenu = false },
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(14.dp))
+                                            .clip(RoundedCornerShape(16.dp))
                                             .background(MaterialTheme.colorScheme.surface)
                                     ) {
                                         for (mode in NotionViewMode.values()) {
+                                            val isCurrent = currentViewMode == mode
+                                            val isSelectedMode = selectedMenuMode == mode
+                                            val itemScale by animateFloatAsState(
+                                                targetValue = if (isSelectedMode) 1.12f else 1f,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                    stiffness = Spring.StiffnessHigh
+                                                ),
+                                                label = "mode_item_scale"
+                                            )
+
                                             DropdownMenuItem(
+                                                modifier = Modifier.graphicsLayer {
+                                                    scaleX = itemScale
+                                                    scaleY = itemScale
+                                                },
                                                 text = {
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                                         Icon(
                                                             painter = painterResource(id = mode.iconRes),
                                                             contentDescription = null,
-                                                            tint = if (currentViewMode == mode) VibrantOrange else MaterialTheme.colorScheme.onSurface,
+                                                            tint = if (isCurrent) VibrantOrange else MaterialTheme.colorScheme.onSurface,
                                                             modifier = Modifier.size(18.dp)
                                                         )
                                                         Spacer(modifier = Modifier.width(10.dp))
                                                         Text(
                                                             text = stringResource(mode.titleRes),
-                                                            fontWeight = if (currentViewMode == mode) FontWeight.Bold else FontWeight.Normal,
-                                                            color = if (currentViewMode == mode) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                                            color = if (isCurrent) VibrantOrange else MaterialTheme.colorScheme.onSurface
                                                         )
                                                     }
                                                 },
                                                 onClick = {
-                                                    showViewModeMenu = false
+                                                    selectedMenuMode = mode
+                                                    scope.launch {
+                                                        delay(130L)
+                                                        currentViewMode = mode
+                                                        showViewModeMenu = false
+                                                        selectedMenuMode = null
+                                                        viewIconRotation += 360f
+                                                    }
                                                     focusManager.clearFocus()
                                                     keyboardController?.hide()
-                                                    currentViewMode = mode
                                                 }
                                             )
                                         }

@@ -46,7 +46,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -142,6 +145,53 @@ fun NotionNoteCard(
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
 
+    val cardScale = remember { androidx.compose.animation.core.Animatable(1f) }
+    val tapJiggle = remember { androidx.compose.animation.core.Animatable(0f) }
+    val coroutineScope = rememberCoroutineScope()
+
+    var wasTransitionActive by remember { mutableStateOf(false) }
+    LaunchedEffect(sharedTransitionScope?.isTransitionActive) {
+        val isActive = sharedTransitionScope?.isTransitionActive == true
+        if (wasTransitionActive && !isActive) {
+            // Settle / Landing impact bounce when closing back into card
+            cardScale.animateTo(0.96f, spring(stiffness = Spring.StiffnessHigh))
+            cardScale.animateTo(
+                1f,
+                spring(
+                    dampingRatio = 0.52f,
+                    stiffness = 420f
+                )
+            )
+            tapJiggle.animateTo(1.6f, spring(stiffness = 950f))
+            tapJiggle.animateTo(-1.2f, spring(stiffness = 900f))
+            tapJiggle.animateTo(0f, spring(stiffness = 650f))
+        }
+        wasTransitionActive = isActive
+    }
+
+    val handleCardClick: () -> Unit = {
+        if (isSelectionMode) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onToggleSelect()
+        } else {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            coroutineScope.launch {
+                // Tactile tap compression & micro-jiggle
+                launch {
+                    cardScale.animateTo(0.93f, spring(stiffness = Spring.StiffnessHigh))
+                    cardScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+                }
+                launch {
+                    tapJiggle.animateTo(-2.4f, spring(stiffness = 1200f))
+                    tapJiggle.animateTo(2.0f, spring(stiffness = 1000f))
+                    tapJiggle.animateTo(0f, spring(stiffness = 700f))
+                }
+                delay(65L)
+                onClick()
+            }
+        }
+    }
+
     @OptIn(ExperimentalSharedTransitionApi::class)
     val sharedBoundsModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
         with(sharedTransitionScope) {
@@ -166,17 +216,12 @@ fun NotionNoteCard(
             .then(sharedBoundsModifier)
             .fillMaxWidth()
             .graphicsLayer {
-                rotationZ = wiggleRotation.value
+                scaleX = cardScale.value
+                scaleY = cardScale.value
+                rotationZ = wiggleRotation.value + tapJiggle.value
             }
             .combinedClickable(
-                onClick = {
-                    if (isSelectionMode) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onToggleSelect()
-                    } else {
-                        onClick()
-                    }
-                },
+                onClick = handleCardClick,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (isSelectionMode) {

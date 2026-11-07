@@ -1,6 +1,7 @@
 package com.notes.purenoteit.ui.components
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,8 +32,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -131,12 +141,52 @@ private fun NotionListRow(
         Modifier
     }
 
+    val rowScale = remember { androidx.compose.animation.core.Animatable(1f) }
+    val rowJiggle = remember { androidx.compose.animation.core.Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+
+    var wasTransitionActive by remember { mutableStateOf(false) }
+    LaunchedEffect(sharedTransitionScope?.isTransitionActive) {
+        val isActive = sharedTransitionScope?.isTransitionActive == true
+        if (wasTransitionActive && !isActive) {
+            rowScale.animateTo(0.97f, spring(stiffness = Spring.StiffnessHigh))
+            rowScale.animateTo(1f, spring(dampingRatio = 0.52f, stiffness = 420f))
+            rowJiggle.animateTo(1.2f, spring(stiffness = 950f))
+            rowJiggle.animateTo(-0.8f, spring(stiffness = 900f))
+            rowJiggle.animateTo(0f, spring(stiffness = 650f))
+        }
+        wasTransitionActive = isActive
+    }
+
+    val handleRowClick: () -> Unit = {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        scope.launch {
+            launch {
+                rowScale.animateTo(0.95f, spring(stiffness = Spring.StiffnessHigh))
+                rowScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy))
+            }
+            launch {
+                rowJiggle.animateTo(-1.8f, spring(stiffness = 1200f))
+                rowJiggle.animateTo(1.5f, spring(stiffness = 1000f))
+                rowJiggle.animateTo(0f, spring(stiffness = 700f))
+            }
+            delay(65L)
+            onNoteClick()
+        }
+    }
+
     Surface(
         modifier = Modifier
             .then(sharedBoundsModifier)
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = rowScale.value
+                scaleY = rowScale.value
+                rotationZ = rowJiggle.value
+            }
             .clip(RoundedCornerShape(14.dp))
-            .clickable { onNoteClick() },
+            .clickable(onClick = handleRowClick),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.6f)),
