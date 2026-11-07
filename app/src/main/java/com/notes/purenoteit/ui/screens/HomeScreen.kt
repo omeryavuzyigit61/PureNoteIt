@@ -68,6 +68,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -453,6 +454,15 @@ fun HomeScreen(
         pageCount = { sortedCategories.size + 1 }
     )
 
+    // Yumuşak, titremesiz ve doğal akıcı sayfa yerleşimi (Soft Fluid Snap Physics)
+    val pagerFlingBehavior = PagerDefaults.flingBehavior(
+        state = pagerState,
+        snapAnimationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        )
+    )
+
     // Parmak hareketiyle sayfa geçildiğinde ve yerleştiğinde kategori durumunu senkronize et
     LaunchedEffect(pagerState.settledPage) {
         val settled = pagerState.settledPage
@@ -470,7 +480,7 @@ fun HomeScreen(
             val idx = sortedCategories.indexOfFirst { it.name == selectedCategory }
             if (idx >= 0) idx + 1 else 0
         }
-        if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
+        if (pagerState.settledPage != targetPage && !pagerState.isScrollInProgress) {
             pagerState.animateScrollToPage(targetPage)
         }
     }
@@ -1041,8 +1051,7 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val activeFilterCount = (if (selectedCategory != null) 1 else 0) +
-                                        (if (selectedSmartFilter != SmartFilter.ALL) 1 else 0) +
+                                val activeFilterCount = (if (selectedSmartFilter != SmartFilter.ALL) 1 else 0) +
                                         (if (selectedHashtag != null) 1 else 0)
 
                                 // 1. Filtrele Butonu (Bottom Sheet Açıcı) - Full Capsule Pill, borderless
@@ -1239,6 +1248,7 @@ fun HomeScreen(
                     HorizontalPager(
                         state = pagerState,
                         beyondViewportPageCount = 1,
+                        flingBehavior = pagerFlingBehavior,
                         modifier = Modifier.fillMaxSize()
                     ) { page ->
                         val targetCat = if (page == 0) null else sortedCategories.getOrNull(page - 1)?.name
@@ -1270,6 +1280,8 @@ fun HomeScreen(
                                 onDeleteClick = { note -> handleSoftDeleteNote(note) },
                                 onStatusChange = { note, newStatus -> noteViewModel.updateNoteStatus(note, newStatus) },
                                 searchQuery = searchQuery,
+                                pageIndex = page,
+                                enableSharedBounds = pagerState.currentPage == page,
                                 modifier = Modifier.padding(paddingValues)
                             )
                         }
@@ -1280,6 +1292,7 @@ fun HomeScreen(
                     HorizontalPager(
                         state = pagerState,
                         beyondViewportPageCount = 1,
+                        flingBehavior = pagerFlingBehavior,
                         modifier = Modifier.fillMaxSize()
                     ) { page ->
                         val targetCat = if (page == 0) null else sortedCategories.getOrNull(page - 1)?.name
@@ -1362,7 +1375,7 @@ fun HomeScreen(
                                                 contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
                                             ) {
                                                 val recentList = currentCategoryNotes.take(6)
-                                                items(recentList, key = { "recent_${it.id}" }) { note ->
+                                                items(recentList, key = { "page_${page}_recent_${it.id}" }) { note ->
                                                     NotionRecentCoverCard(
                                                         note = note,
                                                         categoryList = categoryList,
@@ -1397,7 +1410,7 @@ fun HomeScreen(
                                         }
                                     }
 
-                                    items(currentPinnedNotes, key = { it.id }) { note ->
+                                    items(currentPinnedNotes, key = { "page_${page}_pinned_${it.id}" }) { note ->
                                         NotionNoteCard(
                                             note = note,
                                             onClick = { handleNoteClick(note) },
@@ -1416,7 +1429,8 @@ fun HomeScreen(
                                             },
                                             onLongClick = {
                                                 selectedNoteIds = selectedNoteIds + note.id
-                                            }
+                                            },
+                                            enableSharedBounds = pagerState.currentPage == page
                                         )
                                     }
 
@@ -1443,7 +1457,7 @@ fun HomeScreen(
                                     }
                                 }
 
-                                items(currentRegularNotes, key = { it.id }) { note ->
+                                items(currentRegularNotes, key = { "page_${page}_regular_${it.id}" }) { note ->
                                     NotionNoteCard(
                                         note = note,
                                         onClick = { handleNoteClick(note) },
@@ -1462,7 +1476,8 @@ fun HomeScreen(
                                         },
                                         onLongClick = {
                                             selectedNoteIds = selectedNoteIds + note.id
-                                        }
+                                        },
+                                        enableSharedBounds = pagerState.currentPage == page
                                     )
                                 }
                             }

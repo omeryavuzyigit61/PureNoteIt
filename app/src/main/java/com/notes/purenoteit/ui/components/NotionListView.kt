@@ -78,6 +78,8 @@ fun NotionListView(
     onDeleteClick: (NoteData) -> Unit,
     onStatusChange: (NoteData, String) -> Unit,
     searchQuery: String = "",
+    pageIndex: Int = 0,
+    enableSharedBounds: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -87,7 +89,7 @@ fun NotionListView(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(bottom = 96.dp)
     ) {
-        items(notes, key = { it.id }) { note ->
+        items(notes, key = { "page_${pageIndex}_note_${it.id}" }) { note ->
             NotionListRow(
                 note = note,
                 categories = categories,
@@ -95,7 +97,8 @@ fun NotionListView(
                 onPinClick = { onPinClick(note) },
                 onDeleteClick = { onDeleteClick(note) },
                 onStatusChange = { newStatus -> onStatusChange(note, newStatus) },
-                searchQuery = searchQuery
+                searchQuery = searchQuery,
+                enableSharedBounds = enableSharedBounds
             )
         }
     }
@@ -110,7 +113,8 @@ private fun NotionListRow(
     onPinClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onStatusChange: (String) -> Unit,
-    searchQuery: String = ""
+    searchQuery: String = "",
+    enableSharedBounds: Boolean = true
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
@@ -123,7 +127,7 @@ private fun NotionListRow(
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
 
     @OptIn(ExperimentalSharedTransitionApi::class)
-    val sharedBoundsModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
+    val sharedBoundsModifier = if (enableSharedBounds && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
         with(sharedTransitionScope) {
             Modifier.sharedBounds(
                 sharedContentState = rememberSharedContentState(key = "note_card_container_${note.id}"),

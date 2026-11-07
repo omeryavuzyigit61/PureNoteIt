@@ -95,6 +95,7 @@ fun NotionNoteCard(
     isSelected: Boolean = false,
     onToggleSelect: () -> Unit = {},
     onLongClick: () -> Unit = {},
+    enableSharedBounds: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -193,7 +194,7 @@ fun NotionNoteCard(
     }
 
     @OptIn(ExperimentalSharedTransitionApi::class)
-    val sharedBoundsModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
+    val sharedBoundsModifier = if (enableSharedBounds && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
         with(sharedTransitionScope) {
             Modifier.sharedBounds(
                 sharedContentState = rememberSharedContentState(key = "note_card_container_${note.id}"),

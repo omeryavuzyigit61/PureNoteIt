@@ -191,28 +191,31 @@ fun GlassyDoorFlipChip(
     }
 
     // Kapı Menteşe Açısı (Y-Rotasyonu) & Ölçek Animasyonu
-    val doorAngle = remember { Animatable(if (isPillSelected) 0f else 25f) }
-    val pillScale = remember { Animatable(if (isPillSelected) 1f else 0.95f) }
+    val doorAngle = remember { Animatable(if (isPillSelected) 0f else 20f) }
+    val pillScale = remember { Animatable(if (isPillSelected) 1f else 0.96f) }
 
+    // Çip doğrudan tıklandığında veya menüden seçildiğinde yaylanarak açılma animasyonu
     LaunchedEffect(isPillSelected) {
         if (isPillSelected) {
-            // Kapı dışarıdan yaylanarak açılıp yerine oturur (3D Door Swing In)
-            doorAngle.snapTo(60f)
-            pillScale.snapTo(0.92f)
-            doorAngle.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
+            // Parmak kaydırması devam ederken snapTo çağrılmaz, sadece doğrudan seçimde veya yerleşimde çalışır
+            if (pagerState == null || !pagerState.isScrollInProgress) {
+                doorAngle.snapTo(45f)
+                pillScale.snapTo(0.94f)
+                doorAngle.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
                 )
-            )
-            pillScale.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium
+                pillScale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    )
                 )
-            )
+            }
         } else {
             // Yumuşak geri kapanma
             doorAngle.animateTo(
@@ -229,7 +232,7 @@ fun GlassyDoorFlipChip(
     // Pager parmak hareketi bittiğinde ve bu sayfaya yerleştiğinde kapıyı yaylandırarak yerine oturtur
     LaunchedEffect(pagerState?.settledPage) {
         if (pagerState != null && pagerState.settledPage == chipIndex && !pagerState.isScrollInProgress) {
-            doorAngle.snapTo(25f)
+            doorAngle.snapTo(14f)
             doorAngle.animateTo(
                 targetValue = 0f,
                 animationSpec = spring(
@@ -240,12 +243,8 @@ fun GlassyDoorFlipChip(
         }
     }
 
-    // Seçili iken hafif genişleyen iç dolgu
-    val horizontalPadding by animateDpAsState(
-        targetValue = if (isPillSelected) 14.dp else 11.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
-        label = "pillPadding"
-    )
+    // Titremeyi önlemek için sabit iç dolgu (layout reflow & sıçrama engellendi)
+    val horizontalPadding = 12.dp
 
     // Seçili Sekme Cam Arka Planı (Elevated Frosted Glass Pill)
     val activePillBrush = if (isDarkTheme) {
@@ -294,9 +293,9 @@ fun GlassyDoorFlipChip(
                     val absDelta = kotlin.math.abs(delta).coerceIn(0f, 1f)
 
                     // 3D kapı açılma: Sayfa tam ortadayken (absDelta == 0) kapı düz durur (0°).
-                    // Parmak kaydırıldıkça sol menteşe etrafında kapı gibi dışarı doğru açılır (maks 55°).
-                    currentRotation = absDelta * 55f
-                    currentScale = 1f - (absDelta * 0.06f)
+                    // Parmak kaydırıldıkça sol menteşe etrafında kapı gibi dışarı doğru yumuşakça açılır (maks 42°).
+                    currentRotation = absDelta * 42f
+                    currentScale = 1f - (absDelta * 0.05f)
                 } else {
                     currentRotation = doorAngle.value
                     currentScale = pillScale.value
@@ -307,7 +306,7 @@ fun GlassyDoorFlipChip(
                 scaleX = currentScale
                 scaleY = currentScale
                 cameraDistance = 14f * density // 3D alan derinliği
-                transformOrigin = TransformOrigin(0.12f, 0.5f) // Sol menteşe kapı ekseni
+                transformOrigin = TransformOrigin(0.08f, 0.5f) // Sol menteşe kapı ekseni
             }
             .shadow(
                 elevation = if (isPillSelected) 3.dp else 0.dp,
