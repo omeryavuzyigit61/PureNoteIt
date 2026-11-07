@@ -142,38 +142,29 @@ private fun NotionListRow(
     }
 
     val rowScale = remember { androidx.compose.animation.core.Animatable(1f) }
-    val rowJiggle = remember { androidx.compose.animation.core.Animatable(0f) }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    var isThisRowTarget by remember { mutableStateOf(false) }
 
     var wasTransitionActive by remember { mutableStateOf(false) }
     LaunchedEffect(sharedTransitionScope?.isTransitionActive) {
         val isActive = sharedTransitionScope?.isTransitionActive == true
-        if (wasTransitionActive && !isActive) {
-            rowScale.animateTo(0.97f, spring(stiffness = Spring.StiffnessHigh))
-            rowScale.animateTo(1f, spring(dampingRatio = 0.52f, stiffness = 420f))
-            rowJiggle.animateTo(1.2f, spring(stiffness = 950f))
-            rowJiggle.animateTo(-0.8f, spring(stiffness = 900f))
-            rowJiggle.animateTo(0f, spring(stiffness = 650f))
+        if (isThisRowTarget && wasTransitionActive && !isActive) {
+            rowScale.animateTo(0.985f, spring(stiffness = Spring.StiffnessMedium))
+            rowScale.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 320f))
+            isThisRowTarget = false
         }
         wasTransitionActive = isActive
     }
 
     val handleRowClick: () -> Unit = {
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        isThisRowTarget = true
         scope.launch {
-            launch {
-                rowScale.animateTo(0.95f, spring(stiffness = Spring.StiffnessHigh))
-                rowScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy))
-            }
-            launch {
-                rowJiggle.animateTo(-1.8f, spring(stiffness = 1200f))
-                rowJiggle.animateTo(1.5f, spring(stiffness = 1000f))
-                rowJiggle.animateTo(0f, spring(stiffness = 700f))
-            }
-            delay(65L)
-            onNoteClick()
+            rowScale.animateTo(0.965f, spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow))
+            rowScale.animateTo(1f, spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow))
         }
+        onNoteClick()
     }
 
     Surface(
@@ -183,7 +174,6 @@ private fun NotionListRow(
             .graphicsLayer {
                 scaleX = rowScale.value
                 scaleY = rowScale.value
-                rotationZ = rowJiggle.value
             }
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = handleRowClick),

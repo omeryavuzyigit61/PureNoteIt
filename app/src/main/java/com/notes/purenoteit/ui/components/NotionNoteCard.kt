@@ -146,25 +146,23 @@ fun NotionNoteCard(
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
 
     val cardScale = remember { androidx.compose.animation.core.Animatable(1f) }
-    val tapJiggle = remember { androidx.compose.animation.core.Animatable(0f) }
     val coroutineScope = rememberCoroutineScope()
+    var isThisNoteTarget by remember { mutableStateOf(false) }
 
     var wasTransitionActive by remember { mutableStateOf(false) }
     LaunchedEffect(sharedTransitionScope?.isTransitionActive) {
         val isActive = sharedTransitionScope?.isTransitionActive == true
-        if (wasTransitionActive && !isActive) {
-            // Settle / Landing impact bounce when closing back into card
-            cardScale.animateTo(0.96f, spring(stiffness = Spring.StiffnessHigh))
+        if (isThisNoteTarget && wasTransitionActive && !isActive) {
+            // SADECE tıklanan bu kart için gecikmesiz, soft, pamuksu yerleşme sekmesi
+            cardScale.animateTo(0.985f, spring(stiffness = Spring.StiffnessMedium))
             cardScale.animateTo(
                 1f,
                 spring(
-                    dampingRatio = 0.52f,
-                    stiffness = 420f
+                    dampingRatio = 0.82f,
+                    stiffness = 320f
                 )
             )
-            tapJiggle.animateTo(1.6f, spring(stiffness = 950f))
-            tapJiggle.animateTo(-1.2f, spring(stiffness = 900f))
-            tapJiggle.animateTo(0f, spring(stiffness = 650f))
+            isThisNoteTarget = false
         }
         wasTransitionActive = isActive
     }
@@ -175,20 +173,22 @@ fun NotionNoteCard(
             onToggleSelect()
         } else {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            isThisNoteTarget = true
             coroutineScope.launch {
-                // Tactile tap compression & micro-jiggle
-                launch {
-                    cardScale.animateTo(0.93f, spring(stiffness = Spring.StiffnessHigh))
-                    cardScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
-                }
-                launch {
-                    tapJiggle.animateTo(-2.4f, spring(stiffness = 1200f))
-                    tapJiggle.animateTo(2.0f, spring(stiffness = 1000f))
-                    tapJiggle.animateTo(0f, spring(stiffness = 700f))
-                }
-                delay(65L)
-                onClick()
+                // Soft, elastik ve pamuksu içe esneme (Sıfır katılık, sıfır açısal sarsıntı)
+                cardScale.animateTo(
+                    targetValue = 0.965f,
+                    animationSpec = spring(
+                        dampingRatio = 0.88f,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
+                cardScale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow)
+                )
             }
+            onClick()
         }
     }
 
@@ -218,7 +218,7 @@ fun NotionNoteCard(
             .graphicsLayer {
                 scaleX = cardScale.value
                 scaleY = cardScale.value
-                rotationZ = wiggleRotation.value + tapJiggle.value
+                rotationZ = wiggleRotation.value
             }
             .combinedClickable(
                 onClick = handleCardClick,

@@ -871,7 +871,7 @@ fun HomeScreen(
                                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 ) {
                                     Icon(
-                                        painter = painterResource(id = R.drawable.ic_menu_sidebar),
+                                        painter = painterResource(id = R.drawable.ic_menu_notion_bars),
                                         contentDescription = "Menü",
                                         tint = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.size(20.dp)
