@@ -30,6 +30,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
@@ -92,6 +94,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
@@ -2208,258 +2212,334 @@ fun NoteDetailScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Notion Mobile Page Properties Row (Durum, Kategori, Hatırlatıcı / Alarm)
+                // Notion Mobile Page Properties Row (Tasarım B: Glassy Capsule Bar - M3 Standartları)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Status Chip
-                    val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == noteStatus } ?: KANBAN_COLUMNS[0]
-                    Surface(
+                    val isDark = isSystemInDarkTheme()
+
+                    // Frosted Glass Dış Taşıyıcı Kapsül (Smoky/Milky Acrylic Glass Background - GlassyCategoryBar İkizi)
+                    val glassBgBrush = if (isDark) {
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0x35FFFFFF),
+                                Color(0x15FFFFFF)
+                            )
+                        )
+                    } else {
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xE6FFFFFF),
+                                Color(0xB3E5E5ED)
+                            )
+                        )
+                    }
+
+                    // Cam Işık Kırılması / Parlama Kenarlığı (Specular Highlight Rim)
+                    val glassBorderBrush = Brush.verticalGradient(
+                        colors = if (isDark) {
+                            listOf(
+                                Color.White.copy(alpha = 0.32f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        } else {
+                            listOf(
+                                Color.White,
+                                Color.White.copy(alpha = 0.75f),
+                                Color(0x22000000)
+                            )
+                        }
+                    )
+
+                    // Elevated Active Pill Brushes
+                    val activePillBrush = if (isDark) {
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0x4DFFFFFF),
+                                Color(0x24FFFFFF)
+                            )
+                        )
+                    } else {
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0xFFFFFFFF),
+                                Color(0xFFF7F7FA)
+                            )
+                        )
+                    }
+
+                    val activePillBorderBrush = if (isDark) {
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.55f),
+                                Color.White.copy(alpha = 0.15f)
+                            )
+                        )
+                    } else {
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White,
+                                Color(0xFFE2E2E8)
+                            )
+                        )
+                    }
+
+                    Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { showStatusMenu = true },
-                        shape = RoundedCornerShape(12.dp),
-                        color = currentStatusDef.badgeBgColor
+                            .wrapContentWidth()
+                            .shadow(
+                                elevation = 3.dp,
+                                shape = RoundedCornerShape(26.dp),
+                                spotColor = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.12f),
+                                ambientColor = if (isDark) Color.Black.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.06f)
+                            )
+                            .clip(RoundedCornerShape(26.dp))
+                            .background(brush = glassBgBrush)
+                            .border(
+                                width = 1.dp,
+                                brush = glassBorderBrush,
+                                shape = RoundedCornerShape(26.dp)
+                            )
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            // 1. Status Chip (Elevated Glass Pill)
+                            val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == noteStatus } ?: KANBAN_COLUMNS[0]
                             Box(
                                 modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(currentStatusDef.dotColor)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = stringResource(currentStatusDef.titleRes),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = currentStatusDef.badgeTextColor
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "▼",
-                                fontSize = 8.sp,
-                                color = currentStatusDef.badgeTextColor.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-
-                    // Category Chip
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { showCategoryMenu = true },
-                        shape = RoundedCornerShape(12.dp),
-                        color = SoftOrangeLight
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.category),
-                                contentDescription = null,
-                                tint = VibrantOrange,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = selectedCategoryName,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = VibrantOrange
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "▼",
-                                fontSize = 8.sp,
-                                color = VibrantOrange.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-
-                    // Reminder / Alarm Chip
-                    val hasActiveReminder = reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    val hasNotifPermission = ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.POST_NOTIFICATIONS
-                                    ) == PackageManager.PERMISSION_GRANTED
-                                    if (!hasNotifPermission) {
-                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                }
-                                showReminderSheet = true
-                            },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (hasActiveReminder) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                        border = if (hasActiveReminder) androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f)) else null
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_alarm_clock),
-                                contentDescription = stringResource(R.string.reminder_title),
-                                tint = if (hasActiveReminder) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = if (hasActiveReminder) SimpleDateFormat("d MMM HH:mm", Locale.getDefault()).format(reminderTime) else stringResource(R.string.reminder_title),
-                                fontSize = 11.5.sp,
-                                fontWeight = if (hasActiveReminder) FontWeight.Bold else FontWeight.Medium,
-                                color = if (hasActiveReminder) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    // Live Word Count & Reading Time Stats Chip (Feature 4)
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { showStatsDialog = true },
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = androidx.compose.foundation.BorderStroke(0.5.dp, BorderLight.copy(alpha = 0.5f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_stream_timeline),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = stringResource(R.string.zen_words, wordCount) + " • " + stringResource(R.string.zen_reading_time, readingTimeMinutes),
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    // Quick Table of Contents Jump Chip (TOC)
-                    val headingsCount = remember(blocks.size, blocks.map { it.content }) {
-                        blocks.count { (it.type == BlockType.HEADING_1 || it.type == BlockType.HEADING_2) && it.content.isNotBlank() }
-                    }
-                    if (headingsCount > 0) {
-                        var showTocMenu by remember { mutableStateOf(false) }
-                        Box {
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { showTocMenu = true },
-                                shape = RoundedCornerShape(12.dp),
-                                color = SoftOrangeLight.copy(alpha = 0.7f),
-                                border = androidx.compose.foundation.BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.4f))
+                                    .shadow(
+                                        elevation = 2.dp,
+                                        shape = RoundedCornerShape(20.dp),
+                                        spotColor = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.14f)
+                                    )
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(activePillBrush)
+                                    .border(1.dp, activePillBorderBrush, RoundedCornerShape(20.dp))
+                                    .clickable { showStatusMenu = true }
+                                    .padding(horizontal = 11.dp, vertical = 6.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(currentStatusDef.dotColor)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = stringResource(currentStatusDef.titleRes),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Icon(
-                                        painter = painterResource(id = R.drawable.ic_checklist),
+                                        painter = painterResource(id = R.drawable.ic_chevron_down),
+                                        contentDescription = null,
+                                        tint = if (isDark) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                            }
+
+                            // 2. Category Chip
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable { showCategoryMenu = true }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_m3_folder),
                                         contentDescription = null,
                                         tint = VibrantOrange,
-                                        modifier = Modifier.size(13.dp)
+                                        modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(5.dp))
                                     Text(
-                                        text = stringResource(R.string.toc_title) + " ($headingsCount)",
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = VibrantOrange
+                                        text = selectedCategoryName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDark) Color(0xFFF1F1F5) else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_chevron_down),
+                                        contentDescription = null,
+                                        tint = if (isDark) Color.White.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(13.dp)
                                     )
                                 }
                             }
-                            DropdownMenu(
-                                expanded = showTocMenu,
-                                onDismissRequest = { showTocMenu = false }
-                            ) {
-                                blocks.forEachIndexed { headIdx, headBlock ->
-                                    if ((headBlock.type == BlockType.HEADING_1 || headBlock.type == BlockType.HEADING_2) && headBlock.content.isNotBlank()) {
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = (if (headBlock.type == BlockType.HEADING_1) "• " else "   ◦ ") + headBlock.content,
-                                                    fontWeight = if (headBlock.type == BlockType.HEADING_1) FontWeight.Bold else FontWeight.Normal,
-                                                    fontSize = if (headBlock.type == BlockType.HEADING_1) 14.sp else 13.sp
-                                                )
-                                            },
-                                            onClick = {
-                                                showTocMenu = false
-                                                coroutineScope.launch {
-                                                    listState.animateScrollToItem((headIdx + 1).coerceAtLeast(0))
-                                                }
+
+                            // 3. Reminder / Alarm Chip
+                            val hasActiveReminder = reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            val hasNotifPermission = ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.POST_NOTIFICATIONS
+                                            ) == PackageManager.PERMISSION_GRANTED
+                                            if (!hasNotifPermission) {
+                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                             }
-                                        )
+                                        }
+                                        showReminderSheet = true
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_m3_schedule),
+                                        contentDescription = stringResource(R.string.reminder_title),
+                                        tint = if (hasActiveReminder) VibrantOrange else if (isDark) Color(0xFFD4D4D8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = if (hasActiveReminder) SimpleDateFormat("d MMM HH:mm", Locale.getDefault()).format(reminderTime) else stringResource(R.string.reminder_title),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (hasActiveReminder) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (hasActiveReminder) VibrantOrange else if (isDark) Color(0xFFE4E4E7) else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+
+                            // 4. Live Word Count & Reading Time Stats Chip
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable { showStatsDialog = true }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_m3_insights),
+                                        contentDescription = null,
+                                        tint = if (isDark) Color(0xFFD4D4D8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = stringResource(R.string.zen_words, wordCount) + " • " + stringResource(R.string.zen_reading_time, readingTimeMinutes),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isDark) Color(0xFFE4E4E7) else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+
+                            // 5. Quick Table of Contents Jump Chip (TOC)
+                            val headingsCount = remember(blocks.size, blocks.map { it.content }) {
+                                blocks.count { (it.type == BlockType.HEADING_1 || it.type == BlockType.HEADING_2) && it.content.isNotBlank() }
+                            }
+                            if (headingsCount > 0) {
+                                var showTocMenu by remember { mutableStateOf(false) }
+                                Box {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .clickable { showTocMenu = true }
+                                            .padding(horizontal = 9.dp, vertical = 6.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.ic_m3_toc),
+                                                contentDescription = null,
+                                                tint = VibrantOrange,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(5.dp))
+                                            Text(
+                                                text = stringResource(R.string.toc_title) + " ($headingsCount)",
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (isDark) Color(0xFFE4E4E7) else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+                                    DropdownMenu(
+                                        expanded = showTocMenu,
+                                        onDismissRequest = { showTocMenu = false }
+                                    ) {
+                                        blocks.forEachIndexed { headIdx, headBlock ->
+                                            if ((headBlock.type == BlockType.HEADING_1 || headBlock.type == BlockType.HEADING_2) && headBlock.content.isNotBlank()) {
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            text = (if (headBlock.type == BlockType.HEADING_1) "• " else "   ◦ ") + headBlock.content,
+                                                            fontWeight = if (headBlock.type == BlockType.HEADING_1) FontWeight.Bold else FontWeight.Normal,
+                                                            fontSize = if (headBlock.type == BlockType.HEADING_1) 14.sp else 13.sp
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        showTocMenu = false
+                                                        coroutineScope.launch {
+                                                            listState.animateScrollToItem((headIdx + 1).coerceAtLeast(0))
+                                                        }
+                                                    }
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
-                        }
-                    }
 
-                    // Quick Page Relations / Index Hub Toggle Chip
-                    val totalRelations = subPageBlocks.size + outgoingWikiLinks.size
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                showRelationsHubManually = true
-                                isRelationsExpanded = true
-                                val hubIdx = blocks.indexOfFirst { it.type == BlockType.PAGE_RELATIONS }
-                                if (hubIdx == -1) {
-                                    blocks.add(0, NoteBlock(type = BlockType.PAGE_RELATIONS))
-                                    coroutineScope.launch {
-                                        listState.animateScrollToItem(1)
+                            // 6. Quick Page Relations / Index Hub Toggle Chip
+                            val totalRelations = subPageBlocks.size + outgoingWikiLinks.size
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable {
+                                        showRelationsHubManually = true
+                                        isRelationsExpanded = true
+                                        val hubIdx = blocks.indexOfFirst { it.type == BlockType.PAGE_RELATIONS }
+                                        if (hubIdx == -1) {
+                                            blocks.add(0, NoteBlock(type = BlockType.PAGE_RELATIONS))
+                                            coroutineScope.launch {
+                                                listState.animateScrollToItem(1)
+                                            }
+                                        } else {
+                                            coroutineScope.launch {
+                                                listState.animateScrollToItem((hubIdx + 1).coerceAtLeast(0))
+                                            }
+                                        }
                                     }
-                                } else {
-                                    coroutineScope.launch {
-                                        listState.animateScrollToItem((hubIdx + 1).coerceAtLeast(0))
-                                    }
+                                    .padding(horizontal = 9.dp, vertical = 6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(VibrantOrange)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_m3_link),
+                                        contentDescription = null,
+                                        tint = if (isDark) Color(0xFFD4D4D8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = stringResource(R.string.relations_hub_title) + if (totalRelations > 0) " ($totalRelations)" else "",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isDark) Color(0xFFE4E4E7) else MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
-                            },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (totalRelations > 0 || showRelationsHubManually) SoftOrangeLight.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            0.5.dp,
-                            if (totalRelations > 0 || showRelationsHubManually) VibrantOrange.copy(alpha = 0.4f) else BorderLight.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_hub_index),
-                                contentDescription = null,
-                                tint = VibrantOrange,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = stringResource(R.string.relations_hub_title) + if (totalRelations > 0) " ($totalRelations)" else "",
-                                fontSize = 11.5.sp,
-                                fontWeight = if (totalRelations > 0 || showRelationsHubManually) FontWeight.Bold else FontWeight.Medium,
-                                color = if (totalRelations > 0 || showRelationsHubManually) VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            }
                         }
                     }
                 }
