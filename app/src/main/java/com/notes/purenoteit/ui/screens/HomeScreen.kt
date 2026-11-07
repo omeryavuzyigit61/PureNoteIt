@@ -67,6 +67,8 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -443,6 +445,34 @@ fun HomeScreen(
             compareByDescending<CategoryData> { cat -> activeRootNotes.count { it.categoryId == cat.id } }
                 .thenBy { it.name }
         )
+    }
+
+    // HorizontalPager State: Parmak hareketiyle kategoriler arası yatay kaydırma ve duraksama desteği
+    val pagerState = rememberPagerState(
+        initialPage = 0,
+        pageCount = { sortedCategories.size + 1 }
+    )
+
+    // Parmak hareketiyle sayfa geçildiğinde ve yerleştiğinde kategori durumunu senkronize et
+    LaunchedEffect(pagerState.settledPage) {
+        val settled = pagerState.settledPage
+        val targetCat = if (settled == 0) null else sortedCategories.getOrNull(settled - 1)?.name
+        if (selectedCategory != targetCat) {
+            categoryTransitionDirection = if (settled >= prevCategoryIndex) 1 else -1
+            prevCategoryIndex = settled
+            selectedCategory = targetCat
+        }
+    }
+
+    // Dışarıdan veya menüden kategori değiştiğinde pager'ı animasyonla hedef sayfaya kaydır
+    LaunchedEffect(selectedCategory, sortedCategories) {
+        val targetPage = if (selectedCategory == null) 0 else {
+            val idx = sortedCategories.indexOfFirst { it.name == selectedCategory }
+            if (idx >= 0) idx + 1 else 0
+        }
+        if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(targetPage)
+        }
     }
 
     // Helper function to compute filtered notes for a given category (used for directional animation)
@@ -1102,6 +1132,7 @@ fun HomeScreen(
                                     selectedCategory = if (selectedSmartFilter == SmartFilter.ALL && selectedHashtag == null) selectedCategory else "__CUSTOM_FILTER__",
                                     totalNotesCount = activeRootNotes.size,
                                     activeNotes = activeRootNotes,
+                                    pagerState = pagerState,
                                     isDarkTheme = isDarkTheme,
                                     getCategoryDotColor = { catName -> getCategoryDotColor(catName) },
                                     onAllSelected = {
@@ -1114,6 +1145,7 @@ fun HomeScreen(
                                         selectedCategory = null
                                         selectedSmartFilter = SmartFilter.ALL
                                         selectedHashtag = null
+                                        scope.launch { pagerState.animateScrollToPage(0) }
                                     },
                                     onCategorySelected = { catName, isSame ->
                                         focusManager.clearFocus()
@@ -1123,10 +1155,12 @@ fun HomeScreen(
                                             categoryTransitionDirection = -1
                                             prevCategoryIndex = 0
                                             selectedCategory = null
+                                            scope.launch { pagerState.animateScrollToPage(0) }
                                         } else {
                                             categoryTransitionDirection = if (targetIndex >= prevCategoryIndex) 1 else -1
                                             prevCategoryIndex = targetIndex
                                             selectedCategory = catName
+                                            scope.launch { pagerState.animateScrollToPage(targetIndex) }
                                         }
                                     }
                                 )
@@ -1202,29 +1236,12 @@ fun HomeScreen(
                 }
 
                 NotionViewMode.LIST -> {
-                    AnimatedContent(
-                        targetState = selectedCategory,
-                        transitionSpec = {
-                            val categorySpringSpec = spring<IntOffset>(
-                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                            if (categoryTransitionDirection > 0) {
-                                (slideInHorizontally(animationSpec = categorySpringSpec) { fullWidth -> (fullWidth * 0.35f).toInt() } +
-                                        fadeIn(animationSpec = tween(220))).togetherWith(
-                                    slideOutHorizontally(animationSpec = tween(180)) { fullWidth -> (-fullWidth * 0.35f).toInt() } +
-                                            fadeOut(animationSpec = tween(180))
-                                )
-                            } else {
-                                (slideInHorizontally(animationSpec = categorySpringSpec) { fullWidth -> (-fullWidth * 0.35f).toInt() } +
-                                        fadeIn(animationSpec = tween(220))).togetherWith(
-                                    slideOutHorizontally(animationSpec = tween(180)) { fullWidth -> (fullWidth * 0.35f).toInt() } +
-                                            fadeOut(animationSpec = tween(180))
-                                )
-                            }
-                        },
-                        label = "CategoryListTransition"
-                    ) { targetCat ->
+                    HorizontalPager(
+                        state = pagerState,
+                        beyondViewportPageCount = 1,
+                        modifier = Modifier.fillMaxSize()
+                    ) { page ->
+                        val targetCat = if (page == 0) null else sortedCategories.getOrNull(page - 1)?.name
                         val currentCategoryNotes = remember(
                             targetCat,
                             activeNotes,
@@ -1260,29 +1277,12 @@ fun HomeScreen(
                 }
 
                 NotionViewMode.GRID -> {
-                    AnimatedContent(
-                        targetState = selectedCategory,
-                        transitionSpec = {
-                            val categorySpringSpec = spring<IntOffset>(
-                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                            if (categoryTransitionDirection > 0) {
-                                (slideInHorizontally(animationSpec = categorySpringSpec) { fullWidth -> (fullWidth * 0.35f).toInt() } +
-                                        fadeIn(animationSpec = tween(220))).togetherWith(
-                                    slideOutHorizontally(animationSpec = tween(180)) { fullWidth -> (-fullWidth * 0.35f).toInt() } +
-                                            fadeOut(animationSpec = tween(180))
-                                )
-                            } else {
-                                (slideInHorizontally(animationSpec = categorySpringSpec) { fullWidth -> (-fullWidth * 0.35f).toInt() } +
-                                        fadeIn(animationSpec = tween(220))).togetherWith(
-                                    slideOutHorizontally(animationSpec = tween(180)) { fullWidth -> (fullWidth * 0.35f).toInt() } +
-                                            fadeOut(animationSpec = tween(180))
-                                )
-                            }
-                        },
-                        label = "CategoryGridTransition"
-                    ) { targetCat ->
+                    HorizontalPager(
+                        state = pagerState,
+                        beyondViewportPageCount = 1,
+                        modifier = Modifier.fillMaxSize()
+                    ) { page ->
+                        val targetCat = if (page == 0) null else sortedCategories.getOrNull(page - 1)?.name
                         val currentCategoryNotes = remember(
                             targetCat,
                             activeNotes,

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -61,6 +62,7 @@ fun GlassyCategoryBar(
     selectedCategory: String?,
     totalNotesCount: Int,
     activeNotes: List<NoteData>,
+    pagerState: PagerState? = null,
     isDarkTheme: Boolean = isSystemInDarkTheme(),
     getCategoryDotColor: (String) -> Color?,
     onAllSelected: () -> Unit,
@@ -121,18 +123,20 @@ fun GlassyCategoryBar(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // "Tümü" Sekmesi
+            // "Tümü" Sekmesi (İndeks 0)
             val isAllSelected = selectedCategory == null
             GlassyDoorFlipChip(
                 label = stringResource(R.string.all_categories),
                 isSelected = isAllSelected,
+                pagerState = pagerState,
+                chipIndex = 0,
                 count = totalNotesCount,
                 isDarkTheme = isDarkTheme,
                 onClick = onAllSelected
             )
 
-            // Dinamik Kategoriler
-            categories.forEach { category ->
+            // Dinamik Kategoriler (İndeks 1..N)
+            categories.forEachIndexed { index, category ->
                 val catCount = remember(activeNotes, category.id) {
                     activeNotes.count { it.categoryId == category.id }
                 }
@@ -141,6 +145,8 @@ fun GlassyCategoryBar(
                 GlassyDoorFlipChip(
                     label = category.name,
                     isSelected = isSelected,
+                    pagerState = pagerState,
+                    chipIndex = index + 1,
                     isLocked = category.isPassword == true,
                     count = catCount,
                     dotColor = getCategoryDotColor(category.name),
@@ -158,13 +164,16 @@ fun GlassyCategoryBar(
  * 3D Kapı Efektli Sekme Elemanı (Door-Flip Pill)
  * Seçilme anında sol kenar menteşesi etrafında (Y ekseni) bir oda kapısı gibi
  * 3D açılarak yaylanır (rotationY: 60° -> 0° spring bounce).
- * Cam efekti: Turuncu renk baskısı kaldırılmış, videodaki gibi elevated frosted glass pill olarak tasarlanmıştır.
+ * HorizontalPager jesti sırasında parmak hareketini gerçek zamanlı takip eder;
+ * parmak durdurulduğunda iki açı arasında havada kalır ve bırakıldığında yaylanarak kapanır.
  */
 @Composable
 fun GlassyDoorFlipChip(
     label: String,
     isSelected: Boolean,
     modifier: Modifier = Modifier,
+    pagerState: PagerState? = null,
+    chipIndex: Int = 0,
     isLocked: Boolean = false,
     count: Int? = null,
     dotColor: Color? = null,
@@ -174,12 +183,19 @@ fun GlassyDoorFlipChip(
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current.density
 
-    // Kapı Menteşe Açısı (Y-Rotasyonu) & Ölçek Animasyonu
-    val doorAngle = remember { Animatable(if (isSelected) 0f else 25f) }
-    val pillScale = remember { Animatable(if (isSelected) 1f else 0.95f) }
+    // Pager bağlı ise seçili durumu aktif sayfaya göre, yoksa parametreye göre belirlenir
+    val isPillSelected = if (pagerState != null) {
+        pagerState.currentPage == chipIndex
+    } else {
+        isSelected
+    }
 
-    LaunchedEffect(isSelected) {
-        if (isSelected) {
+    // Kapı Menteşe Açısı (Y-Rotasyonu) & Ölçek Animasyonu
+    val doorAngle = remember { Animatable(if (isPillSelected) 0f else 25f) }
+    val pillScale = remember { Animatable(if (isPillSelected) 1f else 0.95f) }
+
+    LaunchedEffect(isPillSelected) {
+        if (isPillSelected) {
             // Kapı dışarıdan yaylanarak açılıp yerine oturur (3D Door Swing In)
             doorAngle.snapTo(60f)
             pillScale.snapTo(0.92f)
@@ -210,9 +226,23 @@ fun GlassyDoorFlipChip(
         }
     }
 
+    // Pager parmak hareketi bittiğinde ve bu sayfaya yerleştiğinde kapıyı yaylandırarak yerine oturtur
+    LaunchedEffect(pagerState?.settledPage) {
+        if (pagerState != null && pagerState.settledPage == chipIndex && !pagerState.isScrollInProgress) {
+            doorAngle.snapTo(25f)
+            doorAngle.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
+        }
+    }
+
     // Seçili iken hafif genişleyen iç dolgu
     val horizontalPadding by animateDpAsState(
-        targetValue = if (isSelected) 14.dp else 11.dp,
+        targetValue = if (isPillSelected) 14.dp else 11.dp,
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "pillPadding"
     )
@@ -254,25 +284,43 @@ fun GlassyDoorFlipChip(
     Box(
         modifier = modifier
             .graphicsLayer {
+                val currentRotation: Float
+                val currentScale: Float
+
+                // HorizontalPager kaydırma halindeyse parmağın gerçek zamanlı konumunu menteşeye bağla
+                if (pagerState != null && (pagerState.isScrollInProgress || pagerState.currentPageOffsetFraction != 0f)) {
+                    val pagePosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                    val delta = pagePosition - chipIndex
+                    val absDelta = kotlin.math.abs(delta).coerceIn(0f, 1f)
+
+                    // 3D kapı açılma: Sayfa tam ortadayken (absDelta == 0) kapı düz durur (0°).
+                    // Parmak kaydırıldıkça sol menteşe etrafında kapı gibi dışarı doğru açılır (maks 55°).
+                    currentRotation = absDelta * 55f
+                    currentScale = 1f - (absDelta * 0.06f)
+                } else {
+                    currentRotation = doorAngle.value
+                    currentScale = pillScale.value
+                }
+
                 // 3D Kapı Perspektifi (Y ekseni etrafında menteşe dönüşü)
-                rotationY = doorAngle.value
-                scaleX = pillScale.value
-                scaleY = pillScale.value
+                rotationY = currentRotation
+                scaleX = currentScale
+                scaleY = currentScale
                 cameraDistance = 14f * density // 3D alan derinliği
                 transformOrigin = TransformOrigin(0.12f, 0.5f) // Sol menteşe kapı ekseni
             }
             .shadow(
-                elevation = if (isSelected) 3.dp else 0.dp,
+                elevation = if (isPillSelected) 3.dp else 0.dp,
                 shape = RoundedCornerShape(20.dp),
                 spotColor = if (isDarkTheme) Color.Black.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.14f),
                 ambientColor = if (isDarkTheme) Color.Black.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.06f)
             )
             .clip(RoundedCornerShape(20.dp))
             .background(
-                brush = if (isSelected) activePillBrush else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                brush = if (isPillSelected) activePillBrush else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
             )
             .then(
-                if (isSelected) {
+                if (isPillSelected) {
                     Modifier.border(
                         width = 1.dp,
                         brush = activePillBorderBrush,
@@ -317,8 +365,8 @@ fun GlassyDoorFlipChip(
             Text(
                 text = label,
                 fontSize = 12.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) {
+                fontWeight = if (isPillSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isPillSelected) {
                     if (isDarkTheme) PureWhite else CharcoalGray
                 } else {
                     if (isDarkTheme) Color(0xFFA5A5AB) else Color(0xFF6E6E73)
@@ -327,7 +375,7 @@ fun GlassyDoorFlipChip(
 
             if (count != null) {
                 Spacer(modifier = Modifier.width(6.dp))
-                if (isSelected) {
+                if (isPillSelected) {
                     // Seçili cam rozet (Frosted Badge)
                     Box(
                         modifier = Modifier
