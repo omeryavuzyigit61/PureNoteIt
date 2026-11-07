@@ -38,6 +38,10 @@ internal class NoteRepositoryImpl @Inject constructor(
         noteDao.upsertNote(note.toEntity())
     }
 
+    override suspend fun insertNote(note: Note): Long = withContext(ioDispatcher) {
+        noteDao.insertNoteSuspend(note.toEntity())
+    }
+
     override suspend fun updateNote(note: Note) = withContext(ioDispatcher) {
         noteDao.updateNote(note.toEntity())
     }
@@ -64,6 +68,10 @@ internal class NoteRepositoryImpl @Inject constructor(
 
     override suspend fun getNotesBetweenDates(startDate: Long, endDate: Long): List<Note> = withContext(ioDispatcher) {
         noteDao.getNotesBetweenDatesSuspend(startDate, endDate).map { it.toDomain() }
+    }
+
+    override suspend fun getActiveReminders(now: Long): List<Note> = withContext(ioDispatcher) {
+        noteDao.getActiveRemindersSuspend(now).map { it.toDomain() }
     }
 
     override suspend fun updatePinStatus(id: Int, isPinned: Boolean) = withContext(ioDispatcher) {

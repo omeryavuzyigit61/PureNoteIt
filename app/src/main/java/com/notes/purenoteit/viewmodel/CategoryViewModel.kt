@@ -1,14 +1,16 @@
 package com.notes.purenoteit.viewmodel
 
-import android.util.Log
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.notes.purenoteit.data.db.CategoryData
+import com.notes.purenoteit.data.mapper.toDomain
+import com.notes.purenoteit.data.mapper.toEntity
 import com.notes.purenoteit.di.IoDispatcher
-import com.notes.purenoteit.repository.CategoryRepository
+import com.notes.purenoteit.domain.model.Category
+import com.notes.purenoteit.domain.repository.CategoryRepository
+import com.notes.purenoteit.domain.usecase.GetCategoriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,30 +23,60 @@ import javax.inject.Inject
 @HiltViewModel
 class CategoryViewModel @Inject constructor(
     private val repository: CategoryRepository,
+    private val getCategoriesUseCase: GetCategoriesUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
-    private val _categoryList = MutableLiveData<List<CategoryData>>()
-    val categoryList: LiveData<List<CategoryData>> = _categoryList
 
-    // Modern StateFlow API (Compose collectAsStateWithLifecycle için)
+    private val _categoriesDomainFlow = MutableStateFlow<List<Category>>(emptyList())
+    val categoriesDomainFlow: StateFlow<List<Category>> = _categoriesDomainFlow.asStateFlow()
+
     private val _categoryListFlow = MutableStateFlow<List<CategoryData>>(emptyList())
     val categoryListFlow: StateFlow<List<CategoryData>> = _categoryListFlow.asStateFlow()
+
+    private inline fun <T> suspendSafeOrNull(block: () -> T): T? {
+        return try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    init {
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                getCategoriesUseCase().collect { domainCategories ->
+                    val entities = domainCategories.map { it.toEntity() }
+                    withContext(Dispatchers.Main) {
+                        _categoriesDomainFlow.value = domainCategories
+                        _categoryListFlow.value = entities
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     fun seedDefaultCategories() {
         viewModelScope.launch(ioDispatcher) {
             try {
-                val present = runCatching { repository.areDefaultCategoriesPresentSuspend() }.getOrDefault(false)
+                val present = suspendSafeOrNull { repository.areDefaultCategoriesPresent() } ?: false
                 if (!present) {
-                    repository.categoryUpsertSuspend(CategoryData("Not", false, id = 1))
-                    repository.categoryUpsertSuspend(CategoryData("Günlük", false, id = 2))
-                    repository.categoryUpsertSuspend(CategoryData("Önemli", false, id = 3))
+                    repository.upsertCategory(Category(id = 1, name = "Not", isPassword = false))
+                    repository.upsertCategory(Category(id = 2, name = "Günlük", isPassword = false))
+                    repository.upsertCategory(Category(id = 3, name = "Önemli", isPassword = false))
                 }
                 getAllCategories()
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
-                runCatching {
-                    repository.categoryUpsertSuspend(CategoryData("Not", false, id = 1))
-                    repository.categoryUpsertSuspend(CategoryData("Günlük", false, id = 2))
-                    repository.categoryUpsertSuspend(CategoryData("Önemli", false, id = 3))
+                suspendSafeOrNull {
+                    repository.upsertCategory(Category(id = 1, name = "Not", isPassword = false))
+                    repository.upsertCategory(Category(id = 2, name = "Günlük", isPassword = false))
+                    repository.upsertCategory(Category(id = 3, name = "Önemli", isPassword = false))
                 }
                 getAllCategories()
             }
@@ -54,13 +86,15 @@ class CategoryViewModel @Inject constructor(
     fun getAllCategories() {
         viewModelScope.launch(ioDispatcher) {
             try {
-                val list = repository.getAllCategoriesSuspend()
+                val domainList = repository.getAllCategories()
+                val entityList = domainList.map { it.toEntity() }
                 withContext(Dispatchers.Main) {
-                    _categoryListFlow.value = list
-                    runCatching { _categoryList.value = list }
+                    _categoriesDomainFlow.value = domainList
+                    _categoryListFlow.value = entityList
                 }
-            } catch (e: Exception) {
-                Log.e("CategoryViewModel", "Error fetching categories: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -68,11 +102,11 @@ class CategoryViewModel @Inject constructor(
     fun upsert(item: CategoryData) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                repository.categoryUpsertSuspend(item)
+                repository.upsertCategory(item.toDomain())
                 getAllCategories()
-                Log.i("CategoryViewModel", "Category upserted successfully via Coroutines")
-            } catch (error: Exception) {
-                Log.e("CategoryViewModel", "Error upserting category: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -80,10 +114,11 @@ class CategoryViewModel @Inject constructor(
     fun update(item: CategoryData) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                repository.categoryUpdateSuspend(item)
+                repository.updateCategory(item.toDomain())
                 getAllCategories()
-            } catch (e: Exception) {
-                Log.e("CategoryViewModel", "Error updating category: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -91,10 +126,11 @@ class CategoryViewModel @Inject constructor(
     fun delete(item: CategoryData) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                repository.categoryDeleteSuspend(item)
+                repository.deleteCategory(item.toDomain())
                 getAllCategories()
-            } catch (e: Exception) {
-                Log.e("CategoryViewModel", "Error deleting category: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -102,11 +138,11 @@ class CategoryViewModel @Inject constructor(
     fun deleteCategoryById(id: Int) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                repository.deleteCategoryByIdSuspend(id)
+                repository.deleteCategoryById(id)
                 getAllCategories()
-                Log.i("CategoryViewModel", "Category deleted successfully via Coroutines")
-            } catch (error: Exception) {
-                Log.e("CategoryViewModel", "Error deleting category: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -114,34 +150,36 @@ class CategoryViewModel @Inject constructor(
     fun searchCategory(query: String) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                val list = repository.searchCategorySuspend(query)
+                val domainList = repository.searchCategories(query)
+                val entityList = domainList.map { it.toEntity() }
                 withContext(Dispatchers.Main) {
-                    _categoryListFlow.value = list
-                    runCatching { _categoryList.value = list }
+                    _categoriesDomainFlow.value = domainList
+                    _categoryListFlow.value = entityList
                 }
-            } catch (error: Exception) {
-                Log.e("CategoryViewModel", "Error searching categories: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
 
     suspend fun getCategoryById(id: Int): CategoryData? = withContext(ioDispatcher) {
-        repository.getCategoryByIdSuspend(id)
+        repository.getCategoryById(id)?.toEntity()
     }
 
     suspend fun isCategoryExists(name: String): Boolean = withContext(ioDispatcher) {
-        repository.isCategoryExistsSuspend(name)
+        repository.isCategoryExists(name)
     }
 
     suspend fun isPasswordSet(categoryName: String): Boolean = withContext(ioDispatcher) {
-        repository.isPasswordSetSuspend(categoryName) ?: false
+        repository.isPasswordSet(categoryName) ?: false
     }
 
     suspend fun areDefaultCategoriesPresent(): Boolean = withContext(ioDispatcher) {
-        repository.areDefaultCategoriesPresentSuspend()
+        repository.areDefaultCategoriesPresent()
     }
 
     suspend fun getCategoryIdByName(categoryName: String): Int? = withContext(ioDispatcher) {
-        repository.getCategoryIdByNameSuspend(categoryName)
+        repository.getCategoryIdByName(categoryName)
     }
 }

@@ -207,7 +207,7 @@ fun NotionKanbanBoard(
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             for (column in KANBAN_COLUMNS) {
-                val columnNotes = displayedNotes.filter { (it.status ?: "TODO") == column.statusKey }
+                val columnNotes = displayedNotes.filter { it.status == column.statusKey }
 
                 KanbanColumn(
                     columnDef = column,
@@ -528,8 +528,8 @@ private fun KanbanNoteCard(
                     }
 
                     // 1-Tap Quick Transition Arrows
-                    val fastPrev = getFastPrevStatus(note.status ?: "TODO")
-                    val fastNext = getFastNextStatus(note.status ?: "TODO")
+                    val fastPrev = getFastPrevStatus(note.status)
+                    val fastNext = getFastNextStatus(note.status)
 
                     if (fastPrev != null) {
                         Box(

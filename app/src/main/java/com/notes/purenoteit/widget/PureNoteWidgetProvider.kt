@@ -8,18 +8,24 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import com.notes.purenoteit.R
-import com.notes.purenoteit.repository.CategoryRepository
-import com.notes.purenoteit.repository.NoteRepository
+import com.notes.purenoteit.di.ApplicationScope
+import com.notes.purenoteit.domain.repository.CategoryRepository
+import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.view.MainActivity
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class PureNoteWidgetProvider : AppWidgetProvider() {
 
@@ -28,6 +34,7 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
     interface WidgetEntryPoint {
         fun getNoteRepository(): NoteRepository
         fun getCategoryRepository(): CategoryRepository
+        @ApplicationScope fun getApplicationScope(): CoroutineScope
     }
 
     override fun onUpdate(
@@ -118,7 +125,7 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.btn_widget_voice, voicePending)
 
-            // 5. Asynchronously fetch latest public (non-locked, non-trashed) note via Hilt Repository
+            // 5. Asynchronously fetch latest public (non-locked, non-trashed) note via Domain Repository
             try {
                 val entryPoint = EntryPointAccessors.fromApplication(
                     context.applicationContext,
@@ -126,11 +133,12 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
                 )
                 val noteRepository = entryPoint.getNoteRepository()
                 val categoryRepository = entryPoint.getCategoryRepository()
+                val appScope = entryPoint.getApplicationScope()
 
-                CoroutineScope(Dispatchers.IO).launch {
+                appScope.launch {
                     try {
-                        val notes = noteRepository.getAllNotesSuspend()
-                        val categories = categoryRepository.getAllCategoriesSuspend()
+                        val notes = noteRepository.getAllNotes()
+                        val categories = categoryRepository.getAllCategories()
                         val lockedCategoryIds = categories.filter { it.isPassword == true }.map { it.id }.toSet()
                         val publicNotes = notes.filter { note ->
                             note.status != "TRASH" &&
@@ -142,12 +150,12 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
                         val latestPublicNote = publicNotes.maxByOrNull { it.date }
 
                         val data = if (latestPublicNote != null) {
-                            val title = if (!latestPublicNote.title.isNullOrBlank()) latestPublicNote.title!! else "Başlıksız Not"
+                            val title = if (!latestPublicNote.title.isNullOrBlank()) latestPublicNote.title else "Başlıksız Not"
                             val snippet = try {
-                                val blocks = com.notes.purenoteit.model.BlockParser.parse(latestPublicNote.description)
-                                val summary = com.notes.purenoteit.model.BlockParser.toPlainTextSummary(blocks, maxLines = 2)
+                                val blocks = BlockParser.parse(latestPublicNote.description)
+                                val summary = BlockParser.toPlainTextSummary(blocks, maxLines = 2)
                                 if (summary.isNotBlank()) summary else "Açmak için dokunun"
-                            } catch (e: Exception) {
+                            } catch (_: Exception) {
                                 "Açmak için dokunun"
                             }
 
@@ -157,7 +165,7 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
                             val iconPrefix = if (!latestPublicNote.icon.isNullOrBlank()) "${latestPublicNote.icon} " else "📝 "
 
                             WidgetDisplayData(
-                                headerSubtext = "${publicNotes.size} Not • Son: ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(latestPublicNote.date))}",
+                                headerSubtext = "${publicNotes.size} Not • Son: ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(latestPublicNote.date))}",
                                 noteTitle = "$iconPrefix$title$taskSuffix",
                                 noteSnippet = snippet,
                                 noteId = latestPublicNote.id
@@ -195,14 +203,16 @@ class PureNoteWidgetProvider : AppWidgetProvider() {
 
                             appWidgetManager.updateAppWidget(appWidgetId, views)
                         }
-                    } catch (e: Exception) {
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
                         views.setTextViewText(R.id.widget_recent_note_text, "Aklındakileri anında yakala...")
                         views.setTextViewText(R.id.widget_note_card_title, "PureNoteIt")
                         views.setTextViewText(R.id.widget_note_card_snippet, "Hızlı not almak için dokunun ✨")
                         appWidgetManager.updateAppWidget(appWidgetId, views)
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             }
         }

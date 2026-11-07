@@ -438,7 +438,7 @@ private fun WhiteboardCard(
                     color = SoftOrangeLight
                 ) {
                     Text(
-                        text = note.status ?: "TODO",
+                        text = note.status,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = VibrantOrange,

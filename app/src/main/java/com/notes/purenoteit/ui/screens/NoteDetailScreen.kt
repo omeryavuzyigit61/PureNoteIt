@@ -84,7 +84,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -117,8 +116,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -130,6 +127,7 @@ import android.os.Build
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
+import com.notes.purenoteit.domain.model.AppResult
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
@@ -207,7 +205,7 @@ fun NoteDetailScreen(
         }
     }
 
-    val backlinks by noteViewModel.backlinks.observeAsState(emptyList())
+    val backlinks by noteViewModel.backlinksFlow.collectAsStateWithLifecycle()
 
     LaunchedEffect(noteId) {
         if (noteId != -1) {
@@ -324,9 +322,10 @@ fun NoteDetailScreen(
         categoriesForSecurity.any { it.id == selectedCategoryId && it.isPassword == true }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, isNoteProtected) {
+    val requiresSecureWindow = isNoteProtected || showPasswordDialog || showGatekeeperPinDialog
+    DisposableEffect(lifecycleOwner, requiresSecureWindow) {
         val window = (context as? Activity)?.window
-        if (isNoteProtected) {
+        if (requiresSecureWindow) {
             window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         } else {
             window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -353,8 +352,8 @@ fun NoteDetailScreen(
 
     var showLinkNotePicker by remember { mutableStateOf(false) }
     var linkSearchQuery by remember { mutableStateOf("") }
-    val allNotesForLinking by noteViewModel.noteList.observeAsState(emptyList())
-    val allLinks by noteViewModel.allLinks.observeAsState(emptyList())
+    val allNotesForLinking by noteViewModel.noteListFlow.collectAsStateWithLifecycle()
+    val allLinks by noteViewModel.allLinksFlow.collectAsStateWithLifecycle()
     val knownLinkTargets = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
 
     LaunchedEffect(allLinks, currentNoteId) {
@@ -504,13 +503,23 @@ fun NoteDetailScreen(
         }
     }
 
-    fun populateNoteBlocks(note: NoteData) {
-        title = note.title ?: ""
+    fun populateNoteBlocks(note: NoteData): Boolean {
         val rawDesc = if (note.isEncrypted || SecurityUtil.isEncryptedPayload(note.description)) {
-            SecurityUtil.decrypt(note.description ?: "")
+            when (val decrypted = SecurityUtil.decryptSafe(note.description ?: "")) {
+                is AppResult.Success -> decrypted.data
+                is AppResult.Failure -> {
+                    isAccessGranted = false
+                    isInitialLoadCompleted = false
+                    blocks.clear()
+                    title = "🔒 Korumalı Not"
+                    context.showToastShort("Not şifresi çözülemedi. Kasa yeniden kilitlendi.")
+                    return false
+                }
+            }
         } else {
             note.description ?: ""
         }
+        title = note.title ?: ""
         blocks.clear()
         val parsed = BlockParser.parse(rawDesc)
         blocks.addAll(parsed)
@@ -530,6 +539,7 @@ fun NoteDetailScreen(
         if (blocks.isEmpty()) {
             blocks.add(NoteBlock())
         }
+        return true
     }
 
     fun requestGatekeeperUnlock(onSuccess: (() -> Unit)? = null) {
@@ -540,46 +550,31 @@ fun NoteDetailScreen(
         }
         val activity = context as? FragmentActivity
         if (activity != null) {
-            val biometricManager = BiometricManager.from(context)
-            val canAuth = biometricManager.canAuthenticate(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-            )
-            if (canAuth == BiometricManager.BIOMETRIC_SUCCESS) {
-                val prompt = BiometricPrompt(
-                    activity,
-                    ContextCompat.getMainExecutor(context),
-                    object : BiometricPrompt.AuthenticationCallback() {
-                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                            SecurityUtil.unlockVault()
-                            isAccessGranted = true
-                            onSuccess?.invoke() ?: run {
-                                loadedNoteRef?.let { populateNoteBlocks(it) }
-                            }
-                        }
-                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                            gatekeeperSuccessAction = onSuccess
-                            showGatekeeperPinDialog = true
+            SecurityUtil.authenticateWithCryptoBiometric(
+                activity = activity,
+                title = "Korumalı Not",
+                subtitle = "Devam etmek için parmak izinizi okutun",
+                negativeButtonText = "PIN Girin",
+                onUnlocked = {
+                    isAccessGranted = true
+                    onSuccess?.invoke() ?: run {
+                        loadedNoteRef?.let {
+                            isInitialLoadCompleted = populateNoteBlocks(it)
                         }
                     }
-                )
-                prompt.authenticate(
-                    BiometricPrompt.PromptInfo.Builder()
-                        .setTitle("Korumalı Not")
-                        .setSubtitle("Devam etmek için parmak izinizi okutun")
-                        .setNegativeButtonText("PIN Girin")
-                        .build()
-                )
-            } else {
-                gatekeeperSuccessAction = onSuccess
-                showGatekeeperPinDialog = true
-            }
+                },
+                onFallbackToPin = {
+                    gatekeeperSuccessAction = onSuccess
+                    showGatekeeperPinDialog = true
+                }
+            )
         } else {
             gatekeeperSuccessAction = onSuccess
             showGatekeeperPinDialog = true
         }
     }
 
-    val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
+    val categoryList by categoryViewModel.categoryListFlow.collectAsStateWithLifecycle()
 
     // Load existing note data with Kotlin Coroutines LaunchedEffect
     LaunchedEffect(noteId) {
@@ -599,7 +594,7 @@ fun NoteDetailScreen(
                 isPassword = requiresLock
                 isPinned = note.isPinned
                 selectedCategoryId = note.categoryId ?: 1
-                noteStatus = note.status ?: "TODO"
+                noteStatus = note.status
                 noteDate = note.date
                 reminderTime = note.reminderTime
                 reminderType = note.reminderType ?: "ALARM"
@@ -611,13 +606,11 @@ fun NoteDetailScreen(
                     isAccessGranted = false
                     blocks.clear()
                     requestGatekeeperUnlock {
-                        populateNoteBlocks(note)
-                        isInitialLoadCompleted = true
+                        isInitialLoadCompleted = populateNoteBlocks(note)
                     }
                 } else {
                     isAccessGranted = true
-                    populateNoteBlocks(note)
-                    isInitialLoadCompleted = true
+                    isInitialLoadCompleted = populateNoteBlocks(note)
                 }
             }
         } else {
@@ -995,8 +988,11 @@ fun NoteDetailScreen(
         noteViewModel.saveNote(note, contentForLinks = allContentText) { actualId ->
             currentNoteId = actualId
             if (reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone) {
-                val safeTitle = if (isPassword) "🔒 Korumalı Not" else (note.title ?: "Başlıksız Not")
-                val noteDescPreview = if (isPassword) "ENC:" else (blocks.firstOrNull { it.content.isNotBlank() }?.content ?: "")
+                val isReminderProtected = isPassword ||
+                    note.isEncrypted ||
+                    categoryList.any { it.id == note.categoryId && it.isPassword == true }
+                val safeTitle = if (isReminderProtected) "🔒 Korumalı Not" else (note.title ?: "Başlıksız Not")
+                val noteDescPreview = if (isReminderProtected) "ENC:" else (blocks.firstOrNull { it.content.isNotBlank() }?.content ?: "")
                 ReminderManager.scheduleReminder(
                     context = context,
                     noteId = actualId,
@@ -1313,14 +1309,14 @@ fun NoteDetailScreen(
                             toRemove.add(b)
                             blocksModified = true
                         } else {
-                            val newTitle = targetNote.title
+                            val newTitle = targetNote.title.orEmpty()
                             val isRecentlyEditedInParent = (System.currentTimeMillis() - lastParentSubPageEditTime) < 1500L
                             val needTitleUpdate = !isRecentlyEditedInParent &&
-                                !newTitle.isNullOrBlank() &&
+                                newTitle.isNotBlank() &&
                                 b.content != newTitle &&
                                 !(b.content.isEmpty() && newTitle == "Yeni Alt Sayfa")
                             if (needTitleUpdate) {
-                                b = b.copy(content = newTitle!!)
+                                b = b.copy(content = newTitle)
                                 blocks[i] = b
                                 blocksModified = true
                             }
@@ -1447,7 +1443,7 @@ fun NoteDetailScreen(
     val hideExitingGhost = isExitingScreen && pagerCoordinator.suppressOverlay
 
     @OptIn(ExperimentalSharedTransitionApi::class)
-    val targetBoundsModifier = if (originScope != "none" && sharedTransitionScope != null && animatedVisibilityScope != null && noteId > 0) {
+    val targetBoundsModifier = if (!pagerCoordinator.suppressOverlay && originScope != "none" && sharedTransitionScope != null && animatedVisibilityScope != null && noteId > 0) {
         with(sharedTransitionScope) {
             Modifier.sharedBounds(
                 sharedContentState = rememberSharedContentState(
@@ -1455,16 +1451,12 @@ fun NoteDetailScreen(
                 ),
                 animatedVisibilityScope = animatedVisibilityScope,
                 boundsTransform = { _, _ ->
-                    if (pagerCoordinator.suppressOverlay) {
-                        snap()
-                    } else {
-                        spring(
-                            dampingRatio = 0.82f,
-                            stiffness = 380f
-                        )
-                    }
+                    spring(
+                        dampingRatio = 0.82f,
+                        stiffness = 380f
+                    )
                 },
-                renderInOverlayDuringTransition = !pagerCoordinator.suppressOverlay,
+                renderInOverlayDuringTransition = true,
                 clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(0.dp))
             )
         }
@@ -3575,7 +3567,7 @@ fun NoteDetailScreen(
                 TextButton(
                     onClick = {
                         if (pinInput.length == 6) {
-                            SecurityUtil.savePassword(context, pinInput)
+                            SecurityUtil.savePassword(context, pinInput.toCharArray())
                             isPassword = true
                             showPasswordDialog = false
                             pinInput = ""
@@ -3952,7 +3944,7 @@ fun NoteDetailScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (SecurityUtil.verifyPassword(context, gatekeeperPinInput)) {
+                        if (SecurityUtil.verifyPassword(context, gatekeeperPinInput.toCharArray())) {
                             SecurityUtil.unlockVault()
                             isAccessGranted = true
                             showGatekeeperPinDialog = false
@@ -3960,7 +3952,9 @@ fun NoteDetailScreen(
                             gatekeeperSuccessAction = null
                             gatekeeperPinInput = ""
                             pendingAction?.invoke() ?: run {
-                                loadedNoteRef?.let { populateNoteBlocks(it) }
+                                loadedNoteRef?.let {
+                                    isInitialLoadCompleted = populateNoteBlocks(it)
+                                }
                             }
                         } else {
                             context.showToastShort(context.getString(R.string.wrong_pin))

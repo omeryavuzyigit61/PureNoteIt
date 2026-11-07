@@ -1,11 +1,40 @@
 package com.notes.purenoteit.viewmodel
 
 import android.content.Context
-import android.util.Log
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.notes.purenoteit.automation.AutomationEngine
+import com.notes.purenoteit.data.db.NoteData
+import com.notes.purenoteit.data.db.NoteLinkData
+import com.notes.purenoteit.data.db.StreamItemData
+import com.notes.purenoteit.data.mapper.toDomain
+import com.notes.purenoteit.data.mapper.toEntity
+import com.notes.purenoteit.di.IoDispatcher
+import com.notes.purenoteit.domain.model.AppResult
+import com.notes.purenoteit.domain.model.Note
+import com.notes.purenoteit.domain.model.NoteLink
+import com.notes.purenoteit.domain.model.StreamItem
+import com.notes.purenoteit.domain.repository.CategoryRepository
+import com.notes.purenoteit.domain.repository.KnowledgeRepository
+import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.domain.time.AppClock
+import com.notes.purenoteit.domain.usecase.DeleteNoteUseCase
+import com.notes.purenoteit.domain.usecase.GetNotesUseCase
+import com.notes.purenoteit.domain.usecase.SaveNoteUseCase
+import com.notes.purenoteit.model.BlockParser
+import com.notes.purenoteit.model.BlockType
+import com.notes.purenoteit.model.NoteBlock
+import com.notes.purenoteit.ui.mvi.HomeUiEffect
+import com.notes.purenoteit.ui.mvi.HomeUiEvent
+import com.notes.purenoteit.ui.mvi.HomeUiState
+import com.notes.purenoteit.util.SecurityUtil
+import com.notes.purenoteit.util.VaultBackupManager
+import com.notes.purenoteit.widget.PureNoteWidgetProvider
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -16,26 +45,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.notes.purenoteit.ui.mvi.HomeUiEffect
-import com.notes.purenoteit.ui.mvi.HomeUiEvent
-import com.notes.purenoteit.ui.mvi.HomeUiState
-import com.notes.purenoteit.automation.AutomationEngine
-import com.notes.purenoteit.data.db.NoteData
-import com.notes.purenoteit.data.db.NoteLinkData
-import com.notes.purenoteit.data.db.StreamItemData
-import com.notes.purenoteit.model.BlockParser
-import com.notes.purenoteit.model.BlockType
-import com.notes.purenoteit.model.NoteBlock
-import com.notes.purenoteit.repository.CategoryRepository
-import com.notes.purenoteit.repository.KnowledgeRepository
-import com.notes.purenoteit.repository.NoteRepository
-import com.notes.purenoteit.util.SecurityUtil
-import com.notes.purenoteit.util.VaultBackupManager
-import com.notes.purenoteit.widget.PureNoteWidgetProvider
-import com.notes.purenoteit.di.IoDispatcher
-import kotlinx.coroutines.CoroutineDispatcher
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -43,15 +53,26 @@ class NoteViewModel @Inject constructor(
     private val repository: NoteRepository,
     private val categoryRepository: CategoryRepository,
     private val knowledgeRepository: KnowledgeRepository,
+    private val getNotesUseCase: GetNotesUseCase,
+    private val saveNoteUseCase: SaveNoteUseCase,
+    private val deleteNoteUseCase: DeleteNoteUseCase,
     private val automationEngine: AutomationEngine,
+    private val clock: AppClock,
     @ApplicationContext private val context: Context,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
-    private val _noteList = MutableLiveData<List<NoteData>>()
-    val noteList: LiveData<List<NoteData>> = _noteList
 
     private val _noteListFlow = MutableStateFlow<List<NoteData>>(emptyList())
     val noteListFlow: StateFlow<List<NoteData>> = _noteListFlow.asStateFlow()
+
+    private val _allLinksFlow = MutableStateFlow<List<NoteLinkData>>(emptyList())
+    val allLinksFlow: StateFlow<List<NoteLinkData>> = _allLinksFlow.asStateFlow()
+
+    private val _backlinksFlow = MutableStateFlow<List<NoteData>>(emptyList())
+    val backlinksFlow: StateFlow<List<NoteData>> = _backlinksFlow.asStateFlow()
+
+    private val _streamItemsFlow = MutableStateFlow<List<StreamItemData>>(emptyList())
+    val streamItemsFlow: StateFlow<List<StreamItemData>> = _streamItemsFlow.asStateFlow()
 
     // --- MVI Architecture State & Effect Contracts (android_native_rules.md) ---
     private val _homeUiState = MutableStateFlow(HomeUiState())
@@ -59,6 +80,18 @@ class NoteViewModel @Inject constructor(
 
     private val _homeEffect = Channel<HomeUiEffect>(Channel.BUFFERED)
     val homeEffect: Flow<HomeUiEffect> = _homeEffect.receiveAsFlow()
+
+    private var hasExecutedStartupMaintenance = false
+
+    private inline fun <T> suspendSafeOrNull(block: () -> T): T? {
+        return try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     fun onHomeEvent(event: HomeUiEvent) {
         when (event) {
@@ -91,7 +124,7 @@ class NoteViewModel @Inject constructor(
                 _homeUiState.update { it.copy(selectedNoteIds = emptySet()) }
             }
             is HomeUiEvent.DeleteNote -> {
-                delete(event.note)
+                deleteNoteById(event.noteId)
                 viewModelScope.launch(ioDispatcher) {
                     _homeEffect.send(HomeUiEffect.ShowToast("Not silindi"))
                 }
@@ -101,7 +134,7 @@ class NoteViewModel @Inject constructor(
             }
             is HomeUiEvent.BatchDeleteSelected -> {
                 val ids = _homeUiState.value.selectedNoteIds
-                val toDelete = _homeUiState.value.notes.filter { it.id in ids }
+                val toDelete = _noteListFlow.value.filter { it.id in ids }
                 if (toDelete.isNotEmpty()) {
                     batchMoveToTrash(toDelete) {
                         _homeUiState.update { it.copy(selectedNoteIds = emptySet()) }
@@ -121,47 +154,44 @@ class NoteViewModel @Inject constructor(
     private fun notifyWidgetSync() {
         try {
             PureNoteWidgetProvider.updateAllWidgets(context)
-        } catch (e: Exception) {
-            Log.e("NoteViewModel", "Error notifying widget sync: ${e.message}")
+        } catch (_: Exception) {
         }
     }
-
-    private val _allLinks = MutableLiveData<List<NoteLinkData>>()
-    val allLinks: LiveData<List<NoteLinkData>> = _allLinks
-
-    private val _backlinks = MutableLiveData<List<NoteData>>()
-    val backlinks: LiveData<List<NoteData>> = _backlinks
-
-    private val _streamItems = MutableLiveData<List<StreamItemData>>()
-    val streamItems: LiveData<List<StreamItemData>> = _streamItems
-
-    private var hasExecutedStartupMaintenance = false
 
     fun getAllNotes() {
         viewModelScope.launch(ioDispatcher) {
             try {
-                val initialList = repository.getAllNotesSuspend()
-                var currentList = initialList
+                var domainList = repository.getAllNotes()
                 if (!hasExecutedStartupMaintenance) {
                     hasExecutedStartupMaintenance = true
-                    val trashPurged = purgeAllTrashNotesOnUpgrade(currentList)
+                    val trashPurged = purgeAllTrashNotesOnUpgrade(domainList)
                     if (trashPurged) {
-                        currentList = repository.getAllNotesSuspend()
+                        domainList = repository.getAllNotes()
                     }
-                    val healed = healOrphanedSubPages(currentList)
+                    val healed = healOrphanedSubPages(domainList)
                     if (healed) {
-                        currentList = repository.getAllNotesSuspend()
+                        domainList = repository.getAllNotes()
                     }
                 }
+                val entities = domainList.map { it.toEntity() }
+                val categories = suspendSafeOrNull { categoryRepository.getAllCategories() }.orEmpty()
                 withContext(Dispatchers.Main) {
-                    _noteListFlow.value = currentList
-                    _homeUiState.update { it.copy(notes = currentList, isLoading = false) }
-                    runCatching { _noteList.value = currentList }
-                    Log.i("datas", "getAllNotes: coroutines flow updated (${currentList.size} notes)")
+                    _noteListFlow.value = entities
+                    _homeUiState.update {
+                        it.copy(
+                            notes = domainList,
+                            categories = categories,
+                            isLoading = false,
+                            errorMessage = null
+                        )
+                    }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Log.e("NoteViewModel", "Error fetching notes: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) {
+                    _homeUiState.update { it.copy(isLoading = false) }
+                }
             }
         }
     }
@@ -170,29 +200,29 @@ class NoteViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             try {
                 if (item.id > 0) {
-                    val previousNote = runCatching { repository.getNoteByIdSuspend(item.id) }.getOrNull()
-                    if (item.richBlocksJson == null && !previousNote?.richBlocksJson.isNullOrBlank()) {
-                        item.richBlocksJson = previousNote?.richBlocksJson
+                    val previousNote = suspendSafeOrNull { repository.getNoteById(item.id) }
+                    if (item.richBlocksJson == null && previousNote != null && !previousNote.richBlocksJson.isNullOrBlank()) {
+                        item.richBlocksJson = previousNote.richBlocksJson
                     }
                     val previousStatus = previousNote?.status
-                    repository.updateSuspend(item)
+                    repository.updateNote(item.toDomain())
                     if (item.status == "TRASH") {
                         purgeDeletedNoteReferences(item.id, item.title)
                     } else if (previousStatus == "TRASH") {
-                        restoreSubPageToParent(item)
+                        restoreSubPageToParent(item.toDomain())
                     }
                 } else {
-                    repository.upsertSuspend(item)
+                    saveNoteUseCase(item.toDomain())
                 }
                 withContext(Dispatchers.Main) {
                     getAllNotes()
                     getAllLinks()
                     notifyWidgetSync()
                     triggerAutoSync()
-                    Log.i("NoteViewModel", "Note upserted successfully via Coroutines")
                 }
-            } catch (error: Exception) {
-                Log.e("NoteViewModel", "Error upserting note: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -201,22 +231,26 @@ class NoteViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             try {
                 val previousNote = if (item.id > 0) {
-                    runCatching { repository.getNoteByIdSuspend(item.id) }.getOrNull()
-                        ?: _noteList.value?.find { it.id == item.id }
+                    suspendSafeOrNull { repository.getNoteById(item.id) }
+                        ?: _noteListFlow.value.find { it.id == item.id }?.toDomain()
                 } else {
                     null
                 }
-                if (item.richBlocksJson == null && !previousNote?.richBlocksJson.isNullOrBlank()) {
-                    item.richBlocksJson = previousNote?.richBlocksJson
+                if (item.richBlocksJson == null && previousNote != null && !previousNote.richBlocksJson.isNullOrBlank()) {
+                    item.richBlocksJson = previousNote.richBlocksJson
                 }
                 val previousTitle = previousNote?.title
                 val previousStatus = previousNote?.status
 
-                val actualId = if (item.id > 0) {
-                    repository.updateSuspend(item)
-                    item.id
+                val domainItem = item.toDomain().let {
+                    if (it.date <= 0L) it.copy(date = clock.nowMillis()) else it
+                }
+
+                val actualId = if (domainItem.id > 0) {
+                    repository.updateNote(domainItem)
+                    domainItem.id
                 } else {
-                    repository.insertNoteSuspend(item).toInt()
+                    repository.insertNote(domainItem).toInt()
                 }
                 item.id = actualId
 
@@ -227,7 +261,7 @@ class NoteViewModel @Inject constructor(
                     )
                 } else {
                     if (previousStatus == "TRASH") {
-                        restoreSubPageToParent(item)
+                        restoreSubPageToParent(domainItem.copy(id = actualId))
                     }
                     propagateTitleChangeToLinkedNotes(
                         targetNoteId = actualId,
@@ -246,8 +280,9 @@ class NoteViewModel @Inject constructor(
                     triggerAutoSync()
                     onSaved?.invoke(actualId)
                 }
-            } catch (error: Exception) {
-                Log.e("NoteViewModel", "Error saving note: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -265,9 +300,7 @@ class NoteViewModel @Inject constructor(
         if (newTitle.isBlank()) return
 
         try {
-            val backlinkRows = runCatching {
-                knowledgeRepository.getBacklinksSuspend(targetNoteId)
-            }.getOrDefault(emptyList())
+            val backlinkRows = suspendSafeOrNull { knowledgeRepository.getBacklinks(targetNoteId) }.orEmpty()
 
             val oldTitles = buildSet {
                 previousRawTitle?.trim()?.takeIf {
@@ -283,9 +316,7 @@ class NoteViewModel @Inject constructor(
 
             if (oldTitles.isEmpty() && backlinkRows.isEmpty()) return
 
-            val allNotes = runCatching {
-                repository.getAllNotesSuspend()
-            }.getOrDefault(emptyList())
+            val allNotes = suspendSafeOrNull { repository.getAllNotes() }.orEmpty()
 
             for (candidate in allNotes) {
                 if (candidate.id == targetNoteId) continue
@@ -293,7 +324,10 @@ class NoteViewModel @Inject constructor(
                     (candidate.isPassword == true) ||
                     SecurityUtil.isEncryptedPayload(candidate.description)
                 val rawDesc = if (wasEncrypted && !candidate.description.isNullOrBlank()) {
-                    SecurityUtil.decrypt(candidate.description!!)
+                    when (val dec = SecurityUtil.decryptSafe(candidate.description)) {
+                        is AppResult.Success -> dec.data
+                        is AppResult.Failure -> continue // Never overwrite undecryptable encrypted notes
+                    }
                 } else {
                     candidate.description ?: ""
                 }
@@ -310,9 +344,7 @@ class NoteViewModel @Inject constructor(
                         val isMatch = if (block.subPageNoteId != null) {
                             block.subPageNoteId == targetNoteId
                         } else {
-                            oldTitles.any {
-                                block.content.trim().equals(it, ignoreCase = true)
-                            }
+                            oldTitles.any { block.content.trim().equals(it, ignoreCase = true) }
                         }
                         if (isMatch) {
                             if (block.content != newTitle || block.subPageNoteId != targetNoteId) {
@@ -348,18 +380,15 @@ class NoteViewModel @Inject constructor(
                 if (noteModified) {
                     val serialized = BlockParser.serialize(parsedBlocks)
                     val finalDesc = if (wasEncrypted) SecurityUtil.encrypt(serialized) else serialized
-                    val updatedCandidate = candidate.copy(description = finalDesc).also {
-                        it.id = candidate.id
-                    }
-                    runCatching { repository.updateSuspend(updatedCandidate) }
+                    suspendSafeOrNull { repository.updateNote(candidate.copy(description = finalDesc)) }
                 }
             }
 
             if (backlinkRows.isNotEmpty() || oldTitles.isNotEmpty()) {
-                runCatching {
-                    knowledgeRepository.updateTargetLinkTextSuspend(targetNoteId, newTitle)
-                }
+                suspendSafeOrNull { knowledgeRepository.updateTargetLinkText(targetNoteId, newTitle) }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
         }
     }
@@ -373,9 +402,7 @@ class NoteViewModel @Inject constructor(
         deletedRawTitle: String?
     ) {
         try {
-            val backlinkRows = runCatching {
-                knowledgeRepository.getBacklinksSuspend(deletedNoteId)
-            }.getOrDefault(emptyList())
+            val backlinkRows = suspendSafeOrNull { knowledgeRepository.getBacklinks(deletedNoteId) }.orEmpty()
 
             val titlesToRemove = buildSet {
                 deletedRawTitle?.trim()?.takeIf { it.isNotBlank() }?.let { add(it) }
@@ -385,9 +412,7 @@ class NoteViewModel @Inject constructor(
                 }
             }
 
-            val allNotes = runCatching {
-                repository.getAllNotesSuspend()
-            }.getOrDefault(emptyList())
+            val allNotes = suspendSafeOrNull { repository.getAllNotes() }.orEmpty()
 
             for (candidate in allNotes) {
                 if (candidate.id == deletedNoteId) continue
@@ -395,7 +420,10 @@ class NoteViewModel @Inject constructor(
                     (candidate.isPassword == true) ||
                     SecurityUtil.isEncryptedPayload(candidate.description)
                 val rawDesc = if (wasEncrypted && !candidate.description.isNullOrBlank()) {
-                    SecurityUtil.decrypt(candidate.description!!)
+                    when (val dec = SecurityUtil.decryptSafe(candidate.description)) {
+                        is AppResult.Success -> dec.data
+                        is AppResult.Failure -> continue
+                    }
                 } else {
                     candidate.description ?: ""
                 }
@@ -415,9 +443,7 @@ class NoteViewModel @Inject constructor(
                         } else {
                             block.content.isNotBlank() &&
                                 !block.content.trim().equals("Yeni Alt Sayfa", ignoreCase = true) &&
-                                titlesToRemove.any {
-                                    block.content.trim().equals(it, ignoreCase = true)
-                                }
+                                titlesToRemove.any { block.content.trim().equals(it, ignoreCase = true) }
                         }
                         if (isMatch) {
                             blocksToRemove.add(block)
@@ -429,13 +455,11 @@ class NoteViewModel @Inject constructor(
                     for (deadTitle in titlesToRemove) {
                         val pattern = Regex("""\[\[\s*${Regex.escape(deadTitle)}\s*\]\]\s*""", RegexOption.IGNORE_CASE)
                         if (pattern.containsMatchIn(block.content)) {
-                            val cleanedContent = pattern.replace(block.content, "").trimEnd()
-                            block = block.copy(content = cleanedContent)
+                            block = block.copy(content = pattern.replace(block.content, "").trimEnd())
                             blockChanged = true
                         }
                         if (pattern.containsMatchIn(block.toggleBody)) {
-                            val cleanedBody = pattern.replace(block.toggleBody, "").trimEnd()
-                            block = block.copy(toggleBody = cleanedBody)
+                            block = block.copy(toggleBody = pattern.replace(block.toggleBody, "").trimEnd())
                             blockChanged = true
                         }
                     }
@@ -464,25 +488,21 @@ class NoteViewModel @Inject constructor(
                 if (noteModified) {
                     val serialized = BlockParser.serialize(parsedBlocks)
                     val finalDesc = if (wasEncrypted) SecurityUtil.encrypt(serialized) else serialized
-                    val updatedCandidate = candidate.copy(description = finalDesc).also {
-                        it.id = candidate.id
-                    }
-                    runCatching { repository.updateSuspend(updatedCandidate) }
+                    suspendSafeOrNull { repository.updateNote(candidate.copy(description = finalDesc)) }
                 }
             }
 
-            runCatching {
-                knowledgeRepository.deleteLinksForNoteSuspend(deletedNoteId)
-            }
+            suspendSafeOrNull { knowledgeRepository.deleteLinksForNote(deletedNoteId) }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
         }
     }
 
     /**
-     * Re-attaches a sub-page restored from Trash back into its parent note as a SUB_PAGE block,
-     * or promotes it to a standalone root note if its parent note was deleted or is in Trash.
+     * Re-attaches a sub-page restored from Trash back into its parent note as a SUB_PAGE block.
      */
-    private suspend fun restoreSubPageToParent(restoredNote: NoteData): Boolean {
+    private suspend fun restoreSubPageToParent(restoredNote: Note): Boolean {
         return try {
             val richJson = restoredNote.richBlocksJson ?: return false
             if (!richJson.contains("\"isSubPage\":true") && !richJson.contains("\"parentNoteId\"")) {
@@ -492,7 +512,7 @@ class NoteViewModel @Inject constructor(
             val parentId = parentIdMatch?.groupValues?.getOrNull(1)?.toIntOrNull()
 
             val parentNote = if (parentId != null && parentId > 0) {
-                runCatching { repository.getNoteByIdSuspend(parentId) }.getOrNull()
+                suspendSafeOrNull { repository.getNoteById(parentId) }
             } else {
                 null
             }
@@ -502,7 +522,10 @@ class NoteViewModel @Inject constructor(
                     (parentNote.isPassword == true) ||
                     SecurityUtil.isEncryptedPayload(parentNote.description)
                 val rawDesc = if (wasEncrypted && !parentNote.description.isNullOrBlank()) {
-                    SecurityUtil.decrypt(parentNote.description!!)
+                    when (val dec = SecurityUtil.decryptSafe(parentNote.description)) {
+                        is AppResult.Success -> dec.data
+                        is AppResult.Failure -> return false
+                    }
                 } else {
                     parentNote.description ?: ""
                 }
@@ -536,48 +559,47 @@ class NoteViewModel @Inject constructor(
                 if (parentModified) {
                     val serialized = BlockParser.serialize(parsedBlocks)
                     val finalDesc = if (wasEncrypted) SecurityUtil.encrypt(serialized) else serialized
-                    val updatedParent = parentNote.copy(description = finalDesc).also {
-                        it.id = parentNote.id
-                    }
-                    runCatching { repository.updateSuspend(updatedParent) }
+                    suspendSafeOrNull { repository.updateNote(parentNote.copy(description = finalDesc)) }
                 }
 
-                runCatching {
-                    val existingLinks = knowledgeRepository.getOutgoingLinksSuspend(parentNote.id)
+                suspendSafeOrNull {
+                    val existingLinks = knowledgeRepository.getOutgoingLinks(parentNote.id)
                     if (existingLinks.none { it.targetNoteId == restoredNote.id }) {
-                        val newLink = NoteLinkData(
+                        val newLink = NoteLink(
                             sourceNoteId = parentNote.id,
                             targetNoteId = restoredNote.id,
-                            linkText = restoredTitle
+                            linkText = restoredTitle,
+                            createdAt = clock.nowMillis()
                         )
-                        knowledgeRepository.insertAllLinksSuspend(listOf(newLink))
+                        knowledgeRepository.insertAllLinks(listOf(newLink))
                     }
                 }
                 parentModified
             } else {
                 false
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             false
         }
     }
 
-    /**
-     * One-time startup self-healing pass for any sub-page that was restored from Trash previously
-     * and lost its SUB_PAGE block inside its parent note.
-     */
-    private suspend fun healOrphanedSubPages(notes: List<NoteData>): Boolean {
+    private suspend fun healOrphanedSubPages(notes: List<Note>): Boolean {
         var anyModified = false
         try {
-            val now = System.currentTimeMillis()
+            val now = clock.nowMillis()
             val activeNotes = notes.filter { it.status != "TRASH" }
             val referencedSubPageIds = activeNotes.flatMap { note ->
-                runCatching {
+                suspendSafeOrNull {
                     val wasEncrypted = note.isEncrypted ||
                         (note.isPassword == true) ||
                         SecurityUtil.isEncryptedPayload(note.description)
                     val rawDesc = if (wasEncrypted && !note.description.isNullOrBlank()) {
-                        SecurityUtil.decrypt(note.description!!)
+                        when (val dec = SecurityUtil.decryptSafe(note.description)) {
+                            is AppResult.Success -> dec.data
+                            is AppResult.Failure -> ""
+                        }
                     } else {
                         note.description ?: ""
                     }
@@ -585,7 +607,7 @@ class NoteViewModel @Inject constructor(
                     else BlockParser.parse(rawDesc)
                         .filter { it.type == BlockType.SUB_PAGE }
                         .mapNotNull { it.subPageNoteId }
-                }.getOrDefault(emptyList())
+                }.orEmpty()
             }.toSet()
 
             for (candidate in activeNotes) {
@@ -598,18 +620,14 @@ class NoteViewModel @Inject constructor(
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
         }
         return anyModified
     }
 
-    /**
-     * One-time maintenance pass executed on all devices receiving this update:
-     * Permanently purges all notes currently in the Trash bin and cleanly eliminates all
-     * references, backlinks, and child sub-page pointers so no corrupted/bugged notes
-     * can ever be restored.
-     */
-    private suspend fun purgeAllTrashNotesOnUpgrade(notes: List<NoteData>): Boolean {
+    private suspend fun purgeAllTrashNotesOnUpgrade(notes: List<Note>): Boolean {
         val prefs = context.getSharedPreferences("purenoteit_maintenance_prefs", Context.MODE_PRIVATE)
         val alreadyPurged = prefs.getBoolean("has_purged_trash_subpage_fix_v1", false)
         if (alreadyPurged) return false
@@ -619,13 +637,13 @@ class NoteViewModel @Inject constructor(
             val trashedNotes = notes.filter { it.status == "TRASH" }
             for (note in trashedNotes) {
                 purgeDeletedNoteReferences(note.id, note.title)
-                repository.deleteNoteByIdSuspend(note.id)
+                deleteNoteUseCase(note.id)
                 anyDeleted = true
             }
             prefs.edit().putBoolean("has_purged_trash_subpage_fix_v1", true).apply()
-            Log.i("NoteViewModel", "Successfully purged ${trashedNotes.size} trashed notes during update maintenance.")
-        } catch (e: Exception) {
-            Log.e("NoteViewModel", "Error purging trash notes on update: ${e.message}")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
         }
         return anyDeleted
     }
@@ -634,15 +652,20 @@ class NoteViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             try {
                 purgeDeletedNoteReferences(item.id, item.title)
-                repository.deleteSuspend(item)
+                if (item.id > 0) {
+                    deleteNoteUseCase(item.id)
+                } else {
+                    repository.deleteNote(item.toDomain())
+                }
                 withContext(Dispatchers.Main) {
                     getAllNotes()
                     getAllLinks()
                     notifyWidgetSync()
                     triggerAutoSync()
                 }
-            } catch (e: Exception) {
-                Log.e("NoteViewModel", "Error deleting note: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -650,19 +673,19 @@ class NoteViewModel @Inject constructor(
     fun deleteNoteById(id: Int) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                val existingTitle = runCatching { repository.getNoteByIdSuspend(id)?.title }.getOrNull()
-                    ?: _noteList.value?.find { it.id == id }?.title
+                val existingTitle = suspendSafeOrNull { repository.getNoteById(id)?.title }
+                    ?: _noteListFlow.value.find { it.id == id }?.title
                 purgeDeletedNoteReferences(id, existingTitle)
-                repository.deleteNoteByIdSuspend(id)
+                deleteNoteUseCase(id)
                 withContext(Dispatchers.Main) {
                     getAllNotes()
                     getAllLinks()
                     notifyWidgetSync()
                     triggerAutoSync()
-                    Log.i("NoteViewModel", "Note deleted successfully via Coroutines")
                 }
-            } catch (error: Exception) {
-                Log.e("NoteViewModel", "Error deleting note: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -671,15 +694,14 @@ class NoteViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             try {
                 for (note in notes) {
-                    val previousNote = runCatching { repository.getNoteByIdSuspend(note.id) }.getOrNull()
-                    val trashed = note.copy(status = "TRASH").apply {
-                        id = note.id
-                        if (richBlocksJson == null && !previousNote?.richBlocksJson.isNullOrBlank()) {
-                            richBlocksJson = previousNote?.richBlocksJson
-                        }
-                    }
-                    repository.updateSuspend(trashed)
-                    purgeDeletedNoteReferences(trashed.id, trashed.title)
+                    val previousNote = suspendSafeOrNull { repository.getNoteById(note.id) }
+                    val richJson = note.richBlocksJson ?: previousNote?.richBlocksJson
+                    val trashedDomain = note.toDomain().copy(
+                        status = "TRASH",
+                        richBlocksJson = richJson
+                    )
+                    repository.updateNote(trashedDomain)
+                    purgeDeletedNoteReferences(trashedDomain.id, trashedDomain.title)
                 }
                 withContext(Dispatchers.Main) {
                     getAllNotes()
@@ -688,8 +710,9 @@ class NoteViewModel @Inject constructor(
                     triggerAutoSync()
                     onComplete()
                 }
-            } catch (error: Exception) {
-                Log.e("NoteViewModel", "Error in batchMoveToTrash: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -703,25 +726,33 @@ class NoteViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             try {
                 for (note in notes) {
-                    val previousNote = runCatching { repository.getNoteByIdSuspend(note.id) }.getOrNull()
+                    val previousNote = suspendSafeOrNull { repository.getNoteById(note.id) }
                     val currentDesc = note.description ?: ""
                     val updatedDesc = if (shouldLock) {
-                        if (note.isEncrypted || SecurityUtil.isEncryptedPayload(currentDesc)) currentDesc else SecurityUtil.encrypt(currentDesc)
+                        if (note.isEncrypted || SecurityUtil.isEncryptedPayload(currentDesc)) {
+                            currentDesc
+                        } else {
+                            SecurityUtil.encrypt(currentDesc)
+                        }
                     } else {
-                        if (note.isEncrypted || SecurityUtil.isEncryptedPayload(currentDesc)) SecurityUtil.decrypt(currentDesc) else currentDesc
-                    }
-
-                    val updatedNote = note.copy(
-                        isPassword = shouldLock,
-                        isEncrypted = shouldLock,
-                        description = updatedDesc
-                    ).apply {
-                        id = note.id
-                        if (richBlocksJson == null && !previousNote?.richBlocksJson.isNullOrBlank()) {
-                            richBlocksJson = previousNote?.richBlocksJson
+                        if (note.isEncrypted || SecurityUtil.isEncryptedPayload(currentDesc)) {
+                            when (val dec = SecurityUtil.decryptSafe(currentDesc)) {
+                                is AppResult.Success -> dec.data
+                                is AppResult.Failure -> continue
+                            }
+                        } else {
+                            currentDesc
                         }
                     }
-                    repository.updateSuspend(updatedNote)
+
+                    val richJson = note.richBlocksJson ?: previousNote?.richBlocksJson
+                    val updatedDomain = note.toDomain().copy(
+                        isPassword = shouldLock,
+                        isEncrypted = shouldLock,
+                        description = updatedDesc,
+                        richBlocksJson = richJson
+                    )
+                    repository.updateNote(updatedDomain)
                 }
                 withContext(Dispatchers.Main) {
                     getAllNotes()
@@ -730,8 +761,9 @@ class NoteViewModel @Inject constructor(
                     triggerAutoSync()
                     onComplete()
                 }
-            } catch (error: Exception) {
-                Log.e("NoteViewModel", "Error in batchToggleLock: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -739,14 +771,14 @@ class NoteViewModel @Inject constructor(
     fun togglePinStatus(id: Int, currentPinned: Boolean) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                repository.updatePinStatusSuspend(id, !currentPinned)
+                repository.updatePinStatus(id, !currentPinned)
                 withContext(Dispatchers.Main) {
                     getAllNotes()
                     notifyWidgetSync()
-                    Log.i("NoteViewModel", "Pin status toggled successfully via Coroutines")
                 }
-            } catch (error: Exception) {
-                Log.e("NoteViewModel", "Error toggling pin: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -759,13 +791,15 @@ class NoteViewModel @Inject constructor(
     fun getNotesBetweenDates(startDate: Long, endDate: Long) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                val dateDatas = repository.getNotesBetweenDatesSuspend(startDate, endDate)
+                val domainNotes = repository.getNotesBetweenDates(startDate, endDate)
+                val entities = domainNotes.map { it.toEntity() }
                 withContext(Dispatchers.Main) {
-                    _noteListFlow.value = dateDatas
-                    runCatching { _noteList.value = dateDatas }
+                    _noteListFlow.value = entities
+                    _homeUiState.update { it.copy(notes = domainNotes) }
                 }
-            } catch (e: Exception) {
-                Log.e("NoteViewModel", "Error fetching notes between dates: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -773,14 +807,16 @@ class NoteViewModel @Inject constructor(
     fun searchNotesByCategory(categoryName: String) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                repository.getNotesByCategoryFlow(categoryName).collect { notes ->
+                repository.getNotesByCategoryFlow(categoryName).collect { domainNotes ->
+                    val entities = domainNotes.map { it.toEntity() }
                     withContext(Dispatchers.Main) {
-                        _noteListFlow.value = notes
-                        runCatching { _noteList.value = notes }
+                        _noteListFlow.value = entities
+                        _homeUiState.update { it.copy(notes = domainNotes) }
                     }
                 }
-            } catch (error: Exception) {
-                Log.e("NoteViewModel", "Error fetching notes by category: $error")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -788,32 +824,35 @@ class NoteViewModel @Inject constructor(
     fun searchNote(query: String) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                repository.searchNoteFlow(query).collect { notes ->
+                repository.searchNotesFlow(query).collect { domainNotes ->
+                    val entities = domainNotes.map { it.toEntity() }
                     withContext(Dispatchers.Main) {
-                        _noteListFlow.value = notes
-                        runCatching { _noteList.value = notes }
+                        _noteListFlow.value = entities
+                        _homeUiState.update { it.copy(notes = domainNotes) }
                     }
                 }
-            } catch (e: Exception) {
-                Log.i("NoteViewModel", "Error searching notes: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
 
-    suspend fun getNoteByIdSuspend(id: Int): NoteData? {
-        return repository.getNoteByIdSuspend(id)
+    suspend fun getNoteByIdSuspend(id: Int): NoteData? = withContext(ioDispatcher) {
+        repository.getNoteById(id)?.toEntity()
     }
 
     // --- Bi-directional Links & Graph Data ---
     fun getAllLinks() {
         viewModelScope.launch(ioDispatcher) {
             try {
-                val links = knowledgeRepository.getAllLinksSuspend()
+                val links = knowledgeRepository.getAllLinks().map { it.toEntity() }
                 withContext(Dispatchers.Main) {
-                    _allLinks.value = links
+                    _allLinksFlow.value = links
                 }
-            } catch (e: Exception) {
-                Log.e("NoteViewModel", "Error fetching note links: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -821,14 +860,17 @@ class NoteViewModel @Inject constructor(
     fun loadBacklinksForNote(targetNoteId: Int) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                val links = knowledgeRepository.getBacklinksSuspend(targetNoteId)
+                val links = knowledgeRepository.getBacklinks(targetNoteId)
                 val sourceIds = links.map { it.sourceNoteId }.toSet()
-                val allCurrentNotes = _noteList.value ?: emptyList()
-                withContext(Dispatchers.Main) {
-                    _backlinks.value = allCurrentNotes.filter { it.id in sourceIds }
+                val allCurrentNotes = _noteListFlow.value.ifEmpty {
+                    repository.getAllNotes().map { it.toEntity() }
                 }
-            } catch (e: Exception) {
-                Log.e("NoteViewModel", "Error loading backlinks: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    _backlinksFlow.value = allCurrentNotes.filter { it.id in sourceIds }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -842,12 +884,12 @@ class NoteViewModel @Inject constructor(
 
         viewModelScope.launch(ioDispatcher) {
             try {
-                val allNotes = repository.getAllNotesSuspend()
-                val existingOutgoing = runCatching {
-                    knowledgeRepository.getOutgoingLinksSuspend(sourceNoteId)
-                }.getOrDefault(emptyList())
+                val allNotes = repository.getAllNotes()
+                val existingOutgoing = suspendSafeOrNull {
+                    knowledgeRepository.getOutgoingLinks(sourceNoteId)
+                }.orEmpty()
 
-                val resolvedTargets = mutableMapOf<Int, NoteLinkData>()
+                val resolvedTargets = mutableMapOf<Int, NoteLink>()
                 for (matchedLower in matchedTitles) {
                     val byCurrentTitle = allNotes.find {
                         it.id != sourceNoteId &&
@@ -861,58 +903,63 @@ class NoteViewModel @Inject constructor(
                     }
 
                     if (targetNote != null) {
-                        resolvedTargets[targetNote.id] = NoteLinkData(
+                        resolvedTargets[targetNote.id] = NoteLink(
                             sourceNoteId = sourceNoteId,
                             targetNoteId = targetNote.id,
-                            linkText = targetNote.title?.trim() ?: matchedLower
+                            linkText = targetNote.title?.trim() ?: matchedLower,
+                            createdAt = clock.nowMillis()
                         )
                     }
                 }
                 val targetLinks = resolvedTargets.values.toList()
 
-                knowledgeRepository.deleteLinksFromSourceSuspend(sourceNoteId)
+                knowledgeRepository.deleteLinksFromSource(sourceNoteId)
                 if (targetLinks.isNotEmpty()) {
-                    knowledgeRepository.insertAllLinksSuspend(targetLinks)
+                    knowledgeRepository.insertAllLinks(targetLinks)
                 }
 
                 withContext(Dispatchers.Main) {
                     getAllLinks()
                 }
-            } catch (e: Exception) {
-                Log.e("NoteViewModel", "Error syncing note links: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
 
-    // --- Quick Thought Stream (Paket 4) ---
+    // --- Quick Thought Stream ---
     fun loadStreamItems() {
         viewModelScope.launch(ioDispatcher) {
             try {
-                val items = knowledgeRepository.getAllStreamItemsSuspend()
+                val items = knowledgeRepository.getAllStreamItems().map { it.toEntity() }
                 withContext(Dispatchers.Main) {
-                    _streamItems.value = items
+                    _streamItemsFlow.value = items
                 }
-            } catch (e: Exception) {
-                Log.e("NoteViewModel", "Error loading stream items: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
 
     fun addStreamItem(content: String, type: String = "TEXT", audioPath: String? = null, imagePath: String? = null) {
-        val item = StreamItemData(
+        val item = StreamItem(
             content = content,
             type = type,
             audioPath = audioPath,
-            imagePath = imagePath
+            imagePath = imagePath,
+            timestamp = clock.nowMillis()
         )
         viewModelScope.launch(ioDispatcher) {
             try {
-                knowledgeRepository.insertStreamItemSuspend(item)
+                knowledgeRepository.insertStreamItem(item)
                 withContext(Dispatchers.Main) {
                     loadStreamItems()
                 }
-            } catch (e: Exception) {
-                Log.e("NoteViewModel", "Error adding stream item: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -920,18 +967,19 @@ class NoteViewModel @Inject constructor(
     fun deleteStreamItem(id: Int) {
         viewModelScope.launch(ioDispatcher) {
             try {
-                knowledgeRepository.deleteStreamItemByIdSuspend(id)
+                knowledgeRepository.deleteStreamItemById(id)
                 withContext(Dispatchers.Main) {
                     loadStreamItems()
                 }
-            } catch (e: Exception) {
-                Log.e("NoteViewModel", "Error deleting stream item: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
 
     fun convertStreamItemsToNote(selectedIds: List<Int>, title: String, onSuccess: (NoteData) -> Unit) {
-        val currentItems = _streamItems.value ?: emptyList()
+        val currentItems = _streamItemsFlow.value
         val selected = currentItems.filter { it.id in selectedIds }
         if (selected.isEmpty()) return
 
@@ -940,46 +988,41 @@ class NoteViewModel @Inject constructor(
 
         for (item in selected) {
             when (item.type) {
-                "AUDIO" -> {
-                    blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = item.audioPath))
-                }
-                "IMAGE" -> {
-                    blocks.add(NoteBlock(type = BlockType.IMAGE, mediaPath = item.imagePath))
-                }
-                else -> {
-                    blocks.add(NoteBlock(type = BlockType.BULLET_LIST, content = item.content))
-                }
+                "AUDIO" -> blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = item.audioPath))
+                "IMAGE" -> blocks.add(NoteBlock(type = BlockType.IMAGE, mediaPath = item.imagePath))
+                else -> blocks.add(NoteBlock(type = BlockType.BULLET_LIST, content = item.content))
             }
         }
 
-        val newNote = NoteData(
+        val domainNote = Note(
             title = if (title.isBlank()) "Fikir Notu (${selected.size} Madde)" else title.trim(),
             description = BlockParser.serialize(blocks),
-            date = System.currentTimeMillis(),
+            date = clock.nowMillis(),
             icon = "⚡"
         )
 
         viewModelScope.launch(ioDispatcher) {
             try {
-                val generatedId = repository.insertNoteSuspend(newNote)
-                newNote.id = generatedId.toInt()
-                runCatching {
-                    knowledgeRepository.markStreamItemsProcessedSuspend(selectedIds, newNote.id)
+                val generatedId = repository.insertNote(domainNote).toInt()
+                val savedEntity = domainNote.copy(id = generatedId).toEntity()
+                suspendSafeOrNull {
+                    knowledgeRepository.markStreamItemsProcessed(selectedIds, generatedId)
                 }
                 withContext(Dispatchers.Main) {
                     getAllNotes()
                     notifyWidgetSync()
                     loadStreamItems()
-                    onSuccess(newNote)
+                    onSuccess(savedEntity)
                 }
-            } catch (e: Exception) {
-                Log.e("NoteViewModel", "Error converting stream to note: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
 
-    // --- Vault Backup & Restore (Feature 5 - Clean Repository Layer) ---
-    fun backupVault(context: android.content.Context, onSuccess: (java.io.File) -> Unit, onError: (Exception) -> Unit) {
+    // --- Vault Backup & Restore (Domain Repository Layer) ---
+    fun backupVault(context: Context, onSuccess: (File) -> Unit, onError: (Exception) -> Unit) {
         VaultBackupManager.createBackup(
             context = context,
             noteRepository = repository,
@@ -990,7 +1033,7 @@ class NoteViewModel @Inject constructor(
         )
     }
 
-    fun restoreVault(context: android.content.Context, uri: android.net.Uri, onSuccess: (Int, Int) -> Unit, onError: (Exception) -> Unit) {
+    fun restoreVault(context: Context, uri: Uri, onSuccess: (Int, Int) -> Unit, onError: (Exception) -> Unit) {
         VaultBackupManager.restoreBackup(
             context = context,
             backupUri = uri,

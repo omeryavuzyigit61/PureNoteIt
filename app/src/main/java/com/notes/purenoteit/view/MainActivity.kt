@@ -13,6 +13,8 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
@@ -25,17 +27,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.os.LocaleListCompat
-import androidx.navigation.NavType
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
+import androidx.navigation.toRoute
 import com.notes.purenoteit.reminder.AlarmSoundPlayer
 import com.notes.purenoteit.security.AppIntegrityGuard
 import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
 import com.notes.purenoteit.ui.animation.LocalPagerTransitionCoordinator
 import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
 import com.notes.purenoteit.ui.animation.PagerTransitionCoordinator
+import com.notes.purenoteit.ui.navigation.AppRoute
 import com.notes.purenoteit.ui.screens.AnimatedSplashScreen
 import com.notes.purenoteit.ui.screens.CategoryManagementScreen
 import com.notes.purenoteit.ui.screens.HomeScreen
@@ -89,6 +92,7 @@ class MainActivity : AppCompatActivity() {
             AppCompatDelegate.setApplicationLocales(localeList)
         }
         super.onCreate(savedInstanceState)
+        window.decorView.filterTouchesWhenObscured = true
 
         val currentThemeMode = ThemeManager.getThemeMode(this)
         ThemeManager.applyTheme(currentThemeMode)
@@ -191,22 +195,22 @@ class MainActivity : AppCompatActivity() {
                                 val widgetAction = currentIntent.getStringExtra("WIDGET_ACTION")
                                 if (openNoteId != -1) {
                                     AlarmSoundPlayer.stop()
-                                    navController.navigate("note_detail/$openNoteId")
+                                    navController.navigate(AppRoute.NoteDetail(noteId = openNoteId))
                                 } else if (widgetAction != null) {
                                     when (widgetAction) {
                                         "DAILY_AGENDA" -> {
                                             noteViewModel.createDailyAgenda { newNote ->
-                                                navController.navigate("note_detail/${newNote.id}")
+                                                navController.navigate(AppRoute.NoteDetail(noteId = newNote.id))
                                             }
                                         }
                                         "VOICE_NOTE" -> {
-                                            navController.navigate("note_detail/-1?autoVoice=true")
+                                            navController.navigate(AppRoute.NoteDetail(autoVoice = true))
                                         }
                                         "OCR_SCAN" -> {
-                                            navController.navigate("note_detail/-1?autoOcr=true")
+                                            navController.navigate(AppRoute.NoteDetail(autoOcr = true))
                                         }
                                         else -> {
-                                            navController.navigate("note_detail/-1")
+                                            navController.navigate(AppRoute.NoteDetail())
                                         }
                                     }
                                 }
@@ -224,9 +228,13 @@ class MainActivity : AppCompatActivity() {
                             ) {
                                 NavHost(
                                     navController = navController,
-                                    startDestination = "home"
+                                    startDestination = AppRoute.Home,
+                                    enterTransition = { fadeIn(animationSpec = tween(220)) },
+                                    exitTransition = { fadeOut(animationSpec = tween(180)) },
+                                    popEnterTransition = { fadeIn(animationSpec = tween(180)) },
+                                    popExitTransition = { fadeOut(animationSpec = tween(160)) }
                                 ) {
-                                    composable("home") {
+                                    composable<AppRoute.Home> {
                                         CompositionLocalProvider(
                                             LocalNavAnimatedVisibilityScope provides this
                                         ) {
@@ -234,30 +242,42 @@ class MainActivity : AppCompatActivity() {
                                                 noteViewModel = noteViewModel,
                                                 categoryViewModel = categoryViewModel,
                                                 onNavigateToAddNote = { noteId ->
-                                                    navController.navigate("note_detail/$noteId") {
+                                                    navController.navigate(AppRoute.NoteDetail(noteId = noteId)) {
                                                         launchSingleTop = true
                                                     }
                                                 },
                                                 onNavigateToNoteWithScope = { noteId, originScope ->
-                                                    navController.navigate("note_detail/$noteId?originScope=$originScope") {
+                                                    navController.navigate(
+                                                        AppRoute.NoteDetail(
+                                                            noteId = noteId,
+                                                            originScope = originScope
+                                                        )
+                                                    ) {
                                                         launchSingleTop = true
                                                     }
                                                 },
                                                 onNavigateToAddNoteWithDate = { noteId, date ->
-                                                    navController.navigate("note_detail/$noteId?initialDate=$date") {
+                                                    navController.navigate(
+                                                        AppRoute.NoteDetail(
+                                                            noteId = noteId,
+                                                            initialDate = date
+                                                        )
+                                                    ) {
                                                         launchSingleTop = true
                                                     }
                                                 },
                                                 onNavigateToAddNoteWithStatus = { status ->
-                                                    navController.navigate("note_detail/-1?initialStatus=$status") {
+                                                    navController.navigate(
+                                                        AppRoute.NoteDetail(initialStatus = status)
+                                                    ) {
                                                         launchSingleTop = true
                                                     }
                                                 },
                                                 onNavigateToPasswordSettings = {
-                                                    navController.navigate("password_settings")
+                                                    navController.navigate(AppRoute.PasswordSettings)
                                                 },
                                                 onNavigateToCategorySettings = {
-                                                    navController.navigate("category_settings")
+                                                    navController.navigate(AppRoute.CategorySettings)
                                                 },
                                                 currentThemeMode = themeMode,
                                                 onThemeModeChange = { newMode ->
@@ -280,52 +300,19 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     }
 
-                                    composable(
-                                        route = "note_detail/{noteId}?initialDate={initialDate}&autoVoice={autoVoice}&autoOcr={autoOcr}&initialStatus={initialStatus}&originScope={originScope}",
-                                        arguments = listOf(
-                                            navArgument("noteId") {
-                                                type = NavType.IntType
-                                                defaultValue = -1
-                                            },
-                                            navArgument("initialDate") {
-                                                type = NavType.LongType
-                                                defaultValue = -1L
-                                            },
-                                            navArgument("autoVoice") {
-                                                type = NavType.BoolType
-                                                defaultValue = false
-                                            },
-                                            navArgument("autoOcr") {
-                                                type = NavType.BoolType
-                                                defaultValue = false
-                                            },
-                                            navArgument("initialStatus") {
-                                                type = NavType.StringType
-                                                defaultValue = "TODO"
-                                            },
-                                            navArgument("originScope") {
-                                                type = NavType.StringType
-                                                defaultValue = "none"
-                                            }
-                                        )
-                                    ) { backStackEntry ->
-                                        val noteId = backStackEntry.arguments?.getInt("noteId") ?: -1
-                                        val initialDate = backStackEntry.arguments?.getLong("initialDate") ?: -1L
-                                        val autoVoice = backStackEntry.arguments?.getBoolean("autoVoice") ?: false
-                                        val autoOcr = backStackEntry.arguments?.getBoolean("autoOcr") ?: false
-                                        val initialStatus = backStackEntry.arguments?.getString("initialStatus") ?: "TODO"
-                                        val originScope = backStackEntry.arguments?.getString("originScope") ?: "none"
+                                    composable<AppRoute.NoteDetail> { backStackEntry ->
+                                        val routeArgs = backStackEntry.toRoute<AppRoute.NoteDetail>()
 
                                         CompositionLocalProvider(
                                             LocalNavAnimatedVisibilityScope provides this
                                         ) {
                                             NoteDetailScreen(
-                                                noteId = noteId,
-                                                initialDate = initialDate,
-                                                initialStatus = initialStatus,
-                                                autoVoice = autoVoice,
-                                                autoOcr = autoOcr,
-                                                originScope = originScope,
+                                                noteId = routeArgs.noteId,
+                                                initialDate = routeArgs.initialDate,
+                                                initialStatus = routeArgs.initialStatus,
+                                                autoVoice = routeArgs.autoVoice,
+                                                autoOcr = routeArgs.autoOcr,
+                                                originScope = routeArgs.originScope,
                                                 noteViewModel = noteViewModel,
                                                 categoryViewModel = categoryViewModel,
                                                 onNavigateBack = {
@@ -334,18 +321,26 @@ class MainActivity : AppCompatActivity() {
                                                     }
                                                 },
                                                 onNavigateToNote = { targetId ->
-                                                    val targetRoute = "note_detail/$targetId"
-                                                    val existsInBackStack = try {
-                                                        navController.getBackStackEntry(targetRoute)
-                                                        true
-                                                    } catch (e: Exception) {
-                                                        false
-                                                    }
-                                                    if (existsInBackStack) {
-                                                        navController.popBackStack(targetRoute, inclusive = false)
+                                                    val prevEntry = navController.previousBackStackEntry
+                                                    val prevMatchesTarget = prevEntry != null &&
+                                                        prevEntry.destination.hasRoute<AppRoute.NoteDetail>() &&
+                                                        prevEntry.toRoute<AppRoute.NoteDetail>().noteId == targetId
+                                                    if (prevMatchesTarget) {
+                                                        navController.popBackStack()
                                                     } else {
-                                                        navController.navigate(targetRoute) {
-                                                            launchSingleTop = true
+                                                        val targetRoute = AppRoute.NoteDetail(noteId = targetId)
+                                                        val existsInBackStack = try {
+                                                            navController.getBackStackEntry(targetRoute)
+                                                            true
+                                                        } catch (_: IllegalArgumentException) {
+                                                            false
+                                                        }
+                                                        if (existsInBackStack) {
+                                                            navController.popBackStack(targetRoute, inclusive = false)
+                                                        } else {
+                                                            navController.navigate(targetRoute) {
+                                                                launchSingleTop = true
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -353,7 +348,7 @@ class MainActivity : AppCompatActivity() {
                                         }
                                     }
 
-                                    composable("category_settings") {
+                                    composable<AppRoute.CategorySettings> {
                                         CategoryManagementScreen(
                                             categoryViewModel = categoryViewModel,
                                             onNavigateBack = {
@@ -364,7 +359,7 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
 
-                                    composable("password_settings") {
+                                    composable<AppRoute.PasswordSettings> {
                                         PasswordSettingScreen(
                                             onNavigateBack = {
                                                 if (navController.previousBackStackEntry != null) {

@@ -61,4 +61,12 @@ internal class CategoryRepositoryImpl @Inject constructor(
     override suspend fun areDefaultCategoriesPresent(): Boolean = withContext(ioDispatcher) {
         categoryDao.areDefaultCategoriesPresentSuspend()
     }
+
+    override suspend fun isPasswordSet(categoryName: String): Boolean? = withContext(ioDispatcher) {
+        categoryDao.isPasswordSetSuspend(categoryName)
+    }
+
+    override suspend fun getCategoryIdByName(categoryName: String): Int? = withContext(ioDispatcher) {
+        categoryDao.getCategoryIdByNameSuspend(categoryName)
+    }
 }

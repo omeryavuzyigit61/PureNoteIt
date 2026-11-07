@@ -3,6 +3,8 @@ package com.notes.purenoteit.util
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import com.google.gson.Gson
@@ -10,26 +12,35 @@ import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.data.db.NoteLinkData
 import com.notes.purenoteit.data.db.StreamItemData
+import com.notes.purenoteit.data.mapper.toDomain
+import com.notes.purenoteit.data.mapper.toEntity
+import com.notes.purenoteit.domain.model.AppResult
+import com.notes.purenoteit.domain.model.Category
+import com.notes.purenoteit.domain.model.NoteLink
+import com.notes.purenoteit.domain.repository.CategoryRepository
+import com.notes.purenoteit.domain.repository.KnowledgeRepository
+import com.notes.purenoteit.domain.repository.NoteRepository
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
-import com.notes.purenoteit.repository.CategoryRepository
-import com.notes.purenoteit.repository.KnowledgeRepository
-import com.notes.purenoteit.repository.NoteRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 data class VaultBackupPayload(
-    val version: Int = 2,
+    val version: Int = 3,
     val backupDate: Long = System.currentTimeMillis(),
     val notes: List<NoteData>,
     val categories: List<CategoryData>,
@@ -40,8 +51,19 @@ data class VaultBackupPayload(
 object VaultBackupManager {
 
     private val gson = Gson()
+    private val backupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private const val MAX_ARCHIVE_ENTRIES = 2000
     private const val MAX_SINGLE_FILE_BYTES = 100L * 1024L * 1024L // 100 MB per media file limit
+
+    private inline fun <T> suspendSafeOrNull(block: () -> T): T? {
+        return try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     /**
      * Remaps absolute media paths (drawings, images, audio recordings) from a previous device
@@ -88,8 +110,8 @@ object VaultBackupManager {
     }
 
     /**
-     * Creates a compressed, AES-256-GCM encrypted .purevault archive containing all notes,
-     * categories, links, and media files via Clean Architecture Repositories.
+     * Creates a compressed, AES-256-GCM (120k PBKDF2) encrypted .purevault archive containing all notes,
+     * categories, links, stream items, and AES-256-GCM encrypted media files via Domain Repositories.
      */
     fun createBackup(
         context: Context,
@@ -97,20 +119,20 @@ object VaultBackupManager {
         categoryRepository: CategoryRepository,
         knowledgeRepository: KnowledgeRepository,
         onSuccess: (File) -> Unit,
-        onError: (Exception) -> Unit
+        onError: (Exception) -> Unit,
+        passphrase: CharArray? = null
     ) {
-        CoroutineScope(Dispatchers.IO).launch {
+        val passCopy = passphrase?.copyOf()
+        passphrase?.fill('\u0000')
+
+        backupScope.launch {
             try {
-                val rawNotes = noteRepository.getAllNotesSuspend()
-                val categories = categoryRepository.getAllCategoriesSuspend()
-                val links = runCatching { knowledgeRepository.getAllLinksSuspend() }.getOrDefault(emptyList())
-                val streamItems = runCatching {
-                    knowledgeRepository.getAllStreamItemsSuspend()
-                }.getOrDefault(emptyList())
+                val rawNotes = noteRepository.getAllNotes()
+                val categories = categoryRepository.getAllCategories()
+                val links = suspendSafeOrNull { knowledgeRepository.getAllLinks() }.orEmpty()
+                val streamItems = suspendSafeOrNull { knowledgeRepository.getAllStreamItems() }.orEmpty()
                 val lockedCategoryIds = categories.filter { it.isPassword == true }.map { it.id }.toSet()
 
-                // Convert any hardware-bound ENC_V2 note descriptions into 60k-iteration portable AES-256-GCM (ENC_P2:)
-                // and ensure notes in locked categories are encrypted as well.
                 val portableNotes = rawNotes.map { note ->
                     val desc = note.description
                     val isNoteOrCategoryLocked = (note.isPassword == true) ||
@@ -118,11 +140,13 @@ object VaultBackupManager {
                         (note.categoryId != null && note.categoryId in lockedCategoryIds)
                     val portableDesc = when {
                         desc != null && desc.startsWith("ENC_V2:") -> {
-                            val plain = SecurityUtil.decrypt(desc)
-                            SecurityUtil.encryptPortable(plain)
+                            when (val dec = SecurityUtil.decryptSafe(desc)) {
+                                is AppResult.Success -> SecurityUtil.encryptPortable(dec.data, passCopy)
+                                is AppResult.Failure -> desc
+                            }
                         }
                         isNoteOrCategoryLocked && !desc.isNullOrBlank() && !SecurityUtil.isEncryptedPayload(desc) -> {
-                            SecurityUtil.encryptPortable(desc)
+                            SecurityUtil.encryptPortable(desc, passCopy)
                         }
                         else -> desc
                     }
@@ -130,18 +154,17 @@ object VaultBackupManager {
                         description = portableDesc,
                         isPassword = isNoteOrCategoryLocked,
                         isEncrypted = isNoteOrCategoryLocked
-                    ).also { it.id = note.id }
+                    ).toEntity()
                 }
 
                 val payload = VaultBackupPayload(
                     notes = portableNotes,
-                    categories = categories,
-                    links = links,
-                    streamItems = streamItems
+                    categories = categories.map { it.toEntity() },
+                    links = links.map { it.toEntity() },
+                    streamItems = streamItems.map { it.toEntity() }
                 )
                 val rawJsonString = gson.toJson(payload)
-                // Encrypt the entire manifest with AES-256-GCM so plaintext metadata never leaks in transit
-                val encryptedManifest = SecurityUtil.encryptPortable(rawJsonString)
+                val encryptedManifest = SecurityUtil.encryptPortable(rawJsonString, passCopy)
 
                 val backupDir = File(context.cacheDir, "backups").apply { mkdirs() }
                 val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
@@ -154,24 +177,36 @@ object VaultBackupManager {
                     zos.write(encryptedManifest.toByteArray(Charsets.UTF_8))
                     zos.closeEntry()
 
-                    // 2. Add media files from filesDir
+                    // 2. Add AES-256-GCM encrypted media files ("media_enc/...") so media never leaks in plaintext
                     val filesDir = context.filesDir
                     filesDir.walkTopDown().filter { it.isFile && it.name != zipFile.name }.forEach { file ->
-                        val relativePath = "media/" + file.relativeTo(filesDir).path.replace("\\", "/")
-                        val entry = ZipEntry(relativePath)
-                        zos.putNextEntry(entry)
-                        FileInputStream(file).use { fis -> fis.copyTo(zos) }
-                        zos.closeEntry()
+                        if (file.length() <= MAX_SINGLE_FILE_BYTES) {
+                            val relativePath = "media_enc/" + file.relativeTo(filesDir).path.replace("\\", "/")
+                            val entry = ZipEntry(relativePath)
+                            zos.putNextEntry(entry)
+                            val rawBytes = file.readBytes()
+                            val encBytes = try {
+                                SecurityUtil.encryptPortableBytes(rawBytes, passCopy)
+                            } finally {
+                                rawBytes.fill(0)
+                            }
+                            zos.write(encBytes)
+                            zos.closeEntry()
+                        }
                     }
                 }
 
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Handler(Looper.getMainLooper()).post {
                     onSuccess(zipFile)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Handler(Looper.getMainLooper()).post {
                     onError(e)
                 }
+            } finally {
+                passCopy?.fill('\u0000')
             }
         }
     }
@@ -195,8 +230,8 @@ object VaultBackupManager {
     }
 
     /**
-     * Restores a .purevault / zip backup archive with strict CWE-22 Zip Slip Path Traversal protection
-     * and Zip Bomb resource limits.
+     * Restores a .purevault / zip backup archive with strict CWE-22 Zip Slip Path Traversal protection,
+     * Zip Bomb resource limits, and full backward compatibility for V1/V2/V3 manifests and media.
      */
     fun restoreBackup(
         context: Context,
@@ -205,9 +240,13 @@ object VaultBackupManager {
         categoryRepository: CategoryRepository,
         knowledgeRepository: KnowledgeRepository,
         onSuccess: (restoredNotesCount: Int, restoredCategoriesCount: Int) -> Unit,
-        onError: (Exception) -> Unit
+        onError: (Exception) -> Unit,
+        passphrase: CharArray? = null
     ) {
-        CoroutineScope(Dispatchers.IO).launch {
+        val passCopy = passphrase?.copyOf()
+        passphrase?.fill('\u0000')
+
+        backupScope.launch {
             try {
                 var manifestRawOrEncrypted: String? = null
                 val filesDir = context.filesDir.canonicalFile
@@ -225,8 +264,13 @@ object VaultBackupManager {
 
                                 if (entry.name == "vault_manifest.json") {
                                     manifestRawOrEncrypted = zis.bufferedReader(Charsets.UTF_8).readText()
-                                } else if (entry.name.startsWith("media/") && !entry.isDirectory) {
-                                    val relPath = entry.name.removePrefix("media/")
+                                } else if ((entry.name.startsWith("media_enc/") || entry.name.startsWith("media/")) && !entry.isDirectory) {
+                                    val isEncryptedMedia = entry.name.startsWith("media_enc/")
+                                    val relPath = if (isEncryptedMedia) {
+                                        entry.name.removePrefix("media_enc/")
+                                    } else {
+                                        entry.name.removePrefix("media/")
+                                    }
                                     val targetFile = File(filesDir, relPath).canonicalFile
 
                                     // CWE-22 Zip Slip Path Traversal Guard
@@ -235,17 +279,37 @@ object VaultBackupManager {
                                     }
 
                                     targetFile.parentFile?.mkdirs()
-                                    FileOutputStream(targetFile).use { fos ->
+                                    if (isEncryptedMedia) {
+                                        val baos = ByteArrayOutputStream()
                                         val buffer = ByteArray(8192)
-                                        var totalWritten = 0L
+                                        var totalRead = 0L
                                         var read = zis.read(buffer)
                                         while (read != -1) {
-                                            totalWritten += read
-                                            if (totalWritten > MAX_SINGLE_FILE_BYTES) {
+                                            totalRead += read
+                                            if (totalRead > MAX_SINGLE_FILE_BYTES + 1024L) {
                                                 throw SecurityException("Dosya boyutu güvenlik sınırını aştı")
                                             }
-                                            fos.write(buffer, 0, read)
+                                            baos.write(buffer, 0, read)
                                             read = zis.read(buffer)
+                                        }
+                                        val decryptedBytes = SecurityUtil.decryptPortableBytes(baos.toByteArray(), passCopy)
+                                        FileOutputStream(targetFile).use { fos ->
+                                            fos.write(decryptedBytes)
+                                        }
+                                        decryptedBytes.fill(0)
+                                    } else {
+                                        FileOutputStream(targetFile).use { fos ->
+                                            val buffer = ByteArray(8192)
+                                            var totalWritten = 0L
+                                            var read = zis.read(buffer)
+                                            while (read != -1) {
+                                                totalWritten += read
+                                                if (totalWritten > MAX_SINGLE_FILE_BYTES) {
+                                                    throw SecurityException("Dosya boyutu güvenlik sınırını aştı")
+                                                }
+                                                fos.write(buffer, 0, read)
+                                                read = zis.read(buffer)
+                                            }
                                         }
                                     }
                                 }
@@ -260,28 +324,26 @@ object VaultBackupManager {
                     throw IllegalStateException("Yedek dosyası geçersiz veya manifest bulunamadı")
                 }
 
-                // Support both V2 encrypted manifests (ENC: / ENC_V2:) and V1 legacy plaintext JSON manifests
                 val jsonContent = if (SecurityUtil.isEncryptedPayload(manifestRawOrEncrypted)) {
-                    SecurityUtil.decrypt(manifestRawOrEncrypted!!)
+                    when (val dec = SecurityUtil.decryptSafe(manifestRawOrEncrypted, passCopy)) {
+                        is AppResult.Success -> dec.data
+                        is AppResult.Failure -> throw SecurityException("Yedek şifresi çözülemedi veya parola hatalı")
+                    }
                 } else {
-                    manifestRawOrEncrypted!!
+                    manifestRawOrEncrypted
                 }
 
                 val payload = gson.fromJson(jsonContent, VaultBackupPayload::class.java)
 
-                // 1. Restore categories via CategoryRepository and guarantee a valid fallback category for ForeignKey integrity
+                // 1. Restore categories via Domain CategoryRepository
                 payload.categories.forEach { cat ->
-                    runCatching { categoryRepository.categoryUpsertSuspend(cat) }
+                    suspendSafeOrNull { categoryRepository.upsertCategory(cat.toDomain()) }
                 }
-                var currentCategories = runCatching {
-                    categoryRepository.getAllCategoriesSuspend()
-                }.getOrDefault(emptyList())
+                var currentCategories = suspendSafeOrNull { categoryRepository.getAllCategories() }.orEmpty()
                 if (currentCategories.isEmpty()) {
-                    val defaultCat = CategoryData(name = "Genel", isPassword = false).also { it.id = 1 }
-                    runCatching { categoryRepository.categoryUpsertSuspend(defaultCat) }
-                    currentCategories = runCatching {
-                        categoryRepository.getAllCategoriesSuspend()
-                    }.getOrDefault(listOf(defaultCat))
+                    val defaultCat = Category(id = 1, name = "Genel", isPassword = false)
+                    suspendSafeOrNull { categoryRepository.upsertCategory(defaultCat) }
+                    currentCategories = suspendSafeOrNull { categoryRepository.getAllCategories() } ?: listOf(defaultCat)
                 }
                 val validCategoryIds = currentCategories.map { it.id }.toSet()
                 val fallbackCategoryId = currentCategories.firstOrNull()?.id ?: 1
@@ -292,7 +354,7 @@ object VaultBackupManager {
                     .filter { it.status != "TRASH" && !it.title.isNullOrBlank() }
                     .associate { it.title!!.trim().lowercase() to it.id }
 
-                val reconstructedLinks = mutableListOf<NoteLinkData>()
+                val reconstructedLinks = mutableListOf<NoteLink>()
                 val wikiRegex = Regex("""\[\[(.*?)\]\]""")
 
                 // 2. Restore notes (normalizing drawing, image & audio paths, sub-page references, and re-wrapping encryption)
@@ -307,13 +369,14 @@ object VaultBackupManager {
                         (note.categoryId in lockedCategoryIds) ||
                         SecurityUtil.isEncryptedPayload(rawDesc)
 
-                    val plainDesc = if (!rawDesc.isNullOrBlank() && SecurityUtil.isEncryptedPayload(rawDesc)) {
-                        SecurityUtil.decrypt(rawDesc)
+                    val plainDescResult = if (!rawDesc.isNullOrBlank() && SecurityUtil.isEncryptedPayload(rawDesc)) {
+                        SecurityUtil.decryptSafe(rawDesc, passCopy)
                     } else {
-                        rawDesc ?: ""
+                        AppResult.Success(rawDesc ?: "")
                     }
 
-                    if (plainDesc.isNotBlank()) {
+                    if (plainDescResult is AppResult.Success && plainDescResult.data.isNotBlank()) {
+                        val plainDesc = plainDescResult.data
                         val blocks = BlockParser.parse(plainDesc).toMutableList()
                         var blocksUpdated = false
                         for (idx in blocks.indices) {
@@ -341,7 +404,7 @@ object VaultBackupManager {
                                 }
                                 if (resolvedSubId != null && note.status != "TRASH") {
                                     reconstructedLinks.add(
-                                        NoteLinkData(
+                                        NoteLink(
                                             sourceNoteId = note.id,
                                             targetNoteId = resolvedSubId,
                                             linkText = blk.content.trim().ifBlank { "Alt Sayfa" }
@@ -358,7 +421,7 @@ object VaultBackupManager {
                                         val targetId = activeTitleToId[linkTitle.lowercase()]
                                         if (targetId != null && targetId != note.id) {
                                             reconstructedLinks.add(
-                                                NoteLinkData(
+                                                NoteLink(
                                                     sourceNoteId = note.id,
                                                     targetNoteId = targetId,
                                                     linkText = linkTitle
@@ -384,20 +447,20 @@ object VaultBackupManager {
                     note.images = note.images?.mapNotNull { normalizeMediaPath(it, filesDir) }
                     note.sounds = note.sounds?.mapNotNull { normalizeMediaPath(it, filesDir) }
 
-                    runCatching { noteRepository.upsertSuspend(note) }
+                    suspendSafeOrNull { noteRepository.upsertNote(note.toDomain()) }
                 }
 
-                // 3. Restore and verify note links via KnowledgeRepository
-                val allExistingNoteIds = runCatching {
-                    noteRepository.getAllNotesSuspend().map { it.id }.toSet()
-                }.getOrNull() ?: noteIdsInBackup
+                // 3. Restore and verify note links via Domain KnowledgeRepository
+                val allExistingNoteIds = suspendSafeOrNull {
+                    noteRepository.getAllNotes().map { it.id }.toSet()
+                } ?: noteIdsInBackup
 
-                val mergedLinks = (payload.links + reconstructedLinks)
+                val mergedLinks = (payload.links.map { it.toDomain() } + reconstructedLinks)
                     .filter { it.sourceNoteId in allExistingNoteIds && it.targetNoteId in allExistingNoteIds }
                     .distinctBy { Triple(it.sourceNoteId, it.targetNoteId, it.linkText.trim().lowercase()) }
 
                 if (mergedLinks.isNotEmpty()) {
-                    runCatching { knowledgeRepository.insertAllLinksSuspend(mergedLinks) }
+                    suspendSafeOrNull { knowledgeRepository.insertAllLinks(mergedLinks) }
                 }
 
                 // 4. Restore Quick Thought Stream items with normalized media paths
@@ -407,18 +470,22 @@ object VaultBackupManager {
                         item.copy(
                             audioPath = normalizeMediaPath(item.audioPath, filesDir),
                             imagePath = normalizeMediaPath(item.imagePath, filesDir)
-                        ).also { it.id = item.id }
+                        ).also { it.id = item.id }.toDomain()
                     }
-                    runCatching { knowledgeRepository.insertAllStreamItemsSuspend(normalizedStream) }
+                    suspendSafeOrNull { knowledgeRepository.insertAllStreamItems(normalizedStream) }
                 }
 
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Handler(Looper.getMainLooper()).post {
                     onSuccess(payload.notes.size, payload.categories.size)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Handler(Looper.getMainLooper()).post {
                     onError(e)
                 }
+            } finally {
+                passCopy?.fill('\u0000')
             }
         }
     }
@@ -431,8 +498,8 @@ object VaultBackupManager {
     private const val KEY_LAST_SYNC_TIME = "auto_sync_last_time"
     const val AUTO_BACKUP_FILENAME = "PureNoteIt_AutoVault.purevault"
 
-    private val isAutoSyncRunning = java.util.concurrent.atomic.AtomicBoolean(false)
-    private val autoSyncDebounceHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val isAutoSyncRunning = AtomicBoolean(false)
+    private val autoSyncDebounceHandler = Handler(Looper.getMainLooper())
     private var pendingAutoSyncRunnable: Runnable? = null
     private const val AUTO_SYNC_DEBOUNCE_MS = 3500L
 
@@ -449,7 +516,11 @@ object VaultBackupManager {
     fun getConnectedFolderUri(context: Context): Uri? {
         val sp = context.getSharedPreferences(PREF_VAULT_SYNC, Context.MODE_PRIVATE)
         val uriStr = sp.getString(KEY_TREE_URI, null) ?: return null
-        return runCatching { Uri.parse(uriStr) }.getOrNull()
+        return try {
+            Uri.parse(uriStr)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun getConnectedFolderName(context: Context): String? {
@@ -480,22 +551,16 @@ object VaultBackupManager {
             .apply()
     }
 
-    /**
-     * Finds the latest encrypted backup archive inside the connected Google Drive / Cloud folder.
-     */
     fun getAutoBackupUri(context: Context): Uri? {
         val treeUri = getConnectedFolderUri(context) ?: return null
         return try {
             val rootDoc = DocumentFile.fromTreeUri(context, treeUri) ?: return null
             rootDoc.findFile(AUTO_BACKUP_FILENAME)?.uri
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
 
-    /**
-     * Saves the encrypted .purevault archive directly into the user's connected Google Drive / Cloud folder.
-     */
     fun saveBackupToTreeUri(context: Context, backupFile: File, treeUri: Uri): Boolean {
         return try {
             val folderDoc = DocumentFile.fromTreeUri(context, treeUri) ?: return false
@@ -514,16 +579,11 @@ object VaultBackupManager {
             } ?: return false
 
             true
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (_: Exception) {
             false
         }
     }
 
-    /**
-     * Debounces rapid auto-sync triggers (e.g. while typing/saving notes) so disk and SAF
-     * streams are only written once after edits settle.
-     */
     fun scheduleDebouncedAutoSync(
         context: Context,
         noteRepository: NoteRepository,
@@ -544,9 +604,6 @@ object VaultBackupManager {
         autoSyncDebounceHandler.postDelayed(runnable, AUTO_SYNC_DEBOUNCE_MS)
     }
 
-    /**
-     * Performs a single-flight background E2EE auto-backup to Google Drive / Cloud folder.
-     */
     fun performAutoSync(
         context: Context,
         noteRepository: NoteRepository,
@@ -571,7 +628,7 @@ object VaultBackupManager {
             categoryRepository = categoryRepository,
             knowledgeRepository = knowledgeRepository,
             onSuccess = { backupFile ->
-                CoroutineScope(Dispatchers.IO).launch {
+                backupScope.launch {
                     var success = false
                     try {
                         success = saveBackupToTreeUri(context, backupFile, treeUri)
@@ -580,17 +637,17 @@ object VaultBackupManager {
                             sp.edit().putLong(KEY_LAST_SYNC_TIME, System.currentTimeMillis()).apply()
                         }
                     } finally {
-                        runCatching { backupFile.delete() }
+                        try { backupFile.delete() } catch (_: Exception) {}
                         isAutoSyncRunning.set(false)
                     }
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    Handler(Looper.getMainLooper()).post {
                         onComplete?.invoke(success)
                     }
                 }
             },
             onError = {
                 isAutoSyncRunning.set(false)
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Handler(Looper.getMainLooper()).post {
                     onComplete?.invoke(false)
                 }
             }

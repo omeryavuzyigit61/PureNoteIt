@@ -3,14 +3,14 @@ package com.notes.purenoteit.reminder
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
-import com.notes.purenoteit.repository.NoteRepository
+import com.notes.purenoteit.di.ApplicationScope
+import com.notes.purenoteit.domain.repository.NoteRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class ReminderBroadcastReceiver : BroadcastReceiver() {
@@ -19,6 +19,7 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
     @InstallIn(SingletonComponent::class)
     interface ReminderReceiverEntryPoint {
         fun getNoteRepository(): NoteRepository
+        @ApplicationScope fun getApplicationScope(): CoroutineScope
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -27,8 +28,6 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
         val noteDesc = intent.getStringExtra(ReminderManager.EXTRA_NOTE_DESC) ?: ""
         val reminderType = intent.getStringExtra(ReminderManager.EXTRA_REMINDER_TYPE) ?: "ALARM"
         val soundType = intent.getStringExtra(ReminderManager.EXTRA_REMINDER_SOUND) ?: "default"
-
-        Log.d("ReminderReceiver", "Reminder received for note $noteId ($reminderType)")
 
         if (noteId == -1) return
 
@@ -47,22 +46,27 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
             soundType = soundType
         )
 
-        // 3. Mark reminder as done in Room database via NoteRepository
+        // 3. Mark reminder as done in Room database via domain NoteRepository
+        val pendingResult = goAsync()
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 context.applicationContext,
                 ReminderReceiverEntryPoint::class.java
             )
             val noteRepository = entryPoint.getNoteRepository()
-            CoroutineScope(Dispatchers.IO).launch {
+            val appScope = entryPoint.getApplicationScope()
+            appScope.launch {
                 try {
-                    noteRepository.updateReminderDoneSuspend(noteId, true)
-                } catch (e: Exception) {
-                    Log.e("ReminderReceiver", "Error marking reminder done", e)
+                    noteRepository.updateReminderDone(noteId, true)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                } finally {
+                    pendingResult.finish()
                 }
             }
-        } catch (e: Exception) {
-            Log.e("ReminderReceiver", "Error accessing Hilt EntryPoint", e)
+        } catch (_: Exception) {
+            pendingResult.finish()
         }
     }
 }

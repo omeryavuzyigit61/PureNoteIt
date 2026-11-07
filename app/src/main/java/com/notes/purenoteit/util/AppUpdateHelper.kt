@@ -145,13 +145,13 @@ object AppUpdateHelper {
                     availableVersionName = dynamicTargetVersion,
                     releaseNotesTr = listOf(
                         "🪟 Cam Kategori Menüsü: 3D kapı açılma animasyonlu buğulu cam (glassmorphism) üst menü.",
-                        "🛡️ Güçlü Güvenlik: Donanım destekli 256-bit AES SQLCipher ve Jetpack DataStore altyapısı.",
+                        "🛡️ Güçlü Güvenlik: SQLCipher AES-256 tam veritabanı şifrelemesi ve Android Keystore kriptografik kasa.",
                         "⚡ Clean Architecture & MVI: %100 Coroutines ve Flow ile daha hızlı, reaktif performans.",
                         "🎨 Material 3 Tasarım: Yenilenen ızgara simgesi ve ekranda görünen net not sayımı."
                     ),
                     releaseNotesEn = listOf(
                         "🪟 Glassy Tabs V7: 3D door-flip animation and frosted glassmorphism category bar.",
-                        "🛡️ Enhanced Security: Hardware-backed 256-bit AES SQLCipher and Jetpack DataStore.",
+                        "🛡️ Enhanced Security: SQLCipher AES-256 full-database encryption & Android Keystore cryptographic vault.",
                         "⚡ Clean Architecture & MVI: 100% Coroutines & Flow for fast reactive performance.",
                         "🎨 Material 3 UI: Modern grid view icon and accurate visible note count."
                     ),
@@ -224,13 +224,13 @@ object AppUpdateHelper {
             availableVersionName = "v$curName",
             releaseNotesTr = listOf(
                 "🪟 Cam Kategori Menüsü: 3D kapı açılma animasyonlu buğulu cam (glassmorphism) üst menü.",
-                "🛡️ Güçlü Güvenlik: Donanım destekli 256-bit AES SQLCipher ve Jetpack DataStore altyapısı.",
+                "🛡️ Güçlü Güvenlik: Donanım destekli Android Keystore 256-bit AES-GCM şifreleme altyapısı.",
                 "⚡ Clean Architecture & MVI: %100 Coroutines ve Flow ile daha hızlı, reaktif performans.",
                 "🎨 Material 3 Tasarım: Yenilenen ızgara simgesi ve ekranda görünen net not sayımı."
             ),
             releaseNotesEn = listOf(
                 "🪟 Glassy Tabs V7: 3D door-flip animation and frosted glassmorphism category bar.",
-                "🛡️ Enhanced Security: Hardware-backed 256-bit AES SQLCipher and Jetpack DataStore.",
+                "🛡️ Enhanced Security: Hardware-backed Android Keystore 256-bit AES-GCM encryption.",
                 "⚡ Clean Architecture & MVI: 100% Coroutines & Flow for fast reactive performance.",
                 "🎨 Material 3 UI: Modern grid view icon and accurate visible note count."
             )

@@ -4,13 +4,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
-import com.notes.purenoteit.repository.NoteRepository
+import com.notes.purenoteit.di.ApplicationScope
+import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.domain.time.AppClock
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class AlarmActionReceiver : BroadcastReceiver() {
@@ -19,6 +21,8 @@ class AlarmActionReceiver : BroadcastReceiver() {
     @InstallIn(SingletonComponent::class)
     interface AlarmActionEntryPoint {
         fun getNoteRepository(): NoteRepository
+        fun getAppClock(): AppClock
+        @ApplicationScope fun getApplicationScope(): CoroutineScope
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -43,33 +47,40 @@ class AlarmActionReceiver : BroadcastReceiver() {
                 val reminderType = intent.getStringExtra(ReminderManager.EXTRA_REMINDER_TYPE) ?: "ALARM"
                 val soundType = intent.getStringExtra(ReminderManager.EXTRA_REMINDER_SOUND) ?: "default"
 
-                val newReminderTime = System.currentTimeMillis() + (5 * 60 * 1000L)
-                ReminderManager.scheduleReminder(
-                    context = context,
-                    noteId = noteId,
-                    noteTitle = noteTitle,
-                    noteDesc = noteDesc,
-                    reminderTimeMs = newReminderTime,
-                    reminderType = reminderType,
-                    soundType = soundType
-                )
-
-                // Update database via NoteRepository
+                val pendingResult = goAsync()
                 try {
+                    val appContext = context.applicationContext
                     val entryPoint = EntryPointAccessors.fromApplication(
-                        context.applicationContext,
+                        appContext,
                         AlarmActionEntryPoint::class.java
                     )
                     val noteRepository = entryPoint.getNoteRepository()
-                    CoroutineScope(Dispatchers.IO).launch {
+                    val clock = entryPoint.getAppClock()
+                    val appScope = entryPoint.getApplicationScope()
+                    val newReminderTime = clock.nowMillis() + (5 * 60 * 1000L)
+
+                    ReminderManager.scheduleReminder(
+                        context = appContext,
+                        noteId = noteId,
+                        noteTitle = noteTitle,
+                        noteDesc = noteDesc,
+                        reminderTimeMs = newReminderTime,
+                        reminderType = reminderType,
+                        soundType = soundType
+                    )
+
+                    appScope.launch {
                         try {
-                            noteRepository.updateReminderTimeSuspend(noteId, newReminderTime)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                            noteRepository.updateReminderTime(noteId, newReminderTime)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                        } finally {
+                            pendingResult.finish()
                         }
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                } catch (_: Exception) {
+                    pendingResult.finish()
                 }
 
                 Toast.makeText(context, "Alarm 5 dakika ertelendi", Toast.LENGTH_SHORT).show()

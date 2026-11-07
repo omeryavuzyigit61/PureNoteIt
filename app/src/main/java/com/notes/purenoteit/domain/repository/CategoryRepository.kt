@@ -14,4 +14,6 @@ interface CategoryRepository {
     suspend fun searchCategories(query: String): List<Category>
     suspend fun isCategoryExists(name: String): Boolean
     suspend fun areDefaultCategoriesPresent(): Boolean
+    suspend fun isPasswordSet(categoryName: String): Boolean?
+    suspend fun getCategoryIdByName(categoryName: String): Int?
 }

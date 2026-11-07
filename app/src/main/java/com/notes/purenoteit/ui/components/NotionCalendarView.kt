@@ -468,7 +468,7 @@ private fun NotionMultiColumnWeekView(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = SimpleDateFormat("EEE", Locale("tr")).format(day.calendar.time),
+                                text = SimpleDateFormat("EEE", Locale.forLanguageTag("tr")).format(day.calendar.time),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isToday) VibrantOrange else if (isDark) PureWhite.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -777,7 +777,7 @@ private fun NotionMonthScheduleView(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val dateLabel = SimpleDateFormat("d MMMM yyyy, EEEE", Locale("tr")).format(selectedCalendar.time)
+            val dateLabel = SimpleDateFormat("d MMMM yyyy, EEEE", Locale.forLanguageTag("tr")).format(selectedCalendar.time)
             Text(
                 text = dateLabel,
                 fontSize = 13.5.sp,
@@ -870,7 +870,7 @@ fun NotionCalendarEventCard(
     val palette = getCategoryPalette(note.categoryId, cat?.name)
 
     val bgColor = if (isDark) palette.darkBg else palette.lightBg
-    val timeLabel = SimpleDateFormat("HH:mm", Locale("tr")).format(note.date)
+    val timeLabel = SimpleDateFormat("HH:mm", Locale.forLanguageTag("tr")).format(note.date)
 
     Surface(
         modifier = modifier

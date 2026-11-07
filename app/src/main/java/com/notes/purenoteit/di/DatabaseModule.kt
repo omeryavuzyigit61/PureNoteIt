@@ -7,6 +7,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.notes.purenoteit.data.db.CategoryDao
 import com.notes.purenoteit.data.db.NoteDatabase
+import com.notes.purenoteit.data.security.SqlCipherDatabaseManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -91,9 +92,10 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): NoteDatabase =
         Room.databaseBuilder(context, NoteDatabase::class.java, "notes")
+            .openHelperFactory(SqlCipherDatabaseManager.createSupportFactory(context, "notes"))
             .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
-            .fallbackToDestructiveMigrationFrom(1, 2)
-            .fallbackToDestructiveMigrationOnDowngrade()
+            .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2)
+            .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)

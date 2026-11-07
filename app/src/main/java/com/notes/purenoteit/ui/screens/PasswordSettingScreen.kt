@@ -100,39 +100,49 @@ fun PasswordSettingScreen(
     }
 
     fun savePassword() {
-        val curr = currentPassword.trim()
-        val newP = newPassword.trim()
-        val repP = repeatPassword.trim()
+        val currChars = currentPassword.trim().toCharArray()
+        val newChars = newPassword.trim().toCharArray()
+        val repChars = repeatPassword.trim().toCharArray()
 
-        if (newP.isBlank() || repP.isBlank() || (hasPassword && curr.isBlank())) {
-            context.showToastShort(context.getString(R.string.toast_fill_empty_fields))
-            return
-        }
-
-        if (newP.length != 6 || !newP.all { it.isDigit() }) {
-            context.showToastShort(context.getString(R.string.toast_pin_must_be_6_digits))
-            return
-        }
-
-        if (hasPassword) {
-            if (!SecurityUtil.verifyPassword(context, curr)) {
-                context.showToastShort(context.getString(R.string.you_entered_the_current_password_incorrectly))
+        try {
+            if (newChars.isEmpty() || repChars.isEmpty() || (hasPassword && currChars.isEmpty())) {
+                context.showToastShort(context.getString(R.string.toast_fill_empty_fields))
                 return
             }
-            if (curr == newP) {
-                context.showToastShort(context.getString(R.string.toast_new_pin_cannot_be_same))
+
+            if (newChars.size != 6 || !newChars.all { it.isDigit() }) {
+                context.showToastShort(context.getString(R.string.toast_pin_must_be_6_digits))
                 return
             }
-        }
 
-        if (newP != repP) {
-            context.showToastShort(context.getString(R.string.toast_pins_do_not_match))
-            return
-        }
+            if (hasPassword) {
+                val sameAsCurrent = currChars.contentEquals(newChars)
+                if (!SecurityUtil.verifyPassword(context, currChars.copyOf())) {
+                    context.showToastShort(context.getString(R.string.you_entered_the_current_password_incorrectly))
+                    return
+                }
+                if (sameAsCurrent) {
+                    context.showToastShort(context.getString(R.string.toast_new_pin_cannot_be_same))
+                    return
+                }
+            }
 
-        SecurityUtil.savePassword(context, newP)
-        context.showToastShort(context.getString(R.string.toast_password_changed_success))
-        onNavigateBack()
+            if (!newChars.contentEquals(repChars)) {
+                context.showToastShort(context.getString(R.string.toast_pins_do_not_match))
+                return
+            }
+
+            SecurityUtil.savePassword(context, newChars.copyOf())
+            currentPassword = ""
+            newPassword = ""
+            repeatPassword = ""
+            context.showToastShort(context.getString(R.string.toast_password_changed_success))
+            onNavigateBack()
+        } finally {
+            currChars.fill('\u0000')
+            newChars.fill('\u0000')
+            repChars.fill('\u0000')
+        }
     }
 
     Scaffold(

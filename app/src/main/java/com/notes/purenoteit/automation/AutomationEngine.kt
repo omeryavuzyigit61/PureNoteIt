@@ -1,13 +1,17 @@
 package com.notes.purenoteit.automation
 
-import android.util.Log
 import com.notes.purenoteit.data.db.NoteData
+import com.notes.purenoteit.data.mapper.toEntity
+import com.notes.purenoteit.di.ApplicationScope
+import com.notes.purenoteit.domain.model.Note
+import com.notes.purenoteit.domain.repository.CategoryRepository
+import com.notes.purenoteit.domain.repository.KnowledgeRepository
+import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.domain.time.AppClock
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
-import com.notes.purenoteit.repository.CategoryRepository
-import com.notes.purenoteit.repository.KnowledgeRepository
-import com.notes.purenoteit.repository.NoteRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,28 +26,51 @@ import javax.inject.Singleton
 class AutomationEngine @Inject constructor(
     private val knowledgeRepository: KnowledgeRepository,
     private val noteRepository: NoteRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    @ApplicationScope private val applicationScope: CoroutineScope,
+    private val clock: AppClock
 ) {
     /**
      * Evaluates note-level triggers when a note is created or updated.
-     * E.g.: Auto-completes note status when all checklist tasks are done.
      */
     fun onNoteUpdated(note: NoteData, onStatusUpdated: ((String) -> Unit)? = null) {
-        CoroutineScope(Dispatchers.IO).launch {
+        applicationScope.launch {
             try {
-                val rules = knowledgeRepository.getRulesByTriggerSuspend("ALL_TASKS_COMPLETED")
+                val rules = knowledgeRepository.getRulesByTrigger("ALL_TASKS_COMPLETED")
                 val activeRule = rules.firstOrNull { it.isEnabled }
                 if (activeRule != null) {
                     if (note.totalTasks > 0 && note.completedTasks == note.totalTasks && note.status != "DONE") {
                         note.status = "DONE"
-                        noteRepository.upsertSuspend(note)
+                        val domainNote = Note(
+                            id = note.id,
+                            title = note.title,
+                            description = note.description,
+                            date = note.date,
+                            isPassword = note.isPassword,
+                            images = note.images,
+                            categoryId = note.categoryId,
+                            sounds = note.sounds,
+                            isPinned = note.isPinned,
+                            icon = note.icon,
+                            isEncrypted = note.isEncrypted,
+                            totalTasks = note.totalTasks,
+                            completedTasks = note.completedTasks,
+                            status = "DONE",
+                            reminderTime = note.reminderTime,
+                            reminderType = note.reminderType,
+                            reminderSound = note.reminderSound,
+                            isReminderDone = note.isReminderDone,
+                            richBlocksJson = note.richBlocksJson
+                        )
+                        noteRepository.upsertNote(domainNote)
                         withContext(Dispatchers.Main) {
                             onStatusUpdated?.invoke("DONE")
                         }
                     }
                 }
-            } catch (error: Exception) {
-                Log.e("AutomationEngine", "Error checking rules: ${error.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }
@@ -52,8 +79,9 @@ class AutomationEngine @Inject constructor(
      * Creates an automated "Günün Ajandası / Planı" template note.
      */
     fun createDailyAgendaNote(onSuccess: (NoteData) -> Unit) {
-        val dateFormat = SimpleDateFormat("d MMMM yyyy, EEEE", Locale("tr"))
-        val todayStr = dateFormat.format(Date())
+        val now = clock.nowMillis()
+        val dateFormat = SimpleDateFormat("d MMMM yyyy, EEEE", Locale.forLanguageTag("tr"))
+        val todayStr = dateFormat.format(Date(now))
 
         val blocks = listOf(
             NoteBlock(
@@ -93,16 +121,16 @@ class AutomationEngine @Inject constructor(
             )
         )
 
-        CoroutineScope(Dispatchers.IO).launch {
+        applicationScope.launch {
             try {
-                val categories = categoryRepository.getAllCategoriesSuspend()
+                val categories = categoryRepository.getAllCategories()
                 val dailyCat = categories.firstOrNull { it.name.equals("Günlük", ignoreCase = true) }
                 val targetCategoryId = dailyCat?.id ?: categories.firstOrNull()?.id
 
-                val newNote = NoteData(
+                val domainNote = Note(
                     title = "Ajanda: $todayStr",
                     description = BlockParser.serialize(blocks),
-                    date = System.currentTimeMillis(),
+                    date = now,
                     icon = "📅",
                     categoryId = targetCategoryId,
                     status = "TODO",
@@ -110,14 +138,15 @@ class AutomationEngine @Inject constructor(
                     completedTasks = 0
                 )
 
-                val generatedId = noteRepository.insertNoteSuspend(newNote)
-                newNote.id = generatedId.toInt()
+                val generatedId = noteRepository.insertNote(domainNote)
+                val savedNote = domainNote.copy(id = generatedId.toInt()).toEntity()
 
                 withContext(Dispatchers.Main) {
-                    onSuccess(newNote)
+                    onSuccess(savedNote)
                 }
-            } catch (error: Exception) {
-                Log.e("AutomationEngine", "Error creating daily agenda note: ${error.message}", error)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
             }
         }
     }

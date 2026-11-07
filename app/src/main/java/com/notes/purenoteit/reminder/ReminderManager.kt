@@ -41,11 +41,7 @@ object ReminderManager {
             putExtra(EXTRA_REMINDER_SOUND, soundType ?: "default")
         }
 
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
         val pendingIntent = PendingIntent.getBroadcast(
             context,

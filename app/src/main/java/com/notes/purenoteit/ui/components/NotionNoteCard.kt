@@ -200,7 +200,7 @@ fun NotionNoteCard(
     }
 
     @OptIn(ExperimentalSharedTransitionApi::class)
-    val sharedBoundsModifier = if (sharedScopeKey != null && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
+    val sharedBoundsModifier = if (!pagerCoordinator.suppressOverlay && sharedScopeKey != null && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
         with(sharedTransitionScope) {
             Modifier.sharedBounds(
                 sharedContentState = rememberSharedContentState(
@@ -208,16 +208,12 @@ fun NotionNoteCard(
                 ),
                 animatedVisibilityScope = animatedVisibilityScope,
                 boundsTransform = { _, _ ->
-                    if (pagerCoordinator.suppressOverlay) {
-                        snap()
-                    } else {
-                        spring(
-                            dampingRatio = 0.82f,
-                            stiffness = 380f
-                        )
-                    }
+                    spring(
+                        dampingRatio = 0.82f,
+                        stiffness = 380f
+                    )
                 },
-                renderInOverlayDuringTransition = !pagerCoordinator.suppressOverlay,
+                renderInOverlayDuringTransition = true,
                 clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(20.dp))
             )
         }
@@ -776,7 +772,7 @@ fun NotionNoteCard(
 
             // Formatted Date and Active Reminder Badge
             val dateStr = remember(note.date) {
-                SimpleDateFormat("dd MMM yyyy", Locale("tr")).format(Date(note.date))
+                SimpleDateFormat("dd MMM yyyy", Locale.forLanguageTag("tr")).format(Date(note.date))
             }
             val hasActiveReminder = note.reminderTime != null && note.reminderTime!! > System.currentTimeMillis() && !note.isReminderDone
 

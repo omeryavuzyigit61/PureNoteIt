@@ -3,14 +3,22 @@
     <cloud-backup>
         <!-- Exclude sensitive PIN hashes/salts and hardware-bound encrypted notes from unencrypted cloud extraction -->
         <exclude domain="sharedpref" path="Note.xml" />
+        <exclude domain="root" path="no_backup" />
+        <exclude domain="file" path="purenote_sqlcipher_keyset.bin" />
         <exclude domain="database" path="notes" />
         <exclude domain="database" path="notes-shm" />
         <exclude domain="database" path="notes-wal" />
+        <exclude domain="database" path="notes.plain.bak" />
+        <exclude domain="database" path="notes.sqlcipher.tmp" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="Note.xml" />
+        <exclude domain="root" path="no_backup" />
+        <exclude domain="file" path="purenote_sqlcipher_keyset.bin" />
         <exclude domain="database" path="notes" />
         <exclude domain="database" path="notes-shm" />
         <exclude domain="database" path="notes-wal" />
+        <exclude domain="database" path="notes.plain.bak" />
+        <exclude domain="database" path="notes.sqlcipher.tmp" />
     </device-transfer>
 </data-extraction-rules>

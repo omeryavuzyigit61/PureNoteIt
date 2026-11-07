@@ -41,7 +41,7 @@ object LanguageManager {
         val targetLocale = if (langCode == LANG_AUTO) {
             Locale.getDefault()
         } else {
-            Locale(langCode)
+            Locale.forLanguageTag(langCode)
         }
         Locale.setDefault(targetLocale)
 
@@ -85,7 +85,7 @@ object LanguageManager {
         if (savedLang == LANG_AUTO) {
             return context
         }
-        val locale = Locale(savedLang)
+        val locale = Locale.forLanguageTag(savedLang)
         Locale.setDefault(locale)
         val config = Configuration(context.resources.configuration)
         config.setLocale(locale)

@@ -5,18 +5,25 @@
 -renamesourcefileattribute SourceFile
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# 2. Room Database Rules
+# 2. Room Database & SQLCipher Rules
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Dao interface * { *; }
 -keep @androidx.room.Entity class * { *; }
 -keep class com.notes.purenoteit.data.db.** { *; }
+-keep class net.zetetic.database.** { *; }
+-keep interface net.zetetic.database.** { *; }
 -dontwarn androidx.room.paging.**
 
-# 3. Model & Data Classes (Gson / JSON serialization)
+# 3. Model & Data Classes (Gson / JSON & Type-Safe Navigation kotlinx.serialization)
 -keepclassmembers enum * { *; }
 -keep class com.notes.purenoteit.model.** { *; }
 -keepclassmembers class com.notes.purenoteit.model.** { *; }
+-keep class com.notes.purenoteit.util.VaultBackupPayload { *; }
 -keep class com.notes.purenoteit.util.Converters { *; }
+-keep,includedescriptorclasses class com.notes.purenoteit.ui.navigation.** { *; }
+-keepclassmembers class com.notes.purenoteit.ui.navigation.** {
+    *** Companion;
+}
 
 # 4. Dagger Hilt & Dependency Injection
 -keep class * extends dagger.hilt.internal.GeneratedComponent
@@ -24,9 +31,7 @@
 -keep @dagger.hilt.EntryPoint interface * { *; }
 -keep @dagger.hilt.InstallIn interface * { *; }
 
-# 5. Jetpack Compose Material 3 & Navigation
--keep class androidx.compose.material3.** { *; }
--keep class com.notes.purenoteit.ui.** { *; }
+# 5. Jetpack Compose (Allow R8 obfuscation on app UI & Vault classes)
 -dontwarn androidx.compose.**
 
 # 6. Biometrics & ML Kit

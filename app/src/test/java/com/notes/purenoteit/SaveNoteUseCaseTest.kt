@@ -4,6 +4,7 @@ import com.notes.purenoteit.domain.model.AppResult
 import com.notes.purenoteit.domain.model.DataError
 import com.notes.purenoteit.domain.model.Note
 import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.domain.time.AppClock
 import com.notes.purenoteit.domain.usecase.SaveNoteUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -16,7 +17,8 @@ import org.junit.Test
 class SaveNoteUseCaseTest {
 
     private val noteRepository: NoteRepository = mockk(relaxed = true)
-    private val saveNoteUseCase = SaveNoteUseCase(noteRepository)
+    private val fixedClock = AppClock { 1_700_000_000_000L }
+    private val saveNoteUseCase = SaveNoteUseCase(noteRepository, fixedClock)
 
     @Test
     fun `tamamen bos not kaydedilmeye calisildiginda dogrulama hatasi donmelidir`() = runTest {
@@ -30,8 +32,8 @@ class SaveNoteUseCaseTest {
     }
 
     @Test
-    fun `gecerli not kaydedildiginde basariyla upsert edilmelidir`() = runTest {
-        val validNote = Note(id = 1, title = "  Baslik  ", description = "Icerik", date = 5000L)
+    fun `gecerli not kaydedildiginde basariyla upsert edilmeli ve sifir tarih AppClock ile doldurulmalidir`() = runTest {
+        val validNote = Note(id = 1, title = "  Baslik  ", description = "Icerik", date = 0L)
         coEvery { noteRepository.upsertNote(any()) } returns Unit
 
         val result = saveNoteUseCase(validNote)
@@ -39,7 +41,10 @@ class SaveNoteUseCaseTest {
         assertTrue(result is AppResult.Success)
         coVerify(exactly = 1) {
             noteRepository.upsertNote(match {
-                it.id == 1 && it.title == "Baslik" && it.description == "Icerik"
+                it.id == 1 &&
+                    it.title == "Baslik" &&
+                    it.description == "Icerik" &&
+                    it.date == 1_700_000_000_000L
             })
         }
     }

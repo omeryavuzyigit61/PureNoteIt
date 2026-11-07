@@ -24,11 +24,11 @@
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026%2B)-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Platform" />
     <img src="https://img.shields.io/badge/Language-Kotlin%202.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
     <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose" />
-    <img src="https://img.shields.io/badge/Database-Room%20%2B%20SQLCipher-FF8F00?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room SQLCipher" />
+    <img src="https://img.shields.io/badge/Database-Room%20%2B%20SQLCipher%20AES--256-FF8F00?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room + SQLCipher AES-256" />
     <img src="https://img.shields.io/badge/DI-Dagger%20Hilt-00C853?style=for-the-badge&logo=dagger&logoColor=white" alt="Hilt" />
     <img src="https://img.shields.io/badge/Security-AES--256%20Vault-175DDC?style=for-the-badge&logo=bitwarden&logoColor=white" alt="Security" />
     <img src="https://img.shields.io/badge/Optimization-R8%20DEX%20Obfuscated-blueviolet?style=for-the-badge&logo=googleplay&logoColor=white" alt="R8 Obfuscation" />
-    <img src="https://img.shields.io/badge/Version-1.1.0-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-1.1.1-orange?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
   </p>
 
@@ -205,8 +205,8 @@ flowchart TD
 - **Kullanıcı Arayüzü:** [Jetpack Compose](https://developer.android.com/jetpack/compose) & [Material Design 3](https://m3.material.io/)
 - **Mimari:** Clean Architecture + MVI (Model-View-Intent) + Repository Pattern
 - **Bağımlılık Enjeksiyonu (DI):** [Dagger Hilt](https://dagger.dev/hilt/)
-- **Veritabanı & Kalıcılık:** [Room + SQLCipher (256-bit AES)](https://www.zetetic.net/sqlcipher/) & [Jetpack DataStore](https://developer.android.com/topic/libraries/architecture/datastore)
-- **Kriptografi & Güvenlik:** AES-256-GCM, Android Keystore, [AndroidX Biometric](https://developer.android.com/training/sign-in/biometric-auth)
+- **Veritabanı & Kalıcılık:** [Room Database](https://developer.android.com/training/data-storage/room) + SQLCipher 4 (`sqlcipher-android`) Tam Veritabanı Şifrelemesi + Donanım Destekli Android Keystore AES-256-GCM Çift Katmanlı Kasa
+- **Kriptografi & Güvenlik:** AES-256-GCM, PBKDF2-HMAC-SHA256, Android Keystore, `BiometricPrompt.CryptoObject` ile Donanım Kriptografik Biyometri, [AndroidX Biometric](https://developer.android.com/training/sign-in/biometric-auth)
 - **Asenkron & Reaktif:** %100 Kotlin Coroutines, StateFlow, SharedFlow
 - **Yapay Zeka & Görüntü İşleme:** [Google ML Kit Text Recognition](https://developers.google.com/ml-kit/vision/text-recognition/android) (On-Device)
 - **Görsel Yükleme:** [Coil Compose](https://coil-kt.github.io/coil/)
@@ -245,9 +245,16 @@ flowchart TD
 
 ## 📋 Sürüm Notları / Changelog
 
-### v1.1.0 (En Son Sürüm / Latest)
+### v1.1.1 (En Son Sürüm / Latest)
+- 🔒 **SQLCipher 4.20.0 Tam Veritabanı Şifrelemesi:** Room (`notes`) veritabanı disk düzeyinde 256-bit AES ile şifrelendi; Android Keystore donanım sarmallı master key ve atomik `sqlcipher_export` migrasyonu ile tüm mevcut notlar ve alt sayfalar %100 sıfır kayıpla şifreli formata geçirildi.
+- 🚀 **2026 Modern Derleme Zinciri & Android 17 (API 37):** Gradle 9.6.0, Android Gradle Plugin 9.5.1 (Built-in Kotlin), Kotlin 2.4.21, KSP 2.3.13, Compose BOM 2026.09.00 (Material 3 1.4.0), Room 2.8.5, Lifecycle 2.11.0 ve Coroutines 1.11.0 güncellemeleri tamamlandı.
+- 🧭 **Resmi Tip Güvenli (@Serializable) Compose Navigasyonu:** String tabanlı rota şablonları kaldırılarak derleme zamanında tip güvenliği sağlayan `AppRoute` (@Serializable + @SerialName) navigasyon mimarisine geçildi.
+- 🛡️ **Kapsamlı Defansif Güvenlik Sertleştirmesi:** Monotonik saat korumalı PIN kaba kuvvet (brute-force) engeli, `CharArray` RAM sıfırlama (`.fill('\0')`), `FLAG_SECURE`, Tapjacking önleme (`filterTouchesWhenObscured`), R8 obfuscation ve sıkılaştırılmış yedekleme kuralları (`backup_rules.xml`).
+- ⚡ **Geri Dönüş Animasyonu & Sayfa Geçiş İzolasyonu:** Sayfa değiştirme esnasında `sharedBounds` kartlarının diğer sekmelere taşması (`bleed`) 0ms'lik senkron koordinatör (`PagerTransitionCoordinator`) ile tamamen engellendi.
+
+### v1.1.0
 - 🪟 **Cam Kategori Menüsü (Glassy Navigation Tabs V7):** 3D kapı açılma rotasyon animasyonlu (`rotationY`), buğulu cam dokulu (`glassmorphism`) üst kategori dock'u ve zarif sayfa geçişleri.
-- 🛡️ **Donanım Destekli SQLCipher & DataStore:** Veritabanının 256-bit AES donanım şifrelemesi ve senkron SharedPreferences yerine modern asenkron Preferences DataStore mimarisi.
+- 🛡️ **Donanım Destekli Android Keystore AES-256-GCM & Kriptografik Biyometri:** Kilitli notların ve `.purevault` arşivlerinin 256-bit AES-GCM donanım şifrelemesi ve `BiometricPrompt.CryptoObject` doğrulaması.
 - ⚡ **Clean Architecture & MVI Migrasyonu:** %100 Kotlin Coroutines & Flow tek yönlü veri akışı (`UDF`), UseCase katmanı ve 18/18 birim test kapsamı.
 - 🎨 **Modern Material 3 Arayüzü & Senkron Sayaç:** Yenilenen simetrik `grid_view` görünüm butonu ve yalnızca ekranda listelenen gerçek notları sayan akıllı sayaç senkronizasyonu.
 

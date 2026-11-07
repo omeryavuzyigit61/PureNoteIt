@@ -122,7 +122,7 @@ private fun NotionListRow(
     var showStatusMenu by remember { mutableStateOf(false) }
     val category = categories.find { it.id == note.categoryId }
 
-    val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == (note.status ?: "TODO") } ?: KANBAN_COLUMNS[0]
+    val currentStatusDef = KANBAN_COLUMNS.find { it.statusKey == note.status } ?: KANBAN_COLUMNS[0]
     val dateStr = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(note.date))
 
     val sharedTransitionScope = LocalSharedTransitionScope.current
@@ -130,7 +130,7 @@ private fun NotionListRow(
     val pagerCoordinator = LocalPagerTransitionCoordinator.current
 
     @OptIn(ExperimentalSharedTransitionApi::class)
-    val sharedBoundsModifier = if (sharedScopeKey != null && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
+    val sharedBoundsModifier = if (!pagerCoordinator.suppressOverlay && sharedScopeKey != null && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
         with(sharedTransitionScope) {
             Modifier.sharedBounds(
                 sharedContentState = rememberSharedContentState(
@@ -138,16 +138,12 @@ private fun NotionListRow(
                 ),
                 animatedVisibilityScope = animatedVisibilityScope,
                 boundsTransform = { _, _ ->
-                    if (pagerCoordinator.suppressOverlay) {
-                        snap()
-                    } else {
-                        spring(
-                            dampingRatio = 0.82f,
-                            stiffness = 380f
-                        )
-                    }
+                    spring(
+                        dampingRatio = 0.82f,
+                        stiffness = 380f
+                    )
                 },
-                renderInOverlayDuringTransition = !pagerCoordinator.suppressOverlay,
+                renderInOverlayDuringTransition = true,
                 clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(14.dp))
             )
         }

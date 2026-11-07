@@ -5,15 +5,19 @@ import android.content.SharedPreferences
 import android.util.Log
 import app.cash.turbine.test
 import com.notes.purenoteit.automation.AutomationEngine
-import com.notes.purenoteit.data.db.NoteData
-import com.notes.purenoteit.repository.CategoryRepository
-import com.notes.purenoteit.repository.KnowledgeRepository
-import com.notes.purenoteit.repository.NoteRepository
+import com.notes.purenoteit.domain.repository.CategoryRepository
+import com.notes.purenoteit.domain.repository.KnowledgeRepository
+import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.domain.time.AppClock
+import com.notes.purenoteit.domain.usecase.DeleteNoteUseCase
+import com.notes.purenoteit.domain.usecase.GetNotesUseCase
+import com.notes.purenoteit.domain.usecase.SaveNoteUseCase
 import com.notes.purenoteit.ui.mvi.HomeUiEffect
 import com.notes.purenoteit.ui.mvi.HomeUiEvent
 import com.notes.purenoteit.ui.screens.NotionViewMode
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -35,6 +39,7 @@ import org.junit.Test
 class HomeViewModelMviTest {
 
     private val testDispatcher = StandardTestDispatcher()
+    private val fixedClock = AppClock { 1_700_000_000_000L }
     private lateinit var repository: NoteRepository
     private lateinit var categoryRepository: CategoryRepository
     private lateinit var knowledgeRepository: KnowledgeRepository
@@ -64,7 +69,11 @@ class HomeViewModelMviTest {
             repository = repository,
             categoryRepository = categoryRepository,
             knowledgeRepository = knowledgeRepository,
+            getNotesUseCase = GetNotesUseCase(repository),
+            saveNoteUseCase = SaveNoteUseCase(repository, fixedClock),
+            deleteNoteUseCase = DeleteNoteUseCase(repository),
             automationEngine = automationEngine,
+            clock = fixedClock,
             context = context,
             ioDispatcher = testDispatcher
         )
@@ -115,17 +124,17 @@ class HomeViewModelMviTest {
     }
 
     @Test
-    fun `not silme olayi tetiklendiginde effect kanali tek seferlik bildirim yaymalidir`() = runTest(testDispatcher) {
-        val sampleNote = NoteData(title = "Silinecek", date = 1000L).apply { id = 99 }
-        coEvery { repository.deleteSuspend(any()) } returns Unit
+    fun `not silme olayi tetiklendiginde DeleteNoteUseCase calismali ve effect kanali bildirim yaymalidir`() = runTest(testDispatcher) {
+        coEvery { repository.deleteNoteById(99) } returns Unit
 
         viewModel.homeEffect.test {
-            viewModel.onHomeEvent(HomeUiEvent.DeleteNote(sampleNote))
+            viewModel.onHomeEvent(HomeUiEvent.DeleteNote(99))
             testScheduler.advanceUntilIdle()
 
             val effect = awaitItem()
             assertTrue(effect is HomeUiEffect.ShowToast)
             assertEquals("Not silindi", (effect as HomeUiEffect.ShowToast).message)
+            coVerify(exactly = 1) { repository.deleteNoteById(99) }
             cancelAndIgnoreRemainingEvents()
         }
     }

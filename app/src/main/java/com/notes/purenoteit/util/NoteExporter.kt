@@ -374,7 +374,7 @@ object NoteExporter {
             canvas.drawText(displayTitle, marginX, y, brandPaint)
             y += 18f
 
-            val todayStr = SimpleDateFormat("d MMMM yyyy, HH:mm", Locale("tr")).format(Date())
+            val todayStr = SimpleDateFormat("d MMMM yyyy, HH:mm", Locale.forLanguageTag("tr")).format(Date())
             canvas.drawText("Oluşturulma: $todayStr", marginX, y, datePaint)
 
             if (categoryName.isNotBlank() && categoryName != "Tümü") {

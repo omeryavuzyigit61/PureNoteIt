@@ -1,22 +1,23 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
     alias(libs.plugins.google.dagger.hilt)
-    alias(libs.plugins.androidx.navigation.safe.args)
 }
 
 android {
     namespace = "com.notes.purenoteit"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.purenoteit.app"
         minSdk = 24
-        targetSdk = 36
-        versionCode = 14
-        versionName = "1.1.0"
+        targetSdk = 37
+        versionCode = 15
+        versionName = "1.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -32,19 +33,13 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = "1.8"
-        freeCompilerArgs += listOf(
-            "-opt-in=androidx.compose.animation.ExperimentalSharedTransitionApi"
-        )
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
-        viewBinding = true
         compose = true
     }
+    @Suppress("UnstableApiUsage")
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.all {
@@ -55,14 +50,21 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        freeCompilerArgs.add("-opt-in=androidx.compose.animation.ExperimentalSharedTransitionApi")
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.documentfile)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)
-    implementation(libs.androidx.constraintlayout)
-    implementation(libs.androidx.navigation.fragment.ktx)
-    implementation(libs.androidx.navigation.ui.ktx)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.gson)
     implementation(libs.androidx.biometric)
     testImplementation(libs.junit)
@@ -80,7 +82,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons)
-    implementation(libs.androidx.compose.runtime.livedata)
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -91,13 +92,15 @@ dependencies {
     implementation(libs.google.dagger.hilt)
     ksp(libs.google.dagger.hilt.compiler)
 
-    // Room
+    // Room + SQLCipher Full-Database AES-256 Encryption
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.sqlite.ktx)
+    implementation(libs.sqlcipher.android)
     ksp(libs.androidx.room.compiler)
 
     // ML Kit Text Recognition (OCR)
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    implementation(libs.play.services.mlkit.text.recognition)
 
     // Google Play In-App Updates
     implementation(libs.play.app.update)

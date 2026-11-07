@@ -2,8 +2,12 @@
 <full-backup-content>
     <!-- Exclude PIN hashes, salts, and brute-force lockout counters from unencrypted cloud auto-backups -->
     <exclude domain="sharedpref" path="Note.xml" />
-    <!-- Exclude hardware-bound SQLite database from automatic cloud extraction (use encrypted .purevault instead) -->
+    <!-- Exclude hardware-bound SQLite database and keyset from automatic cloud extraction -->
+    <exclude domain="root" path="no_backup" />
+    <exclude domain="file" path="purenote_sqlcipher_keyset.bin" />
     <exclude domain="database" path="notes" />
     <exclude domain="database" path="notes-shm" />
     <exclude domain="database" path="notes-wal" />
+    <exclude domain="database" path="notes.plain.bak" />
+    <exclude domain="database" path="notes.sqlcipher.tmp" />
 </full-backup-content>

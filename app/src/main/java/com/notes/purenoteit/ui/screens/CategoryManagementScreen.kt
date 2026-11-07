@@ -37,13 +37,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import android.app.Activity
+import android.view.WindowManager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,7 +80,7 @@ fun CategoryManagementScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val categoryList by categoryViewModel.categoryList.observeAsState(emptyList())
+    val categoryList by categoryViewModel.categoryListFlow.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
     var showAddEditDialog by remember { mutableStateOf(false) }
@@ -87,6 +90,18 @@ fun CategoryManagementScreen(
     var showPinDialog by remember { mutableStateOf(false) }
     var targetCategoryForPin by remember { mutableStateOf<CategoryData?>(null) }
     var enteredPin by remember { mutableStateOf("") }
+
+    DisposableEffect(showPinDialog) {
+        val window = (context as? Activity)?.window
+        if (showPinDialog) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
 
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var deletingCategory by remember { mutableStateOf<CategoryData?>(null) }
@@ -479,11 +494,11 @@ fun CategoryManagementScreen(
                         targetCategoryForPin?.let { cat ->
                             val isCurrentlyLocked = cat.isPassword == true
                             if (!isPasswordSet) {
-                                SecurityUtil.savePassword(context, pin)
+                                SecurityUtil.savePassword(context, pin.toCharArray())
                                 cat.isPassword = true
                                 categoryViewModel.update(cat)
                                 context.showToastShort(context.getString(R.string.cat_pwd_saved_and_locked_toast))
-                            } else if (SecurityUtil.verifyPassword(context, pin)) {
+                            } else if (SecurityUtil.verifyPassword(context, pin.toCharArray())) {
                                 cat.isPassword = !isCurrentlyLocked
                                 categoryViewModel.update(cat)
                                 val toastRes = if (isCurrentlyLocked) {
@@ -493,10 +508,12 @@ fun CategoryManagementScreen(
                                 }
                                 context.showToastShort(context.getString(toastRes))
                             } else {
+                                enteredPin = ""
                                 context.showToastShort(context.getString(R.string.wrong_password))
                                 return@TextButton
                             }
                         }
+                        enteredPin = ""
                         showPinDialog = false
                     }
                 ) {

@@ -4,10 +4,12 @@ import com.notes.purenoteit.domain.model.AppResult
 import com.notes.purenoteit.domain.model.DataError
 import com.notes.purenoteit.domain.model.Note
 import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.domain.time.AppClock
 import kotlinx.coroutines.CancellationException
 
 class SaveNoteUseCase(
-    private val noteRepository: NoteRepository
+    private val noteRepository: NoteRepository,
+    private val clock: AppClock
 ) {
     suspend operator fun invoke(note: Note): AppResult<Unit, DataError.Local> {
         val trimmedTitle = note.title?.trim()
@@ -21,7 +23,7 @@ class SaveNoteUseCase(
             val sanitized = note.copy(
                 title = trimmedTitle,
                 description = trimmedDesc,
-                date = if (note.date <= 0L) System.currentTimeMillis() else note.date
+                date = if (note.date <= 0L) clock.nowMillis() else note.date
             )
             noteRepository.upsertNote(sanitized)
             AppResult.Success(Unit)
