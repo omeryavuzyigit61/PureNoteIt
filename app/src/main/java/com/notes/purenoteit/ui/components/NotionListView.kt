@@ -2,6 +2,7 @@ package com.notes.purenoteit.ui.components
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,6 +28,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
+import com.notes.purenoteit.ui.animation.LocalPagerTransitionCoordinator
 import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -79,7 +81,7 @@ fun NotionListView(
     onStatusChange: (NoteData, String) -> Unit,
     searchQuery: String = "",
     pageIndex: Int = 0,
-    enableSharedBounds: Boolean = true,
+    sharedScopeKey: String? = "p${pageIndex}_list",
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -98,7 +100,7 @@ fun NotionListView(
                 onDeleteClick = { onDeleteClick(note) },
                 onStatusChange = { newStatus -> onStatusChange(note, newStatus) },
                 searchQuery = searchQuery,
-                enableSharedBounds = enableSharedBounds
+                sharedScopeKey = sharedScopeKey
             )
         }
     }
@@ -114,7 +116,7 @@ private fun NotionListRow(
     onDeleteClick: () -> Unit,
     onStatusChange: (String) -> Unit,
     searchQuery: String = "",
-    enableSharedBounds: Boolean = true
+    sharedScopeKey: String? = null
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
@@ -125,19 +127,27 @@ private fun NotionListRow(
 
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+    val pagerCoordinator = LocalPagerTransitionCoordinator.current
 
     @OptIn(ExperimentalSharedTransitionApi::class)
-    val sharedBoundsModifier = if (enableSharedBounds && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
+    val sharedBoundsModifier = if (sharedScopeKey != null && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
         with(sharedTransitionScope) {
             Modifier.sharedBounds(
-                sharedContentState = rememberSharedContentState(key = "note_card_container_${note.id}"),
+                sharedContentState = rememberSharedContentState(
+                    key = "note_card_${sharedScopeKey}_${note.id}"
+                ),
                 animatedVisibilityScope = animatedVisibilityScope,
                 boundsTransform = { _, _ ->
-                    spring(
-                        dampingRatio = 0.82f,
-                        stiffness = 380f
-                    )
+                    if (pagerCoordinator.suppressOverlay) {
+                        snap()
+                    } else {
+                        spring(
+                            dampingRatio = 0.82f,
+                            stiffness = 380f
+                        )
+                    }
                 },
+                renderInOverlayDuringTransition = !pagerCoordinator.suppressOverlay,
                 clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(14.dp))
             )
         }
@@ -151,9 +161,12 @@ private fun NotionListRow(
     var isThisRowTarget by remember { mutableStateOf(false) }
 
     var wasTransitionActive by remember { mutableStateOf(false) }
-    LaunchedEffect(sharedTransitionScope?.isTransitionActive) {
+    LaunchedEffect(sharedTransitionScope?.isTransitionActive, pagerCoordinator.suppressOverlay) {
         val isActive = sharedTransitionScope?.isTransitionActive == true
-        if (isThisRowTarget && wasTransitionActive && !isActive) {
+        if (pagerCoordinator.suppressOverlay) {
+            isThisRowTarget = false
+            rowScale.snapTo(1f)
+        } else if (isThisRowTarget && wasTransitionActive && !isActive) {
             rowScale.animateTo(0.985f, spring(stiffness = Spring.StiffnessMedium))
             rowScale.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 320f))
             isThisRowTarget = false

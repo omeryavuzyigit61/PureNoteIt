@@ -71,7 +71,9 @@ import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
+import androidx.compose.animation.core.snap
 import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
+import com.notes.purenoteit.ui.animation.LocalPagerTransitionCoordinator
 import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
@@ -95,7 +97,7 @@ fun NotionNoteCard(
     isSelected: Boolean = false,
     onToggleSelect: () -> Unit = {},
     onLongClick: () -> Unit = {},
-    enableSharedBounds: Boolean = true,
+    sharedScopeKey: String? = null,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -145,15 +147,19 @@ fun NotionNoteCard(
 
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+    val pagerCoordinator = LocalPagerTransitionCoordinator.current
 
     val cardScale = remember { androidx.compose.animation.core.Animatable(1f) }
     val coroutineScope = rememberCoroutineScope()
     var isThisNoteTarget by remember { mutableStateOf(false) }
 
     var wasTransitionActive by remember { mutableStateOf(false) }
-    LaunchedEffect(sharedTransitionScope?.isTransitionActive) {
+    LaunchedEffect(sharedTransitionScope?.isTransitionActive, pagerCoordinator.suppressOverlay) {
         val isActive = sharedTransitionScope?.isTransitionActive == true
-        if (isThisNoteTarget && wasTransitionActive && !isActive) {
+        if (pagerCoordinator.suppressOverlay) {
+            isThisNoteTarget = false
+            cardScale.snapTo(1f)
+        } else if (isThisNoteTarget && wasTransitionActive && !isActive) {
             // SADECE tıklanan bu kart için gecikmesiz, soft, pamuksu yerleşme sekmesi
             cardScale.animateTo(0.985f, spring(stiffness = Spring.StiffnessMedium))
             cardScale.animateTo(
@@ -194,17 +200,24 @@ fun NotionNoteCard(
     }
 
     @OptIn(ExperimentalSharedTransitionApi::class)
-    val sharedBoundsModifier = if (enableSharedBounds && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
+    val sharedBoundsModifier = if (sharedScopeKey != null && sharedTransitionScope != null && animatedVisibilityScope != null && note.id > 0) {
         with(sharedTransitionScope) {
             Modifier.sharedBounds(
-                sharedContentState = rememberSharedContentState(key = "note_card_container_${note.id}"),
+                sharedContentState = rememberSharedContentState(
+                    key = "note_card_${sharedScopeKey}_${note.id}"
+                ),
                 animatedVisibilityScope = animatedVisibilityScope,
                 boundsTransform = { _, _ ->
-                    spring(
-                        dampingRatio = 0.82f,
-                        stiffness = 380f
-                    )
+                    if (pagerCoordinator.suppressOverlay) {
+                        snap()
+                    } else {
+                        spring(
+                            dampingRatio = 0.82f,
+                            stiffness = 380f
+                        )
+                    }
                 },
+                renderInOverlayDuringTransition = !pagerCoordinator.suppressOverlay,
                 clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(20.dp))
             )
         }

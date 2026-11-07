@@ -12,12 +12,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -98,10 +100,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -131,6 +135,7 @@ import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.reminder.ReminderManager
 import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
+import com.notes.purenoteit.ui.animation.LocalPagerTransitionCoordinator
 import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
 import com.notes.purenoteit.ui.components.DrawingCanvasSheet
 import com.notes.purenoteit.ui.components.EmojiPickerSheet
@@ -165,6 +170,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -174,6 +181,7 @@ fun NoteDetailScreen(
     initialStatus: String = "TODO",
     autoVoice: Boolean = false,
     autoOcr: Boolean = false,
+    originScope: String = "none",
     noteViewModel: NoteViewModel,
     categoryViewModel: CategoryViewModel,
     onNavigateBack: () -> Unit,
@@ -182,11 +190,11 @@ fun NoteDetailScreen(
     val context = LocalContext.current
     val audioRecorder = remember { AudioRecorder(context) }
     val voiceHelper = remember { VoiceTranscriptionHelper(context) }
-    var lastBackPressTime by remember { mutableLongStateOf(0L) }
+    var lastBackPressMark by remember { mutableStateOf<TimeMark?>(null) }
     val safeNavigateBack = {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastBackPressTime > 600L) {
-            lastBackPressTime = currentTime
+        val prevMark = lastBackPressMark
+        if (prevMark == null || prevMark.elapsedNow().inWholeMilliseconds > 600L) {
+            lastBackPressMark = TimeSource.Monotonic.markNow()
             onNavigateBack()
         }
     }
@@ -310,10 +318,15 @@ fun NoteDetailScreen(
     var gatekeeperSuccessAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var resumeTriggerEpoch by remember { mutableLongStateOf(0L) }
 
+    val categoriesForSecurity by categoryViewModel.categoryListFlow.collectAsStateWithLifecycle()
+    val isNoteProtected = isPassword ||
+        (loadedNoteRef?.isEncrypted == true) ||
+        categoriesForSecurity.any { it.id == selectedCategoryId && it.isPassword == true }
+
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, isPassword) {
+    DisposableEffect(lifecycleOwner, isNoteProtected) {
         val window = (context as? Activity)?.window
-        if (isPassword) {
+        if (isNoteProtected) {
             window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         } else {
             window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -324,7 +337,7 @@ fun NoteDetailScreen(
                 noteViewModel.getAllNotes()
                 noteViewModel.getAllLinks()
                 resumeTriggerEpoch = System.currentTimeMillis()
-                if (isPassword && !SecurityUtil.isVaultUnlocked) {
+                if (isNoteProtected && !SecurityUtil.isVaultUnlocked) {
                     isAccessGranted = false
                     title = "🔒 Korumalı Not"
                     blocks.clear()
@@ -1429,19 +1442,29 @@ fun NoteDetailScreen(
 
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+    val pagerCoordinator = LocalPagerTransitionCoordinator.current
+    val isExitingScreen = animatedVisibilityScope?.transition?.targetState == EnterExitState.PostExit
+    val hideExitingGhost = isExitingScreen && pagerCoordinator.suppressOverlay
 
     @OptIn(ExperimentalSharedTransitionApi::class)
-    val targetBoundsModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && noteId > 0) {
+    val targetBoundsModifier = if (originScope != "none" && sharedTransitionScope != null && animatedVisibilityScope != null && noteId > 0) {
         with(sharedTransitionScope) {
             Modifier.sharedBounds(
-                sharedContentState = rememberSharedContentState(key = "note_card_container_$noteId"),
+                sharedContentState = rememberSharedContentState(
+                    key = "note_card_${originScope}_$noteId"
+                ),
                 animatedVisibilityScope = animatedVisibilityScope,
                 boundsTransform = { _, _ ->
-                    spring(
-                        dampingRatio = 0.82f,
-                        stiffness = 380f
-                    )
+                    if (pagerCoordinator.suppressOverlay) {
+                        snap()
+                    } else {
+                        spring(
+                            dampingRatio = 0.82f,
+                            stiffness = 380f
+                        )
+                    }
                 },
+                renderInOverlayDuringTransition = !pagerCoordinator.suppressOverlay,
                 clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(0.dp))
             )
         }
@@ -1452,6 +1475,9 @@ fun NoteDetailScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .graphicsLayer {
+                alpha = if (hideExitingGhost) 0f else 1f
+            }
             .then(targetBoundsModifier)
             .background(MaterialTheme.colorScheme.background)
     ) {

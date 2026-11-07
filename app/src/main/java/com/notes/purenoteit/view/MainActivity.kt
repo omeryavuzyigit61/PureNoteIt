@@ -33,7 +33,9 @@ import androidx.navigation.navArgument
 import com.notes.purenoteit.reminder.AlarmSoundPlayer
 import com.notes.purenoteit.security.AppIntegrityGuard
 import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
+import com.notes.purenoteit.ui.animation.LocalPagerTransitionCoordinator
 import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
+import com.notes.purenoteit.ui.animation.PagerTransitionCoordinator
 import com.notes.purenoteit.ui.screens.AnimatedSplashScreen
 import com.notes.purenoteit.ui.screens.CategoryManagementScreen
 import com.notes.purenoteit.ui.screens.HomeScreen
@@ -212,10 +214,13 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
 
+                        val pagerTransitionCoordinator = remember { PagerTransitionCoordinator() }
+
                         @OptIn(ExperimentalSharedTransitionApi::class)
                         SharedTransitionLayout {
                             CompositionLocalProvider(
-                                LocalSharedTransitionScope provides this
+                                LocalSharedTransitionScope provides this,
+                                LocalPagerTransitionCoordinator provides pagerTransitionCoordinator
                             ) {
                                 NavHost(
                                     navController = navController,
@@ -230,6 +235,11 @@ class MainActivity : AppCompatActivity() {
                                                 categoryViewModel = categoryViewModel,
                                                 onNavigateToAddNote = { noteId ->
                                                     navController.navigate("note_detail/$noteId") {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onNavigateToNoteWithScope = { noteId, originScope ->
+                                                    navController.navigate("note_detail/$noteId?originScope=$originScope") {
                                                         launchSingleTop = true
                                                     }
                                                 },
@@ -271,7 +281,7 @@ class MainActivity : AppCompatActivity() {
                                     }
 
                                     composable(
-                                        route = "note_detail/{noteId}?initialDate={initialDate}&autoVoice={autoVoice}&autoOcr={autoOcr}&initialStatus={initialStatus}",
+                                        route = "note_detail/{noteId}?initialDate={initialDate}&autoVoice={autoVoice}&autoOcr={autoOcr}&initialStatus={initialStatus}&originScope={originScope}",
                                         arguments = listOf(
                                             navArgument("noteId") {
                                                 type = NavType.IntType
@@ -292,6 +302,10 @@ class MainActivity : AppCompatActivity() {
                                             navArgument("initialStatus") {
                                                 type = NavType.StringType
                                                 defaultValue = "TODO"
+                                            },
+                                            navArgument("originScope") {
+                                                type = NavType.StringType
+                                                defaultValue = "none"
                                             }
                                         )
                                     ) { backStackEntry ->
@@ -300,6 +314,7 @@ class MainActivity : AppCompatActivity() {
                                         val autoVoice = backStackEntry.arguments?.getBoolean("autoVoice") ?: false
                                         val autoOcr = backStackEntry.arguments?.getBoolean("autoOcr") ?: false
                                         val initialStatus = backStackEntry.arguments?.getString("initialStatus") ?: "TODO"
+                                        val originScope = backStackEntry.arguments?.getString("originScope") ?: "none"
 
                                         CompositionLocalProvider(
                                             LocalNavAnimatedVisibilityScope provides this
@@ -310,6 +325,7 @@ class MainActivity : AppCompatActivity() {
                                                 initialStatus = initialStatus,
                                                 autoVoice = autoVoice,
                                                 autoOcr = autoOcr,
+                                                originScope = originScope,
                                                 noteViewModel = noteViewModel,
                                                 categoryViewModel = categoryViewModel,
                                                 onNavigateBack = {

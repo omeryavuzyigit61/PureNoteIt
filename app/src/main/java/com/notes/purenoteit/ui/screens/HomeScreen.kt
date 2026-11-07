@@ -3,6 +3,7 @@ package com.notes.purenoteit.ui.screens
 import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
+import android.view.WindowManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,6 +12,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -103,7 +105,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableFloatStateOf
@@ -145,6 +150,8 @@ import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
+import com.notes.purenoteit.ui.animation.LocalPagerTransitionCoordinator
+import com.notes.purenoteit.ui.animation.LocalSharedTransitionScope
 import com.notes.purenoteit.ui.components.GlassyCategoryBar
 import com.notes.purenoteit.ui.components.resilientClickable
 import com.notes.purenoteit.ui.components.LanguageSelectionSheet
@@ -179,6 +186,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 enum class SmartFilter(val titleRes: Int, val iconRes: Int) {
     ALL(R.string.filter_all, R.drawable.category),
@@ -201,12 +211,17 @@ enum class NotionViewMode(val titleRes: Int, val iconRes: Int) {
     STREAM(R.string.tab_stream, R.drawable.ic_stream_timeline)
 }
 
-@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+    ExperimentalSharedTransitionApi::class
+)
 @Composable
 fun HomeScreen(
     noteViewModel: NoteViewModel,
     categoryViewModel: CategoryViewModel,
     onNavigateToAddNote: (noteId: Int) -> Unit,
+    onNavigateToNoteWithScope: (noteId: Int, originScope: String) -> Unit = { id, _ -> onNavigateToAddNote(id) },
     onNavigateToAddNoteWithDate: (noteId: Int, initialDate: Long) -> Unit = { id, _ -> onNavigateToAddNote(id) },
     onNavigateToAddNoteWithStatus: (status: String) -> Unit = { _ -> onNavigateToAddNote(-1) },
     onNavigateToPasswordSettings: () -> Unit,
@@ -266,9 +281,22 @@ fun HomeScreen(
 
     // Dialog state for PIN unlock
     var pendingUnlockNoteId by remember { mutableStateOf<Int?>(null) }
+    var pendingUnlockOriginScope by remember { mutableStateOf("none") }
     var showPinDialog by remember { mutableStateOf(false) }
     var enteredPin by remember { mutableStateOf("") }
     var pendingBatchLock by remember { mutableStateOf(false) }
+
+    DisposableEffect(showPinDialog) {
+        val window = (context as? Activity)?.window
+        if (showPinDialog) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
 
     // Multi-Selection / Batch Mode State
     var selectedNoteIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
@@ -455,6 +483,28 @@ fun HomeScreen(
         pageCount = { sortedCategories.size + 1 }
     )
 
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val pagerTransitionCoordinator = LocalPagerTransitionCoordinator.current
+    val isPagerActivelyMoving by remember {
+        derivedStateOf {
+            pagerState.isScrollInProgress || abs(pagerState.currentPageOffsetFraction) > 0.002f
+        }
+    }
+    val isSharedTransitionActive = sharedTransitionScope?.isTransitionActive == true
+
+    SideEffect {
+        pagerTransitionCoordinator.updatePagerMovement(
+            moving = isPagerActivelyMoving,
+            isTransitionActive = isSharedTransitionActive
+        )
+    }
+
+    DisposableEffect(pagerTransitionCoordinator) {
+        onDispose {
+            pagerTransitionCoordinator.reset()
+        }
+    }
+
     // Yumuşak, titremesiz ve doğal akıcı sayfa yerleşimi (Soft Fluid Snap Physics)
     val pagerFlingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
@@ -560,16 +610,19 @@ fun HomeScreen(
         notePendingTrash = note
     }
 
-    var lastNoteClickTime by remember { mutableLongStateOf(0L) }
-    val handleNoteClick: (NoteData) -> Unit = handleNoteClickLabel@{ note ->
-        val now = System.currentTimeMillis()
-        if (now - lastNoteClickTime < 380L) return@handleNoteClickLabel
-        lastNoteClickTime = now
+    var lastNoteClickMark by remember { mutableStateOf<TimeMark?>(null) }
+    val openNoteWithScope: (NoteData, String) -> Unit = openNoteLabel@{ note, originScope ->
+        val prevMark = lastNoteClickMark
+        if (prevMark != null && prevMark.elapsedNow().inWholeMilliseconds < 380L) {
+            return@openNoteLabel
+        }
+        lastNoteClickMark = TimeSource.Monotonic.markNow()
         focusManager.clearFocus()
         keyboardController?.hide()
         val isNoteProtected = note.isPassword == true || note.isEncrypted || (note.categoryId in lockedCategoryIds)
         if (isNoteProtected && !SecurityUtil.isVaultUnlocked) {
             pendingUnlockNoteId = note.id
+            pendingUnlockOriginScope = originScope
             // Try biometrics first, fallback to PIN dialog
             val activity = context as? FragmentActivity
             if (activity != null) {
@@ -584,7 +637,7 @@ fun HomeScreen(
                         object : BiometricPrompt.AuthenticationCallback() {
                             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                                 SecurityUtil.unlockVault()
-                                onNavigateToAddNote(note.id)
+                                onNavigateToNoteWithScope(note.id, originScope)
                             }
                             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                                 showPinDialog = true
@@ -605,8 +658,11 @@ fun HomeScreen(
                 showPinDialog = true
             }
         } else {
-            onNavigateToAddNote(note.id)
+            onNavigateToNoteWithScope(note.id, originScope)
         }
+    }
+    val handleNoteClick: (NoteData) -> Unit = { note ->
+        openNoteWithScope(note, "none")
     }
 
     ModalNavigationDrawer(
@@ -1280,13 +1336,13 @@ fun HomeScreen(
                             NotionListView(
                                 notes = currentCategoryNotes,
                                 categories = categoryList,
-                                onNoteClick = handleNoteClick,
+                                onNoteClick = { note -> openNoteWithScope(note, "p${page}_list") },
                                 onPinClick = { note -> noteViewModel.togglePinStatus(note.id, note.isPinned) },
                                 onDeleteClick = { note -> handleSoftDeleteNote(note) },
                                 onStatusChange = { note, newStatus -> noteViewModel.updateNoteStatus(note, newStatus) },
                                 searchQuery = searchQuery,
                                 pageIndex = page,
-                                enableSharedBounds = pagerState.currentPage == page,
+                                sharedScopeKey = "p${page}_list",
                                 modifier = Modifier.padding(paddingValues)
                             )
                         }
@@ -1418,7 +1474,7 @@ fun HomeScreen(
                                     items(currentPinnedNotes, key = { "page_${page}_pinned_${it.id}" }) { note ->
                                         NotionNoteCard(
                                             note = note,
-                                            onClick = { handleNoteClick(note) },
+                                            onClick = { openNoteWithScope(note, "p${page}_grid") },
                                             onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
                                             onDeleteClick = { handleSoftDeleteNote(note) },
                                             isCategoryLocked = note.categoryId in lockedCategoryIds,
@@ -1435,7 +1491,7 @@ fun HomeScreen(
                                             onLongClick = {
                                                 selectedNoteIds = selectedNoteIds + note.id
                                             },
-                                            enableSharedBounds = pagerState.currentPage == page
+                                            sharedScopeKey = "p${page}_grid"
                                         )
                                     }
 
@@ -1465,7 +1521,7 @@ fun HomeScreen(
                                 items(currentRegularNotes, key = { "page_${page}_regular_${it.id}" }) { note ->
                                     NotionNoteCard(
                                         note = note,
-                                        onClick = { handleNoteClick(note) },
+                                        onClick = { openNoteWithScope(note, "p${page}_grid") },
                                         onPinClick = { noteViewModel.togglePinStatus(note.id, note.isPinned) },
                                         onDeleteClick = { handleSoftDeleteNote(note) },
                                         isCategoryLocked = note.categoryId in lockedCategoryIds,
@@ -1482,7 +1538,7 @@ fun HomeScreen(
                                         onLongClick = {
                                             selectedNoteIds = selectedNoteIds + note.id
                                         },
-                                        enableSharedBounds = pagerState.currentPage == page
+                                        sharedScopeKey = "p${page}_grid"
                                     )
                                 }
                             }
@@ -1726,11 +1782,13 @@ fun HomeScreen(
                                 SecurityUtil.unlockVault()
                             }
                             val targetId = pendingUnlockNoteId
+                            val targetScope = pendingUnlockOriginScope
                             showPinDialog = false
                             pendingUnlockNoteId = null
+                            pendingUnlockOriginScope = "none"
                             enteredPin = ""
                             if (targetId != null) {
-                                onNavigateToAddNote(targetId)
+                                onNavigateToNoteWithScope(targetId, targetScope)
                             }
                         } else {
                             context.showToastShort("Yanlış PIN Kodu")
