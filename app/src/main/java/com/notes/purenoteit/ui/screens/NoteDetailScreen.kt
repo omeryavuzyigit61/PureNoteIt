@@ -98,6 +98,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -3205,6 +3206,8 @@ fun NoteDetailScreen(
 
     // Modern Notion Status Bottom Sheet
     if (showStatusMenu) {
+        val isDarkStatusSheet = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+
         ModalBottomSheet(
             onDismissRequest = { showStatusMenu = false },
             containerColor = MaterialTheme.colorScheme.surface,
@@ -3259,12 +3262,15 @@ fun NoteDetailScreen(
                             .padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(
-                                if (isSelected) col.badgeBgColor
-                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                when {
+                                    isSelected && isDarkStatusSheet -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                                    isSelected -> col.badgeBgColor
+                                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDarkStatusSheet) 0.45f else 0.35f)
+                                }
                             )
                             .border(
                                 width = if (isSelected) 1.5.dp else 1.dp,
-                                color = if (isSelected) col.dotColor else Color.Transparent,
+                                color = if (isSelected) col.dotColor else if (isDarkStatusSheet) Color.White.copy(alpha = 0.1f) else Color.Transparent,
                                 shape = RoundedCornerShape(14.dp)
                             )
                             .clickable {
@@ -3287,7 +3293,11 @@ fun NoteDetailScreen(
                                 text = stringResource(col.titleRes),
                                 fontSize = 15.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) col.badgeTextColor else MaterialTheme.colorScheme.onSurface
+                                color = when {
+                                    isSelected && isDarkStatusSheet -> PureWhite
+                                    isSelected -> col.badgeTextColor
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                }
                             )
                         }
 
@@ -3310,6 +3320,7 @@ fun NoteDetailScreen(
     // Modern Notion Category Bottom Sheet with Inline "+ Yeni Kategori Ekle"
     if (showCategoryMenu) {
         var newCategoryText by remember { mutableStateOf("") }
+        val isDarkCatSheet = MaterialTheme.colorScheme.surface.luminance() < 0.5f
 
         ModalBottomSheet(
             onDismissRequest = { showCategoryMenu = false },
@@ -3362,7 +3373,12 @@ fun NoteDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDarkCatSheet) 0.6f else 0.5f))
+                        .border(
+                            1.dp,
+                            if (isDarkCatSheet) Color.White.copy(alpha = 0.12f) else BorderLight.copy(alpha = 0.6f),
+                            RoundedCornerShape(12.dp)
+                        )
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -3380,7 +3396,7 @@ fun NoteDetailScreen(
                                 Text(
                                     text = stringResource(R.string.category_sheet_new_hint),
                                     fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             innerTextField()
@@ -3447,20 +3463,23 @@ fun NoteDetailScreen(
                                 .padding(vertical = 3.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
-                                    if (isSelected) SoftOrangeLight
-                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                    when {
+                                        isSelected && isDarkCatSheet -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                                        isSelected -> Color(0xFFFFF8F2)
+                                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDarkCatSheet) 0.45f else 0.35f)
+                                    }
                                 )
-                            .border(
-                                width = if (isSelected) 1.5.dp else 1.dp,
-                                color = if (isSelected) VibrantOrange else Color.Transparent,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable {
-                                selectedCategoryId = category.id
-                                selectedCategoryName = category.name
-                                showCategoryMenu = false
-                            }
-                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                                .border(
+                                    width = if (isSelected) 1.5.dp else 1.dp,
+                                    color = if (isSelected) VibrantOrange else if (isDarkCatSheet) Color.White.copy(alpha = 0.1f) else Color.Transparent,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable {
+                                    selectedCategoryId = category.id
+                                    selectedCategoryName = category.name
+                                    showCategoryMenu = false
+                                }
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -3476,7 +3495,11 @@ fun NoteDetailScreen(
                                     text = category.name,
                                     fontSize = 14.5.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                                    color = when {
+                                        isSelected && isDarkCatSheet -> PureWhite
+                                        isSelected -> CharcoalGray
+                                        else -> MaterialTheme.colorScheme.onSurface
+                                    }
                                 )
                             }
 

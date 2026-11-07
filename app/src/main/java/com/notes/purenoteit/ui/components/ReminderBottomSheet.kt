@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -85,6 +86,7 @@ fun ReminderBottomSheet(
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
 
     val currentCal = remember {
         Calendar.getInstance().apply {
@@ -165,7 +167,15 @@ fun ReminderBottomSheet(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(SoftOrangeLight),
+                        .background(
+                            if (isDark) VibrantOrange.copy(alpha = 0.18f)
+                            else SoftOrangeLight
+                        )
+                        .border(
+                            1.dp,
+                            if (isDark) VibrantOrange.copy(alpha = 0.35f) else Color.Transparent,
+                            RoundedCornerShape(12.dp)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -186,7 +196,7 @@ fun ReminderBottomSheet(
                     Text(
                         text = stringResource(R.string.reminder_subtitle),
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -198,7 +208,7 @@ fun ReminderBottomSheet(
                 text = stringResource(R.string.reminder_title),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -247,15 +257,18 @@ fun ReminderBottomSheet(
                         .clip(RoundedCornerShape(14.dp))
                         .clickable { datePickerDialog.show() },
                     shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.5f))
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.55f else 0.45f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isDark) Color.White.copy(alpha = 0.12f) else BorderLight.copy(alpha = 0.5f)
+                    )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
                             text = stringResource(R.string.select_date),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
@@ -274,22 +287,22 @@ fun ReminderBottomSheet(
                         .clip(RoundedCornerShape(14.dp))
                         .clickable { timePickerDialog.show() },
                     shape = RoundedCornerShape(14.dp),
-                    color = SoftOrangeLight.copy(alpha = 0.5f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, VibrantOrange.copy(alpha = 0.4f))
+                    color = if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f) else Color(0xFFFFF8F2),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, VibrantOrange)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "Time",
+                            text = stringResource(R.string.select_time),
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = VibrantOrange
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color(0xFFFFA756) else Color(0xFFE65100)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(selectedCalendar.time),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = VibrantOrange
+                            color = if (isDark) PureWhite else CharcoalGray
                         )
                     }
                 }
@@ -312,10 +325,14 @@ fun ReminderBottomSheet(
                             selectedType = "ALARM"
                         },
                     shape = RoundedCornerShape(14.dp),
-                    color = if (isAlarm) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    color = when {
+                        isAlarm && isDark -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                        isAlarm -> Color(0xFFFFF8F2)
+                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.35f)
+                    },
                     border = androidx.compose.foundation.BorderStroke(
-                        1.5.dp,
-                        if (isAlarm) VibrantOrange else BorderLight.copy(alpha = 0.5f)
+                        if (isAlarm) 1.5.dp else 1.dp,
+                        if (isAlarm) VibrantOrange else if (isDark) Color.White.copy(alpha = 0.12f) else BorderLight.copy(alpha = 0.5f)
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -323,13 +340,17 @@ fun ReminderBottomSheet(
                             text = "🔔 " + stringResource(R.string.reminder_type_alarm),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isAlarm) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                            color = when {
+                                isAlarm && isDark -> PureWhite
+                                isAlarm -> CharcoalGray
+                                else -> MaterialTheme.colorScheme.onSurface
+                            }
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = stringResource(R.string.reminder_type_alarm_desc),
                             fontSize = 10.5.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            color = if (isAlarm && isDark) Color(0xFFD4D4D8) else MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 14.sp
                         )
                     }
@@ -346,10 +367,14 @@ fun ReminderBottomSheet(
                             AlarmSoundPlayer.stop()
                         },
                     shape = RoundedCornerShape(14.dp),
-                    color = if (isNotif) SoftOrangeLight else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    color = when {
+                        isNotif && isDark -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                        isNotif -> Color(0xFFFFF8F2)
+                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.35f)
+                    },
                     border = androidx.compose.foundation.BorderStroke(
-                        1.5.dp,
-                        if (isNotif) VibrantOrange else BorderLight.copy(alpha = 0.5f)
+                        if (isNotif) 1.5.dp else 1.dp,
+                        if (isNotif) VibrantOrange else if (isDark) Color.White.copy(alpha = 0.12f) else BorderLight.copy(alpha = 0.5f)
                     )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -357,13 +382,17 @@ fun ReminderBottomSheet(
                             text = "🔕 " + stringResource(R.string.reminder_type_notif),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isNotif) VibrantOrange else MaterialTheme.colorScheme.onSurface
+                            color = when {
+                                isNotif && isDark -> PureWhite
+                                isNotif -> CharcoalGray
+                                else -> MaterialTheme.colorScheme.onSurface
+                            }
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = stringResource(R.string.reminder_type_notif_desc),
                             fontSize = 10.5.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            color = if (isNotif && isDark) Color(0xFFD4D4D8) else MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 14.sp
                         )
                     }
@@ -381,7 +410,7 @@ fun ReminderBottomSheet(
                         text = stringResource(R.string.reminder_sound_title),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -400,16 +429,20 @@ fun ReminderBottomSheet(
                                         selectedSound = soundOption.key
                                     },
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) SoftOrangeLight.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                color = when {
+                                    isSelected && isDark -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                    isSelected -> Color(0xFFFFF8F2)
+                                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.4f else 0.35f)
+                                },
                                 border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    if (isSelected) VibrantOrange else BorderLight.copy(alpha = 0.4f)
+                                    if (isSelected) 1.5.dp else 1.dp,
+                                    if (isSelected) VibrantOrange else if (isDark) Color.White.copy(alpha = 0.1f) else BorderLight.copy(alpha = 0.4f)
                                 )
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        .padding(horizontal = 12.dp, vertical = 9.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
@@ -418,7 +451,11 @@ fun ReminderBottomSheet(
                                             modifier = Modifier
                                                 .size(16.dp)
                                                 .clip(CircleShape)
-                                                .border(2.dp, if (isSelected) VibrantOrange else BorderLight, CircleShape),
+                                                .border(
+                                                    2.dp,
+                                                    if (isSelected) VibrantOrange else if (isDark) Color.White.copy(alpha = 0.4f) else BorderLight,
+                                                    CircleShape
+                                                ),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             if (isSelected) {
@@ -435,7 +472,11 @@ fun ReminderBottomSheet(
                                             text = stringResource(soundOption.labelRes),
                                             fontSize = 13.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = when {
+                                                isSelected && isDark -> PureWhite
+                                                isSelected -> CharcoalGray
+                                                else -> MaterialTheme.colorScheme.onSurface
+                                            }
                                         )
                                     }
 
@@ -524,13 +565,21 @@ private fun QuickPresetChip(
     label: String,
     onClick: () -> Unit
 ) {
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .border(1.dp, BorderLight.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+            .background(
+                if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
+            .border(
+                1.dp,
+                if (isDark) Color.White.copy(alpha = 0.15f) else BorderLight.copy(alpha = 0.6f),
+                RoundedCornerShape(10.dp)
+            )
             .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp, vertical = 7.dp)
     ) {
         Text(
             text = label,
