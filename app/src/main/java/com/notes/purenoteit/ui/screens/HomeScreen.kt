@@ -949,39 +949,41 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Left: Drawer menu button (Modern Sidebar Dock Pill)
-                                IconButton(
-                                    onClick = {
-                                        val currentTime = System.currentTimeMillis()
-                                        if (currentTime - lastMenuPressTime > 400L) {
-                                            lastMenuPressTime = currentTime
-                                            scope.launch {
-                                                menuIconScale.animateTo(0.85f, spring(stiffness = Spring.StiffnessHigh))
-                                                menuIconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
-                                            }
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                            scope.launch {
-                                                if (drawerState.isClosed) {
-                                                    drawerState.open()
-                                                }
-                                            }
-                                        }
-                                    },
+                                // Left: Drawer menu button (Geniş Dokunma Alanı & İnce Hatlı İkon)
+                                val topBtnBg = if (isDarkTheme) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.045f)
+                                val topBtnBorder = if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
+                                Box(
+                                    contentAlignment = Alignment.Center,
                                     modifier = Modifier
-                                        .size(46.dp)
+                                        .size(48.dp)
                                         .graphicsLayer {
                                             scaleX = menuIconScale.value
                                             scaleY = menuIconScale.value
                                         }
-                                        .clip(RoundedCornerShape(13.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(topBtnBg)
+                                        .border(0.75.dp, topBtnBorder, RoundedCornerShape(14.dp))
+                                        .resilientClickable {
+                                            val currentTime = System.currentTimeMillis()
+                                            if (currentTime - lastMenuPressTime > 200L) {
+                                                lastMenuPressTime = currentTime
+                                                scope.launch {
+                                                    menuIconScale.animateTo(0.88f, spring(stiffness = Spring.StiffnessHigh))
+                                                    menuIconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                                                }
+                                                focusManager.clearFocus()
+                                                keyboardController?.hide()
+                                                scope.launch {
+                                                    drawerState.open()
+                                                }
+                                            }
+                                        }
                                 ) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_menu_notion_bars),
                                         contentDescription = "Menü",
                                         tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(25.dp)
                                     )
                                 }
 
@@ -1019,26 +1021,28 @@ fun HomeScreen(
 
                                 // Right: View Mode Selector Menu Button (Modern Material 3 Squircle with Spring Flip)
                                 Box {
-                                    IconButton(
-                                        onClick = {
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                            viewIconRotation += 360f
-                                            scope.launch {
-                                                viewIconScale.animateTo(0.85f, spring(stiffness = Spring.StiffnessHigh))
-                                                viewIconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
-                                            }
-                                            showViewModeMenu = true
-                                        },
+                                    Box(
+                                        contentAlignment = Alignment.Center,
                                         modifier = Modifier
-                                            .size(46.dp)
+                                            .size(48.dp)
                                             .graphicsLayer {
                                                 scaleX = viewIconScale.value
                                                 scaleY = viewIconScale.value
                                                 rotationZ = animatedViewIconRotation
                                             }
-                                            .clip(RoundedCornerShape(13.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(topBtnBg)
+                                            .border(0.75.dp, topBtnBorder, RoundedCornerShape(14.dp))
+                                            .resilientClickable {
+                                                focusManager.clearFocus()
+                                                keyboardController?.hide()
+                                                viewIconRotation += 360f
+                                                scope.launch {
+                                                    viewIconScale.animateTo(0.88f, spring(stiffness = Spring.StiffnessHigh))
+                                                    viewIconScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                                                }
+                                                showViewModeMenu = true
+                                            }
                                     ) {
                                         Icon(
                                             painter = painterResource(id = currentViewMode.iconRes),
