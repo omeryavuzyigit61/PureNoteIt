@@ -28,7 +28,7 @@
     <img src="https://img.shields.io/badge/DI-Dagger%20Hilt-00C853?style=for-the-badge&logo=dagger&logoColor=white" alt="Hilt" />
     <img src="https://img.shields.io/badge/Security-AES--256%20Vault-175DDC?style=for-the-badge&logo=bitwarden&logoColor=white" alt="Security" />
     <img src="https://img.shields.io/badge/Optimization-R8%20DEX%20Obfuscated-blueviolet?style=for-the-badge&logo=googleplay&logoColor=white" alt="R8 Obfuscation" />
-    <img src="https://img.shields.io/badge/Version-1.1.1-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-1.1.2-orange?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
   </p>
 
@@ -245,7 +245,14 @@ flowchart TD
 
 ## 📋 Sürüm Notları / Changelog
 
-### v1.1.1 (En Son Sürüm / Latest)
+### v1.1.2 (En Son Sürüm / Latest)
+- 🪟 **Gelişmiş Saydam Cam Tasarımı (Frosted Glassmorphism):** Ana ekran kategori çubuğu, editör özellikler çubuğu ve alt araç çubuğu göze batmayan, matlaşmayan, gerçek yarı saydam cam zeminine kavuşturuldu.
+- ✨ **Çoklu Seçim & Dokunsal Yaylanma (Wiggle) Animasyonu:** Nota uzun basarak (`long-press`) toplu seçme modu onarıldı, kart seçildiğinde yaylanarak titreme animasyonu güçlendirildi ve koyu temadaki kontrast/renk uyumsuzlukları giderildi.
+- 📱 **Akıcı 3D Kapı Efekti & Otomatik Sekme Kaydırma:** Kategori sekmelerindeki kapı efekti sayfa kaydırma konumuna sürekli bağlanarak titreme ve basıklık sorunları yok edildi; seçili sekmeye ulaşıldığında menünün otomatik kayması sağlandı.
+- 🎯 **Ergonomik Menü İkonu & 48dp Dokunma Alanı:** Sol üst menü butonu daha ince ve şık Notion çizgileriyle yenilendi; dokunma alanı 48dp'ye çıkarılarak tek dokunuşla hızlı açılma sağlandı.
+- 📦 **Play Console C/C++ Sembol Entegrasyonu:** SQLCipher yerel kütüphanelerinin hata ayıklama sembolleri (`ndk.debugSymbolLevel = "SYMBOL_TABLE"`) paket derlemesine gömüldü.
+
+### v1.1.1
 - 🔒 **SQLCipher 4.20.0 Tam Veritabanı Şifrelemesi:** Room (`notes`) veritabanı disk düzeyinde 256-bit AES ile şifrelendi; Android Keystore donanım sarmallı master key ve atomik `sqlcipher_export` migrasyonu ile tüm mevcut notlar ve alt sayfalar %100 sıfır kayıpla şifreli formata geçirildi.
 - 🚀 **2026 Modern Derleme Zinciri & Android 17 (API 37):** Gradle 9.6.0, Android Gradle Plugin 9.5.1 (Built-in Kotlin), Kotlin 2.4.21, KSP 2.3.13, Compose BOM 2026.09.00 (Material 3 1.4.0), Room 2.8.5, Lifecycle 2.11.0 ve Coroutines 1.11.0 güncellemeleri tamamlandı.
 - 🧭 **Resmi Tip Güvenli (@Serializable) Compose Navigasyonu:** String tabanlı rota şablonları kaldırılarak derleme zamanında tip güvenliği sağlayan `AppRoute` (@Serializable + @SerialName) navigasyon mimarisine geçildi.
