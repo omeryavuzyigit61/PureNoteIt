@@ -2244,15 +2244,15 @@ fun NoteDetailScreen(
                     val glassBgBrush = if (isDark) {
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0x1AFFFFFF),
-                                Color(0x0AFFFFFF)
+                                Color(0x12FFFFFF),
+                                Color(0x06FFFFFF)
                             )
                         )
                     } else {
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0x59FFFFFF),
-                                Color(0x33FFFFFF)
+                                Color(0x47FFFFFF),
+                                Color(0x26FFFFFF)
                             )
                         )
                     }
@@ -2276,15 +2276,15 @@ fun NoteDetailScreen(
                     val pillBgBrush = if (isDark) {
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x26FFFFFF),
-                                Color(0x12FFFFFF)
+                                Color(0x1AFFFFFF),
+                                Color(0x0AFFFFFF)
                             )
                         )
                     } else {
                         Brush.verticalGradient(
                             listOf(
-                                Color(0xB3FFFFFF),
-                                Color(0x80F2F2F7)
+                                Color(0x8CFFFFFF),
+                                Color(0x59F2F2F7)
                             )
                         )
                     }
@@ -2292,8 +2292,8 @@ fun NoteDetailScreen(
                     val pillBorderBrush = if (isDark) {
                         Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.24f),
-                                Color.White.copy(alpha = 0.06f)
+                                Color.White.copy(alpha = 0.18f),
+                                Color.White.copy(alpha = 0.04f)
                             )
                         )
                     } else {

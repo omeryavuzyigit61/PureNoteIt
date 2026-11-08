@@ -63,10 +63,10 @@ fun NotionToolbar(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         // Saydam cam zemin: arkadaki içerik hissedilir, katman gibi durmaz
-        color = if (isDark) Color.White.copy(alpha = 0.07f) else Color.White.copy(alpha = 0.45f),
+        color = if (isDark) Color.White.copy(alpha = 0.04f) else Color.White.copy(alpha = 0.32f),
         border = androidx.compose.foundation.BorderStroke(
             0.75.dp,
-            if (isDark) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.75f)
+            if (isDark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.65f)
         ),
         shadowElevation = 0.dp
     ) {
@@ -300,7 +300,7 @@ private fun ToolbarItem(
             .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
         // Yarı saydam cam hap: arka plan rengi soluk, içerik net
-        color = containerColor.copy(alpha = containerColor.alpha * 0.55f),
+        color = containerColor.copy(alpha = containerColor.alpha * 0.4f),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(

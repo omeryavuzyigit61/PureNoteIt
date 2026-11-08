@@ -78,15 +78,15 @@ fun GlassyCategoryBar(
     val glassBgBrush = if (isDarkTheme) {
         Brush.verticalGradient(
             colors = listOf(
-                Color(0x1AFFFFFF),
-                Color(0x0AFFFFFF)
+                Color(0x12FFFFFF),
+                Color(0x06FFFFFF)
             )
         )
     } else {
         Brush.verticalGradient(
             colors = listOf(
-                Color(0x59FFFFFF),
-                Color(0x33FFFFFF)
+                Color(0x47FFFFFF),
+                Color(0x26FFFFFF)
             )
         )
     }
@@ -95,8 +95,8 @@ fun GlassyCategoryBar(
     val glassBorderBrush = Brush.verticalGradient(
         colors = if (isDarkTheme) {
             listOf(
-                Color.White.copy(alpha = 0.16f),
-                Color.White.copy(alpha = 0.04f)
+                Color.White.copy(alpha = 0.12f),
+                Color.White.copy(alpha = 0.03f)
             )
         } else {
             listOf(
@@ -237,19 +237,20 @@ fun GlassyDoorFlipChip(
     }
 
     val chipShape = RoundedCornerShape(20.dp)
-    val shadowElevationPx = with(LocalDensity.current) { 2.dp.toPx() }
+    // Saydam zeminin altından gölge sızıp "mat" görünmesin diye gölge kapalı
+    val shadowElevationPx = 0f
     val shadowSpot = if (isDarkTheme) Color.Black.copy(alpha = 0.40f) else Color.Black.copy(alpha = 0.10f)
 
     // Seçili sekme cam arka planı (daha saydam, katman hissi vermez)
     val activePillBrush = if (isDarkTheme) {
-        Brush.verticalGradient(listOf(Color(0x33FFFFFF), Color(0x1AFFFFFF)))
+        Brush.verticalGradient(listOf(Color(0x1FFFFFFF), Color(0x0DFFFFFF)))
     } else {
-        Brush.verticalGradient(listOf(Color(0xCCFFFFFF), Color(0x99F7F7FA)))
+        Brush.verticalGradient(listOf(Color(0x99FFFFFF), Color(0x5CF7F7FA)))
     }
     val activePillBorderBrush = if (isDarkTheme) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.08f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.04f)))
     } else {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color(0x33E2E2E8)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.85f), Color(0x26E2E2E8)))
     }
 
     Box(
@@ -345,7 +346,7 @@ fun GlassyDoorFlipChip(
                         .clip(RoundedCornerShape(50))
                         .background(
                             if (isPillSelected) {
-                                if (isDarkTheme) Color(0x28FFFFFF) else Color(0x0E000000)
+                                if (isDarkTheme) Color(0x1AFFFFFF) else Color(0x0A000000)
                             } else {
                                 Color.Transparent
                             }
