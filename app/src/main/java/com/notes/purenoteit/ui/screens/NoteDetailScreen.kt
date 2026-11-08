@@ -2244,31 +2244,30 @@ fun NoteDetailScreen(
                     val glassBgBrush = if (isDark) {
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0x35FFFFFF),
-                                Color(0x15FFFFFF)
+                                Color(0x1AFFFFFF),
+                                Color(0x0AFFFFFF)
                             )
                         )
                     } else {
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0xE6FFFFFF),
-                                Color(0xB3E5E5ED)
+                                Color(0x59FFFFFF),
+                                Color(0x33FFFFFF)
                             )
                         )
                     }
 
-                    // Cam Işık Kırılması / Parlama Kenarlığı (Specular Highlight Rim)
+                    // Cam Işık Kırılması: çok ince, düşük kontrastlı kenar
                     val glassBorderBrush = Brush.verticalGradient(
                         colors = if (isDark) {
                             listOf(
-                                Color.White.copy(alpha = 0.32f),
-                                Color.White.copy(alpha = 0.08f)
+                                Color.White.copy(alpha = 0.16f),
+                                Color.White.copy(alpha = 0.04f)
                             )
                         } else {
                             listOf(
-                                Color.White,
-                                Color.White.copy(alpha = 0.75f),
-                                Color(0x22000000)
+                                Color.White.copy(alpha = 0.70f),
+                                Color(0x14000000)
                             )
                         }
                     )
@@ -2277,15 +2276,15 @@ fun NoteDetailScreen(
                     val pillBgBrush = if (isDark) {
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x38FFFFFF),
-                                Color(0x18FFFFFF)
+                                Color(0x26FFFFFF),
+                                Color(0x12FFFFFF)
                             )
                         )
                     } else {
                         Brush.verticalGradient(
                             listOf(
-                                Color(0xFFFFFFFF),
-                                Color(0xFFF2F2F7)
+                                Color(0xB3FFFFFF),
+                                Color(0x80F2F2F7)
                             )
                         )
                     }
@@ -2293,15 +2292,15 @@ fun NoteDetailScreen(
                     val pillBorderBrush = if (isDark) {
                         Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.40f),
-                                Color.White.copy(alpha = 0.10f)
+                                Color.White.copy(alpha = 0.24f),
+                                Color.White.copy(alpha = 0.06f)
                             )
                         )
                     } else {
                         Brush.verticalGradient(
                             listOf(
-                                Color.White,
-                                Color(0xFFE2E2E8)
+                                Color.White.copy(alpha = 0.90f),
+                                Color(0x33E2E2E8)
                             )
                         )
                     }
@@ -2310,7 +2309,7 @@ fun NoteDetailScreen(
                         modifier = Modifier
                             .wrapContentWidth()
                             .shadow(
-                                elevation = 3.dp,
+                                elevation = 0.dp,
                                 shape = RoundedCornerShape(26.dp),
                                 spotColor = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.12f),
                                 ambientColor = if (isDark) Color.Black.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.06f)
@@ -2333,7 +2332,7 @@ fun NoteDetailScreen(
                             Box(
                                 modifier = Modifier
                                     .shadow(
-                                        elevation = 1.5.dp,
+                                        elevation = 0.dp,
                                         shape = RoundedCornerShape(20.dp),
                                         spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
                                     )
@@ -2371,7 +2370,7 @@ fun NoteDetailScreen(
                             Box(
                                 modifier = Modifier
                                     .shadow(
-                                        elevation = 1.5.dp,
+                                        elevation = 0.dp,
                                         shape = RoundedCornerShape(20.dp),
                                         spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
                                     )
@@ -2410,7 +2409,7 @@ fun NoteDetailScreen(
                             Box(
                                 modifier = Modifier
                                     .shadow(
-                                        elevation = 1.5.dp,
+                                        elevation = 0.dp,
                                         shape = RoundedCornerShape(20.dp),
                                         spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
                                     )
@@ -2452,7 +2451,7 @@ fun NoteDetailScreen(
                             Box(
                                 modifier = Modifier
                                     .shadow(
-                                        elevation = 1.5.dp,
+                                        elevation = 0.dp,
                                         shape = RoundedCornerShape(20.dp),
                                         spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
                                     )
@@ -2489,7 +2488,7 @@ fun NoteDetailScreen(
                                     Box(
                                         modifier = Modifier
                                             .shadow(
-                                                elevation = 1.5.dp,
+                                                elevation = 0.dp,
                                                 shape = RoundedCornerShape(20.dp),
                                                 spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
                                             )
@@ -2547,7 +2546,7 @@ fun NoteDetailScreen(
                             Box(
                                 modifier = Modifier
                                     .shadow(
-                                        elevation = 1.5.dp,
+                                        elevation = 0.dp,
                                         shape = RoundedCornerShape(20.dp),
                                         spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.1f)
                                     )

@@ -62,9 +62,13 @@ fun NotionToolbar(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) BorderDark else BorderLight.copy(alpha = 0.7f)),
-        shadowElevation = 8.dp
+        // Saydam cam zemin: arkadaki içerik hissedilir, katman gibi durmaz
+        color = if (isDark) Color.White.copy(alpha = 0.07f) else Color.White.copy(alpha = 0.45f),
+        border = androidx.compose.foundation.BorderStroke(
+            0.75.dp,
+            if (isDark) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.75f)
+        ),
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier
@@ -295,7 +299,8 @@ private fun ToolbarItem(
             .height(38.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
-        color = containerColor,
+        // Yarı saydam cam hap: arka plan rengi soluk, içerik net
+        color = containerColor.copy(alpha = containerColor.alpha * 0.55f),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
