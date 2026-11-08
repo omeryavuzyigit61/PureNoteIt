@@ -1240,6 +1240,8 @@ fun HomeScreen(
                                         }
                                     }
                                 )
+                                // Son sekmenin tamamen görünebilmesi için sağ uçta boşluk
+                                Spacer(modifier = Modifier.width(12.dp))
                             }
                         }
                     }

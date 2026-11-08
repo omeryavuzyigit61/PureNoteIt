@@ -2,13 +2,12 @@ package com.notes.purenoteit.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -25,18 +24,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -50,6 +52,9 @@ import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.VibrantOrange
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.sin
 
 /**
  * Glassy Navigation Tabs (V7) - Glassmorphism & 3D Door-Flip Category Bar
@@ -69,51 +74,44 @@ fun GlassyCategoryBar(
     onCategorySelected: (categoryName: String, isSame: Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 1. Frosted Glass Dış Taşıyıcı Kapsül (Smoky/Milky Acrylic Glass Background)
+    // 1. Gerçekten saydam taşıyıcı kapsül: arkadaki içerik hissedilir, katman gibi durmaz.
     val glassBgBrush = if (isDarkTheme) {
         Brush.verticalGradient(
             colors = listOf(
-                Color(0x35FFFFFF),
-                Color(0x15FFFFFF)
+                Color(0x1AFFFFFF),
+                Color(0x0AFFFFFF)
             )
         )
     } else {
         Brush.verticalGradient(
             colors = listOf(
-                Color(0xE6FFFFFF),
-                Color(0xB3E5E5ED)
+                Color(0x59FFFFFF),
+                Color(0x33FFFFFF)
             )
         )
     }
 
-    // 2. Cam Işık Kırılması / Parlama Kenarlığı (Specular Highlight Rim)
+    // 2. Çok ince, düşük kontrastlı kenar (sert katman çizgisi yok)
     val glassBorderBrush = Brush.verticalGradient(
         colors = if (isDarkTheme) {
             listOf(
-                Color.White.copy(alpha = 0.32f),
-                Color.White.copy(alpha = 0.08f)
+                Color.White.copy(alpha = 0.16f),
+                Color.White.copy(alpha = 0.04f)
             )
         } else {
             listOf(
-                Color.White,
-                Color.White.copy(alpha = 0.75f),
-                Color(0x22000000)
+                Color.White.copy(alpha = 0.70f),
+                Color(0x14000000)
             )
         }
     )
 
     Box(
         modifier = modifier
-            .shadow(
-                elevation = 3.dp,
-                shape = RoundedCornerShape(26.dp),
-                spotColor = if (isDarkTheme) Color.Black.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.12f),
-                ambientColor = if (isDarkTheme) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.06f)
-            )
             .clip(RoundedCornerShape(26.dp))
             .background(brush = glassBgBrush)
             .border(
-                width = 1.dp,
+                width = 0.75.dp,
                 brush = glassBorderBrush,
                 shape = RoundedCornerShape(26.dp)
             )
@@ -162,10 +160,13 @@ fun GlassyCategoryBar(
 
 /**
  * 3D Kapı Efektli Sekme Elemanı (Door-Flip Pill)
- * Seçilme anında sol kenar menteşesi etrafında (Y ekseni) bir oda kapısı gibi
- * 3D açılarak yaylanır (rotationY: 60° -> 0° spring bounce).
- * HorizontalPager jesti sırasında parmak hareketini gerçek zamanlı takip eder;
- * parmak durdurulduğunda iki açı arasında havada kalır ve bırakıldığında yaylanarak kapanır.
+ *
+ * Titreme / basıklık düzeltmesi: tüm görsel durum (seçilme oranı, kapı açısı, ölçek)
+ * HorizontalPager konumundan (currentPage + offsetFraction) TEK KAYNAKTAN, dallanmasız ve
+ * sürekli hesaplanır. Böylece dokunma, liste başı/sonu veya sayfa geçişinde snapTo sıçraması,
+ * ölçek farkı ya da layout yeniden akışı oluşmaz; geçiş bitince tüm sekmeler tam düz (0°, 1x)
+ * durumda sonlanır. Kapı, geçiş sırasında sin(π·d) eğrisiyle açılıp aynı yumuşaklıkla kapanır.
+ * Seçili sekme ekran dışındaysa menü otomatik olarak görünür alana kaydırılır.
  */
 @Composable
 fun GlassyDoorFlipChip(
@@ -183,163 +184,128 @@ fun GlassyDoorFlipChip(
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current.density
 
-    // Pager bağlı ise seçili durumu aktif sayfaya göre, yoksa parametreye göre belirlenir
-    val isPillSelected = if (pagerState != null) {
-        pagerState.currentPage == chipIndex
-    } else {
-        isSelected
+    // Pager yoksa yedek: parametreye göre yumuşak (tween) seçilme oranı
+    val fallbackSelection = remember { Animatable(if (isSelected) 1f else 0f) }
+    LaunchedEffect(isSelected, pagerState == null) {
+        if (pagerState == null) {
+            fallbackSelection.animateTo(
+                targetValue = if (isSelected) 1f else 0f,
+                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+            )
+        }
     }
 
-    // Kapı Menteşe Açısı (Y-Rotasyonu) & Ölçek Animasyonu
-    val doorAngle = remember { Animatable(if (isPillSelected) 0f else 20f) }
-    val pillScale = remember { Animatable(if (isPillSelected) 1f else 0.96f) }
-
-    // Çip doğrudan tıklandığında veya menüden seçildiğinde yaylanarak açılma animasyonu
-    LaunchedEffect(isPillSelected) {
-        if (isPillSelected) {
-            // Parmak kaydırması devam ederken snapTo çağrılmaz, sadece doğrudan seçimde veya yerleşimde çalışır
-            if (pagerState == null || !pagerState.isScrollInProgress) {
-                doorAngle.snapTo(45f)
-                pillScale.snapTo(0.94f)
-                doorAngle.animateTo(
-                    targetValue = 0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                )
-                pillScale.animateTo(
-                    targetValue = 1f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    )
-                )
-            }
+    // 0f..1f seçilme oranı (graphicsLayer / çizim aşamasında okunur; recomposition tetiklemez)
+    val selectionFraction: () -> Float = {
+        if (pagerState != null) {
+            val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
+            (1f - abs(position - chipIndex)).coerceIn(0f, 1f)
         } else {
-            // Yumuşak geri kapanma
-            doorAngle.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
-            )
-            pillScale.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
-            )
+            fallbackSelection.value
         }
     }
 
-    // Pager parmak hareketi bittiğinde ve bu sayfaya yerleştiğinde kapıyı yaylandırarak yerine oturtur
-    LaunchedEffect(pagerState?.settledPage) {
-        if (pagerState != null && pagerState.settledPage == chipIndex && !pagerState.isScrollInProgress) {
-            doorAngle.snapTo(14f)
-            doorAngle.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
+    // Sadece renk eşiği için (yerleşimi etkilemez): ayrık geçiş
+    val isPillSelected by remember(pagerState, chipIndex) {
+        derivedStateOf {
+            if (pagerState != null) {
+                val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                abs(position - chipIndex) < 0.5f
+            } else {
+                isSelected
+            }
+        }
+    }
+
+    // Seçili sekme görünür alanda değilse yatay menüyü kaydırarak göster
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    var chipWidthPx by remember { mutableIntStateOf(0) }
+    var chipHeightPx by remember { mutableIntStateOf(0) }
+    val revealMarginPx = with(LocalDensity.current) { 56.dp.toPx() }
+    val isTarget = if (pagerState != null) pagerState.targetPage == chipIndex else isSelected
+    LaunchedEffect(isTarget, chipWidthPx) {
+        if (isTarget && chipWidthPx > 0) {
+            bringIntoViewRequester.bringIntoView(
+                Rect(
+                    left = -revealMarginPx,
+                    top = 0f,
+                    right = chipWidthPx + revealMarginPx,
+                    bottom = chipHeightPx.toFloat()
                 )
             )
         }
     }
 
-    // Titremeyi önlemek için sabit iç dolgu (layout reflow & sıçrama engellendi)
-    val horizontalPadding = 12.dp
+    val chipShape = RoundedCornerShape(20.dp)
+    val shadowElevationPx = with(LocalDensity.current) { 2.dp.toPx() }
+    val shadowSpot = if (isDarkTheme) Color.Black.copy(alpha = 0.40f) else Color.Black.copy(alpha = 0.10f)
 
-    // Seçili Sekme Cam Arka Planı (Elevated Frosted Glass Pill)
+    // Seçili sekme cam arka planı (daha saydam, katman hissi vermez)
     val activePillBrush = if (isDarkTheme) {
-        Brush.verticalGradient(
-            listOf(
-                Color(0x4DFFFFFF),
-                Color(0x24FFFFFF)
-            )
-        )
+        Brush.verticalGradient(listOf(Color(0x33FFFFFF), Color(0x1AFFFFFF)))
     } else {
-        Brush.verticalGradient(
-            listOf(
-                Color(0xFFFFFFFF),
-                Color(0xFFF7F7FA)
-            )
-        )
+        Brush.verticalGradient(listOf(Color(0xCCFFFFFF), Color(0x99F7F7FA)))
     }
-
-    // Seçili Sekme Kenar Pırıltısı (Specular Highlight Rim)
     val activePillBorderBrush = if (isDarkTheme) {
-        Brush.verticalGradient(
-            listOf(
-                Color.White.copy(alpha = 0.55f),
-                Color.White.copy(alpha = 0.15f)
-            )
-        )
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.08f)))
     } else {
-        Brush.verticalGradient(
-            listOf(
-                Color.White,
-                Color(0xFFE2E2E8)
-            )
-        )
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color(0x33E2E2E8)))
     }
 
     Box(
         modifier = modifier
-            .graphicsLayer {
-                val currentRotation: Float
-                val currentScale: Float
-
-                // HorizontalPager kaydırma halindeyse parmağın gerçek zamanlı konumunu menteşeye bağla
-                if (pagerState != null && (pagerState.isScrollInProgress || pagerState.currentPageOffsetFraction != 0f)) {
-                    val pagePosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
-                    val delta = pagePosition - chipIndex
-                    val absDelta = kotlin.math.abs(delta).coerceIn(0f, 1f)
-
-                    // 3D kapı açılma: Sayfa tam ortadayken (absDelta == 0) kapı düz durur (0°).
-                    // Parmak kaydırıldıkça sol menteşe etrafında kapı gibi dışarı doğru yumuşakça açılır (maks 42°).
-                    currentRotation = absDelta * 42f
-                    currentScale = 1f - (absDelta * 0.05f)
-                } else {
-                    currentRotation = doorAngle.value
-                    currentScale = pillScale.value
-                }
-
-                // 3D Kapı Perspektifi (Y ekseni etrafında menteşe dönüşü)
-                rotationY = currentRotation
-                scaleX = currentScale
-                scaleY = currentScale
-                cameraDistance = 14f * density // 3D alan derinliği
-                transformOrigin = TransformOrigin(0.08f, 0.5f) // Sol menteşe kapı ekseni
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .onSizeChanged {
+                chipWidthPx = it.width
+                chipHeightPx = it.height
             }
-            .shadow(
-                elevation = if (isPillSelected) 3.dp else 0.dp,
-                shape = RoundedCornerShape(20.dp),
-                spotColor = if (isDarkTheme) Color.Black.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.14f),
-                ambientColor = if (isDarkTheme) Color.Black.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.06f)
-            )
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = if (isPillSelected) activePillBrush else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
-            )
-            .then(
-                if (isPillSelected) {
-                    Modifier.border(
-                        width = 1.dp,
-                        brush = activePillBorderBrush,
-                        shape = RoundedCornerShape(20.dp)
-                    )
+            .graphicsLayer {
+                // Kapı: seçili (d=0) ve tamamen uzak (d>=1) iken düz; geçişte sin(π·d) ile menteşeden açılır
+                val d = if (pagerState != null) {
+                    val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                    abs(position - chipIndex).coerceIn(0f, 1f)
                 } else {
-                    Modifier
+                    1f - fallbackSelection.value
                 }
-            )
+                val swing = sin(PI.toFloat() * d)
+                rotationY = swing * 38f
+                val scale = 1f - swing * 0.04f
+                scaleX = scale
+                scaleY = scale
+                cameraDistance = 14f * density
+                transformOrigin = TransformOrigin(0.08f, 0.5f)
+            }
+            .clip(chipShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
-            }
-            .padding(horizontal = horizontalPadding, vertical = 7.dp),
+            },
         contentAlignment = Alignment.Center
     ) {
+        // Cam zemin katmanı: sadece alpha değişir (layout / boyut sabit, sıçrama yok)
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    val sel = selectionFraction()
+                    alpha = sel
+                    shadowElevation = shadowElevationPx * sel
+                    shape = chipShape
+                    clip = false
+                    spotShadowColor = shadowSpot
+                    ambientShadowColor = shadowSpot
+                }
+                .clip(chipShape)
+                .background(brush = activePillBrush)
+                .border(width = 1.dp, brush = activePillBorderBrush, shape = chipShape)
+        )
+
+        // İçerik: sabit düzen (sabit font ağırlığı + sabit rozet) -> geçişte genişlik değişmez
         Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
@@ -364,7 +330,7 @@ fun GlassyDoorFlipChip(
             Text(
                 text = label,
                 fontSize = 12.sp,
-                fontWeight = if (isPillSelected) FontWeight.Bold else FontWeight.Medium,
+                fontWeight = FontWeight.SemiBold,
                 color = if (isPillSelected) {
                     if (isDarkTheme) PureWhite else CharcoalGray
                 } else {
@@ -374,29 +340,27 @@ fun GlassyDoorFlipChip(
 
             if (count != null) {
                 Spacer(modifier = Modifier.width(6.dp))
-                if (isPillSelected) {
-                    // Seçili cam rozet (Frosted Badge)
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (isPillSelected) {
                                 if (isDarkTheme) Color(0x28FFFFFF) else Color(0x0E000000)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 1.dp)
-                    ) {
-                        Text(
-                            text = count.toString(),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDarkTheme) PureWhite else CharcoalGray
+                            } else {
+                                Color.Transparent
+                            }
                         )
-                    }
-                } else {
+                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                ) {
                     Text(
                         text = count.toString(),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = if (isDarkTheme) Color(0xFF7A7A80) else Color(0xFF8E8E93)
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isPillSelected) {
+                            if (isDarkTheme) PureWhite else CharcoalGray
+                        } else {
+                            if (isDarkTheme) Color(0xFF7A7A80) else Color(0xFF8E8E93)
+                        }
                     )
                 }
             }
