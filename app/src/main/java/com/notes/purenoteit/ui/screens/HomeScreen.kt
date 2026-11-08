@@ -1643,10 +1643,13 @@ fun HomeScreen(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(26.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 6.dp,
-                        shadowElevation = 8.dp,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                        color = if (isDarkTheme) Color(0xFF1A1A1E).copy(alpha = 0.92f) else Color.White.copy(alpha = 0.94f),
+                        tonalElevation = 0.dp,
+                        shadowElevation = 6.dp,
+                        border = BorderStroke(
+                            0.75.dp,
+                            if (isDarkTheme) Color.White.copy(alpha = 0.14f) else Color(0x18000000)
+                        )
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -1660,8 +1663,23 @@ fun HomeScreen(
                             val lockIconRes = if (shouldLock) R.drawable.lock else R.drawable.unlock
                             val lockText = if (shouldLock) stringResource(R.string.lock) else stringResource(R.string.unlock)
                             val lockContentDesc = stringResource(if (shouldLock) R.string.batch_lock_notes else R.string.batch_unlock_notes)
-                            val lockTint = if (shouldLock) VibrantOrange else Color(0xFF2E7D32)
-                            val lockBg = if (shouldLock) VibrantOrange.copy(alpha = 0.12f) else Color(0xFFE8F5E9)
+                            val lockTint = when {
+                                shouldLock && isDarkTheme -> Color(0xFFFFA756)
+                                shouldLock -> VibrantOrange
+                                isDarkTheme -> Color(0xFF81C784)
+                                else -> Color(0xFF2E7D32)
+                            }
+                            val lockBg = when {
+                                shouldLock && isDarkTheme -> VibrantOrange.copy(alpha = 0.16f)
+                                shouldLock -> VibrantOrange.copy(alpha = 0.12f)
+                                isDarkTheme -> Color(0xFF2E7D32).copy(alpha = 0.22f)
+                                else -> Color(0xFFE8F5E9)
+                            }
+                            val lockBorder = when {
+                                shouldLock -> VibrantOrange.copy(alpha = 0.35f)
+                                isDarkTheme -> Color(0xFF81C784).copy(alpha = 0.35f)
+                                else -> Color(0xFF66BB6A).copy(alpha = 0.4f)
+                            }
 
                             // 1. Şifrele / Kilidi Aç Dynamic Pill Button
                             Row(
@@ -1677,6 +1695,7 @@ fun HomeScreen(
                                         }
                                     }
                                     .background(lockBg)
+                                    .border(0.75.dp, lockBorder, RoundedCornerShape(20.dp))
                                     .padding(horizontal = 16.dp, vertical = 9.dp)
                             ) {
                                 Icon(
@@ -1697,6 +1716,9 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.width(8.dp))
 
                             // 2. Sil Pill Button
+                            val deleteBg = if (isDarkTheme) Color(0xFFE53935).copy(alpha = 0.18f) else Color(0xFFFFEBEE)
+                            val deleteBorder = if (isDarkTheme) Color(0xFFEF5350).copy(alpha = 0.38f) else Color(0xFFEF5350).copy(alpha = 0.30f)
+                            val deleteTint = if (isDarkTheme) Color(0xFFFF6B6B) else Color(0xFFD32F2F)
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
@@ -1704,13 +1726,14 @@ fun HomeScreen(
                                     .clickable {
                                         showBatchDeleteConfirm = true
                                     }
-                                    .background(Color(0xFFFFEBEE))
+                                    .background(deleteBg)
+                                    .border(0.75.dp, deleteBorder, RoundedCornerShape(20.dp))
                                     .padding(horizontal = 16.dp, vertical = 9.dp)
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.delete),
                                     contentDescription = stringResource(R.string.batch_delete_notes),
-                                    tint = Color(0xFFD32F2F),
+                                    tint = deleteTint,
                                     modifier = Modifier.size(17.dp)
                                 )
                                 Spacer(modifier = Modifier.width(7.dp))
@@ -1718,7 +1741,7 @@ fun HomeScreen(
                                     text = stringResource(R.string.delete),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFD32F2F)
+                                    color = deleteTint
                                 )
                             }
                         }

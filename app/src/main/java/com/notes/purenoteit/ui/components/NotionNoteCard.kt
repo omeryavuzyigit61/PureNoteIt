@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -103,31 +104,50 @@ fun NotionNoteCard(
     var showMenu by remember { mutableStateOf(false) }
     val isProtected = note.isPassword == true || note.isEncrypted || isCategoryLocked
     val haptic = LocalHapticFeedback.current
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
 
     // Gentle tactile micro-wiggle when selected
     val wiggleRotation = remember { androidx.compose.animation.core.Animatable(0f) }
+    val selectionPopScale = remember { androidx.compose.animation.core.Animatable(1f) }
     LaunchedEffect(isSelected) {
         if (isSelected) {
+            launch {
+                selectionPopScale.snapTo(1f)
+                selectionPopScale.animateTo(
+                    targetValue = 0.965f,
+                    animationSpec = tween(durationMillis = 85, easing = FastOutSlowInEasing)
+                )
+                selectionPopScale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
+            }
             wiggleRotation.snapTo(0f)
             wiggleRotation.animateTo(
                 targetValue = 0f,
                 animationSpec = androidx.compose.animation.core.keyframes {
-                    durationMillis = 280
+                    durationMillis = 340
                     0f at 0
-                    -2.0f at 60 using FastOutSlowInEasing
-                    1.8f at 130 using FastOutSlowInEasing
-                    -0.8f at 200 using FastOutSlowInEasing
-                    0f at 280 using FastOutSlowInEasing
+                    -3.0f at 65 using FastOutSlowInEasing
+                    2.6f at 140 using FastOutSlowInEasing
+                    -1.8f at 215 using FastOutSlowInEasing
+                    0.9f at 280 using FastOutSlowInEasing
+                    0f at 340 using FastOutSlowInEasing
                 }
             )
         } else {
             wiggleRotation.snapTo(0f)
+            selectionPopScale.snapTo(1f)
         }
     }
 
-    // Smooth liquid color transitions (Water tint wash)
+    // Theme-aware smooth liquid color transitions (Water tint wash)
+    val selectedCardBg = if (isDark) Color(0xFF261D16) else Color(0xFFFFF7EE)
     val animatedBgColor by animateColorAsState(
-        targetValue = if (isSelected) Color(0xFFFFF7EE) else MaterialTheme.colorScheme.surface,
+        targetValue = if (isSelected) selectedCardBg else MaterialTheme.colorScheme.surface,
         animationSpec = tween(durationMillis = 260),
         label = "note_card_bg"
     )
@@ -226,8 +246,9 @@ fun NotionNoteCard(
             .then(sharedBoundsModifier)
             .fillMaxWidth()
             .graphicsLayer {
-                scaleX = cardScale.value
-                scaleY = cardScale.value
+                val combinedScale = cardScale.value * selectionPopScale.value
+                scaleX = combinedScale
+                scaleY = combinedScale
                 rotationZ = wiggleRotation.value
             }
             .resilientCombinedClickable(
@@ -724,10 +745,13 @@ fun NotionNoteCard(
                 ) {
                     // Subpage pill
                     if (subpageCount > 0) {
+                        val subpageBg = if (isDark) Color(0xFF282038) else Color(0xFFEDE7F6)
+                        val subpageBorder = if (isDark) Color(0xFF7E57C2).copy(alpha = 0.45f) else Color(0xFFB39DDB)
+                        val subpageTint = if (isDark) Color(0xFFD1C4E9) else Color(0xFF5E35B1)
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFFEDE7F6),
-                            border = BorderStroke(0.5.dp, Color(0xFFB39DDB))
+                            color = subpageBg,
+                            border = BorderStroke(0.5.dp, subpageBorder)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -736,7 +760,7 @@ fun NotionNoteCard(
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_subpage_doc),
                                     contentDescription = null,
-                                    tint = Color(0xFF5E35B1),
+                                    tint = subpageTint,
                                     modifier = Modifier.size(11.dp)
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
@@ -744,7 +768,7 @@ fun NotionNoteCard(
                                     text = "$subpageCount " + stringResource(R.string.subpage_badge),
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF5E35B1)
+                                    color = subpageTint
                                 )
                             }
                         }
@@ -753,7 +777,7 @@ fun NotionNoteCard(
                     for (tag in hashtags) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = SoftOrangeLight,
+                            color = if (isDark) VibrantOrange.copy(alpha = 0.16f) else SoftOrangeLight,
                             border = BorderStroke(0.5.dp, VibrantOrange.copy(alpha = 0.35f))
                         ) {
                             Text(

@@ -8,8 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
 
 /**
  * Resilient Combined Clickable Modifier
@@ -32,14 +30,19 @@ fun Modifier.resilientCombinedClickable(
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             if (currentOnLongClick != null) {
-                try {
-                    withTimeout(viewConfiguration.longPressTimeoutMillis) {
-                        val up = waitForUpOrCancellation()
-                        if (up != null) {
-                            currentOnClick()
-                        }
-                    }
-                } catch (e: TimeoutCancellationException) {
+                // AwaitPointerEventScope.withTimeoutOrNull: zaman aşımında istisna fırlatmaz, null döner.
+                // (Önceki sürümde TimeoutCancellationException yakalanıyordu; scope'un kendi
+                // PointerEventTimeoutCancellationException'ı farklı tür olduğundan uzun basma hiç tetiklenmiyordu.)
+                var finished = false
+                var wasReleased = false
+                withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                    val up = waitForUpOrCancellation()
+                    wasReleased = up != null
+                    finished = true
+                }
+                if (finished) {
+                    if (wasReleased) currentOnClick()
+                } else {
                     currentOnLongClick?.invoke()
                     waitForUpOrCancellation()
                 }
