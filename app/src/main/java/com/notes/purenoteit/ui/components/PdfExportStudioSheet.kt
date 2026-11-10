@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.notes.purenoteit.R
+import com.notes.purenoteit.domain.storage.MediaPathResolver
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.ui.theme.BorderLight
@@ -59,6 +61,7 @@ import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
 import com.notes.purenoteit.ui.theme.VibrantOrange
+import com.notes.purenoteit.util.MediaFileUriHelper
 import com.notes.purenoteit.util.PdfExportConfig
 import java.io.File
 import java.text.SimpleDateFormat
@@ -71,10 +74,12 @@ fun PdfExportStudioSheet(
     title: String,
     categoryName: String,
     blocks: List<NoteBlock>,
+    mediaPathResolver: MediaPathResolver? = null,
     onDismiss: () -> Unit,
     onExportPdf: (PdfExportConfig) -> Unit,
     onExportMarkdown: () -> Unit
 ) {
+    val context = LocalContext.current
     var includeText by remember { mutableStateOf(true) }
     var includeImages by remember { mutableStateOf(true) }
     var includeDrawings by remember { mutableStateOf(true) }
@@ -399,8 +404,13 @@ fun PdfExportStudioSheet(
                                                 color = Color(0xFFF5F5F5),
                                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0))
                                             ) {
+                                                val resolvedImg = MediaFileUriHelper.resolveReadableFile(
+                                                    context = context,
+                                                    rawPath = block.mediaPath,
+                                                    mediaPathResolver = mediaPathResolver
+                                                )
                                                 AsyncImage(
-                                                    model = File(block.mediaPath ?: ""),
+                                                    model = resolvedImg ?: File(block.mediaPath ?: ""),
                                                     contentDescription = "Görsel Önizleme",
                                                     contentScale = ContentScale.Fit,
                                                     modifier = Modifier.fillMaxWidth()
@@ -421,8 +431,13 @@ fun PdfExportStudioSheet(
                                                 color = PureWhite,
                                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0))
                                             ) {
+                                                val resolvedDrawing = MediaFileUriHelper.resolveReadableFile(
+                                                    context = context,
+                                                    rawPath = block.mediaPath,
+                                                    mediaPathResolver = mediaPathResolver
+                                                )
                                                 AsyncImage(
-                                                    model = File(block.mediaPath ?: ""),
+                                                    model = resolvedDrawing ?: File(block.mediaPath ?: ""),
                                                     contentDescription = "Çizim Önizleme",
                                                     contentScale = ContentScale.Fit,
                                                     modifier = Modifier.fillMaxWidth()

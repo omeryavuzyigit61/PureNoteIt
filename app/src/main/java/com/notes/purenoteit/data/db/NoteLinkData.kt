@@ -6,6 +6,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.io.Serializable
+import java.util.UUID
 
 @Entity(
     tableName = "note_links",
@@ -25,7 +26,8 @@ import java.io.Serializable
     ],
     indices = [
         Index(value = ["sourceNoteId"]),
-        Index(value = ["targetNoteId"])
+        Index(value = ["targetNoteId"]),
+        Index(value = ["syncUuid"], unique = true)
     ]
 )
 data class NoteLinkData(
@@ -36,7 +38,19 @@ data class NoteLinkData(
     @ColumnInfo(name = "linkText")
     val linkText: String,
     @ColumnInfo(name = "createdAt")
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "syncUuid", defaultValue = "''")
+    var syncUuid: String = UUID.randomUUID().toString(),
+    @ColumnInfo(name = "sourceSyncUuid", defaultValue = "''")
+    var sourceSyncUuid: String = "",
+    @ColumnInfo(name = "targetSyncUuid", defaultValue = "''")
+    var targetSyncUuid: String = "",
+    @ColumnInfo(name = "updatedAt", defaultValue = "0")
+    var updatedAt: Long = 0L,
+    @ColumnInfo(name = "deletedAt")
+    var deletedAt: Long? = null,
+    @ColumnInfo(name = "syncVersion", defaultValue = "1")
+    var syncVersion: Long = 1L
 ) : Serializable {
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0

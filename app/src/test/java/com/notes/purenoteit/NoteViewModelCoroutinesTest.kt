@@ -68,6 +68,7 @@ class NoteViewModelCoroutinesTest {
             deleteNoteUseCase = DeleteNoteUseCase(repository),
             automationEngine = automationEngine,
             clock = fixedClock,
+            mediaPathResolver = mockk(relaxed = true),
             context = context,
             ioDispatcher = testDispatcher
         )

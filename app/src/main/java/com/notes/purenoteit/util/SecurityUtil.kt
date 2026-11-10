@@ -486,13 +486,12 @@ object SecurityUtil {
         }
     }
 
+    private val SHARED_CRYPTO by lazy { com.notes.purenoteit.SharedCryptoFactory.createVaultCrypto() }
+
+    private fun defaultFallbackChars(): CharArray = (APP_SALT + "_" + AES_KEY_SALT).toCharArray()
+
     fun isEncryptedPayload(text: String?): Boolean {
-        if (text.isNullOrBlank()) return false
-        return text.startsWith("ENC_V2:") ||
-            text.startsWith("ENC_P3_PWD:") ||
-            text.startsWith("ENC_P3:") ||
-            text.startsWith("ENC_P2:") ||
-            text.startsWith("ENC:")
+        return SHARED_CRYPTO.isEncryptedPayload(text)
     }
 
     fun encrypt(plainText: String): String {
@@ -521,35 +520,23 @@ object SecurityUtil {
     }
 
     /**
-     * Portable AES-256-GCM encryption (V3) using per-payload 16-byte random salt
-     * and 120,000 PBKDF2-HMAC-SHA256 iterations for .purevault archives.
-     * Supports optional user [passphrase] (zeroized by caller or internally copied & cleared).
+     * Portable AES-256-GCM encryption (V3) delegated to `:shared` [com.notes.purenoteit.crypto.VaultCrypto]
+     * using per-payload 16-byte random salt and 120,000 PBKDF2-HMAC-SHA256 iterations.
      */
     fun encryptPortable(plainText: String, passphrase: CharArray? = null): String {
         if (plainText.isEmpty()) return plainText
-        val salt = ByteArray(PORTABLE_SALT_LENGTH)
-        val iv = ByteArray(GCM_IV_LENGTH)
-        return try {
-            val randomGen = SecureRandom()
-            randomGen.nextBytes(salt)
-            randomGen.nextBytes(iv)
-            val hasPassphrase = passphrase != null && passphrase.isNotEmpty()
-            val key = derivePortableKey(salt, PBKDF2_ITERATIONS_V3, passphrase)
-
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv))
-            val cipherText = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-
-            val combined = ByteArray(salt.size + iv.size + cipherText.size)
-            System.arraycopy(salt, 0, combined, 0, salt.size)
-            System.arraycopy(iv, 0, combined, salt.size, iv.size)
-            System.arraycopy(cipherText, 0, combined, salt.size + iv.size, cipherText.size)
-
-            val prefix = if (hasPassphrase) "ENC_P3_PWD:" else "ENC_P3:"
-            prefix + Base64.encodeToString(combined, Base64.NO_WRAP)
-        } finally {
-            salt.fill(0)
-            iv.fill(0)
+        return if (passphrase != null && passphrase.isNotEmpty()) {
+            when (val res = SHARED_CRYPTO.encryptWithPassphrase(plainText, passphrase)) {
+                is AppResult.Success -> res.data
+                is AppResult.Failure -> throw GeneralSecurityException("Portable encryption failed: ${res.error}")
+            }
+        } else {
+            val fallback = defaultFallbackChars()
+            try {
+                SHARED_CRYPTO.encryptLegacyFallback(plainText, fallback)
+            } finally {
+                fallback.fill('\u0000')
+            }
         }
     }
 
@@ -558,28 +545,11 @@ object SecurityUtil {
      * so `.purevault` archives never expose raw media in cloud storage or share targets.
      */
     fun encryptPortableBytes(plainBytes: ByteArray, passphrase: CharArray? = null): ByteArray {
-        val randomGen = SecureRandom()
-        val salt = ByteArray(PORTABLE_SALT_LENGTH).also { randomGen.nextBytes(it) }
-        val iv = ByteArray(GCM_IV_LENGTH).also { randomGen.nextBytes(it) }
+        val secret = if (passphrase != null && passphrase.isNotEmpty()) passphrase.copyOf() else defaultFallbackChars()
         return try {
-            val key = derivePortableKey(salt, PBKDF2_ITERATIONS_V3, passphrase)
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv))
-            val cipherBytes = cipher.doFinal(plainBytes)
-
-            val out = ByteArray(MEDIA_MAGIC_V3.size + salt.size + iv.size + cipherBytes.size)
-            var offset = 0
-            System.arraycopy(MEDIA_MAGIC_V3, 0, out, offset, MEDIA_MAGIC_V3.size)
-            offset += MEDIA_MAGIC_V3.size
-            System.arraycopy(salt, 0, out, offset, salt.size)
-            offset += salt.size
-            System.arraycopy(iv, 0, out, offset, iv.size)
-            offset += iv.size
-            System.arraycopy(cipherBytes, 0, out, offset, cipherBytes.size)
-            out
+            SHARED_CRYPTO.encryptLegacyMediaBytes(plainBytes, secret)
         } finally {
-            salt.fill(0)
-            iv.fill(0)
+            secret.fill('\u0000')
         }
     }
 
@@ -588,29 +558,11 @@ object SecurityUtil {
      * legacy unencrypted bytes if the PVM3 header is absent.
      */
     fun decryptPortableBytes(encryptedBytes: ByteArray, passphrase: CharArray? = null): ByteArray {
-        val headerSize = MEDIA_MAGIC_V3.size + PORTABLE_SALT_LENGTH + GCM_IV_LENGTH
-        if (encryptedBytes.size <= headerSize) return encryptedBytes
-        for (i in MEDIA_MAGIC_V3.indices) {
-            if (encryptedBytes[i] != MEDIA_MAGIC_V3[i]) return encryptedBytes
-        }
-
-        val salt = ByteArray(PORTABLE_SALT_LENGTH)
-        val iv = ByteArray(GCM_IV_LENGTH)
+        val secret = if (passphrase != null && passphrase.isNotEmpty()) passphrase.copyOf() else defaultFallbackChars()
         return try {
-            var offset = MEDIA_MAGIC_V3.size
-            System.arraycopy(encryptedBytes, offset, salt, 0, PORTABLE_SALT_LENGTH)
-            offset += PORTABLE_SALT_LENGTH
-            System.arraycopy(encryptedBytes, offset, iv, 0, GCM_IV_LENGTH)
-            offset += GCM_IV_LENGTH
-            val cipherLen = encryptedBytes.size - offset
-
-            val key = derivePortableKey(salt, PBKDF2_ITERATIONS_V3, passphrase)
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv))
-            cipher.doFinal(encryptedBytes, offset, cipherLen)
+            SHARED_CRYPTO.decryptMediaBytesLegacyCompat(encryptedBytes, secret)
         } finally {
-            salt.fill(0)
-            iv.fill(0)
+            secret.fill('\u0000')
         }
     }
 
@@ -666,41 +618,15 @@ object SecurityUtil {
         }
 
         if (encryptedText.startsWith("ENC_P3_PWD:") || encryptedText.startsWith("ENC_P3:") || encryptedText.startsWith("ENC_P2:")) {
-            val (prefix, iterations) = when {
-                encryptedText.startsWith("ENC_P3_PWD:") -> "ENC_P3_PWD:" to PBKDF2_ITERATIONS_V3
-                encryptedText.startsWith("ENC_P3:") -> "ENC_P3:" to PBKDF2_ITERATIONS_V3
-                else -> "ENC_P2:" to PBKDF2_ITERATIONS_V2
-            }
-            val salt = ByteArray(PORTABLE_SALT_LENGTH)
-            val iv = ByteArray(GCM_IV_LENGTH)
+            val fallback = defaultFallbackChars()
             return try {
-                val rawBase64 = encryptedText.removePrefix(prefix)
-                val combined = Base64.decode(rawBase64, Base64.NO_WRAP)
-                val headerLen = PORTABLE_SALT_LENGTH + GCM_IV_LENGTH
-                if (combined.size <= headerLen) {
-                    return AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
-                }
-
-                System.arraycopy(combined, 0, salt, 0, PORTABLE_SALT_LENGTH)
-                System.arraycopy(combined, PORTABLE_SALT_LENGTH, iv, 0, GCM_IV_LENGTH)
-
-                val cipherText = ByteArray(combined.size - headerLen)
-                System.arraycopy(combined, headerLen, cipherText, 0, cipherText.size)
-
-                val effectivePass = if (prefix == "ENC_P3_PWD:") passphrase else null
-                val key = derivePortableKey(salt, iterations, effectivePass)
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv))
-
-                val original = cipher.doFinal(cipherText)
-                AppResult.Success(String(original, Charsets.UTF_8))
-            } catch (_: GeneralSecurityException) {
-                AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
-            } catch (_: Exception) {
-                AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
+                SHARED_CRYPTO.decryptEnvelope(
+                    encryptedText = encryptedText,
+                    passphrase = passphrase,
+                    legacyFallbackSecret = fallback
+                )
             } finally {
-                salt.fill(0)
-                iv.fill(0)
+                fallback.fill('\u0000')
             }
         }
 

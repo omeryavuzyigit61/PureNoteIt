@@ -181,6 +181,7 @@ import com.notes.purenoteit.util.LanguageManager
 import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.showToastShort
 import com.notes.purenoteit.viewmodel.CategoryViewModel
+import com.notes.purenoteit.viewmodel.CloudSyncViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -231,7 +232,8 @@ fun HomeScreen(
     onToggleDarkTheme: (Boolean) -> Unit,
     isDarkTheme: Boolean,
     currentThemeMode: ThemeMode = ThemeMode.SYSTEM,
-    onThemeModeChange: (ThemeMode) -> Unit = {}
+    onThemeModeChange: (ThemeMode) -> Unit = {},
+    cloudSyncViewModel: CloudSyncViewModel? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -2152,7 +2154,12 @@ fun HomeScreen(
             },
             onNavigateToPasswordSettings = onNavigateToPasswordSettings,
             onOpenVaultBackupRestore = { showVaultRestoreDialog = true },
-            onDismiss = { showSettingsScreen = false }
+            onDismiss = { showSettingsScreen = false },
+            cloudSyncViewModel = cloudSyncViewModel,
+            onNotesSynced = {
+                noteViewModel.getAllNotes()
+                categoryViewModel.getAllCategories()
+            }
         )
     }
 

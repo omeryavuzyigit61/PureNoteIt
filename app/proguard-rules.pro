@@ -14,15 +14,46 @@
 -keep interface net.zetetic.database.** { *; }
 -dontwarn androidx.room.paging.**
 
-# 3. Model & Data Classes (Gson / JSON & Type-Safe Navigation kotlinx.serialization)
+# 3. Model & Data Classes (kotlinx.serialization JSON, Type-Safe Navigation & Room Converters)
+-keepattributes *Annotation*,InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
 -keepclassmembers enum * { *; }
--keep class com.notes.purenoteit.model.** { *; }
--keepclassmembers class com.notes.purenoteit.model.** { *; }
--keep class com.notes.purenoteit.util.VaultBackupPayload { *; }
+-keep,includedescriptorclasses class com.notes.purenoteit.model.** { *; }
+-keepclassmembers class com.notes.purenoteit.model.** {
+    *** Companion;
+    *;
+}
+-keep,includedescriptorclasses class com.notes.purenoteit.util.VaultBackupPayload { *; }
+-keepclassmembers class com.notes.purenoteit.util.VaultBackupPayload {
+    *** Companion;
+    *;
+}
+-keep,includedescriptorclasses class com.notes.purenoteit.util.Backup* { *; }
+-keepclassmembers class com.notes.purenoteit.util.Backup* {
+    *** Companion;
+    *;
+}
 -keep class com.notes.purenoteit.util.Converters { *; }
 -keep,includedescriptorclasses class com.notes.purenoteit.ui.navigation.** { *; }
 -keepclassmembers class com.notes.purenoteit.ui.navigation.** {
     *** Companion;
+}
+-keep,includedescriptorclasses class com.notes.purenoteit.data.runner.** { *; }
+-keepclassmembers class com.notes.purenoteit.data.runner.** {
+    *** Companion;
+}
+-keep,includedescriptorclasses class com.notes.purenoteit.sync.** { *; }
+-keepclassmembers class com.notes.purenoteit.sync.** {
+    *** Companion;
+    *;
+}
+-keep,includedescriptorclasses class com.notes.purenoteit.security.** { *; }
+-keepclassmembers class com.notes.purenoteit.security.** {
+    *** Companion;
+    *;
 }
 
 # 4. Dagger Hilt & Dependency Injection

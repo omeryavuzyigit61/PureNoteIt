@@ -6,6 +6,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.notes.purenoteit.data.db.CategoryDao
+import com.notes.purenoteit.data.db.DatabaseMigrations
 import com.notes.purenoteit.data.db.NoteDatabase
 import com.notes.purenoteit.data.security.SqlCipherDatabaseManager
 import dagger.Module
@@ -93,25 +94,27 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): NoteDatabase =
         Room.databaseBuilder(context, NoteDatabase::class.java, "notes")
             .openHelperFactory(SqlCipherDatabaseManager.createSupportFactory(context, "notes"))
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, DatabaseMigrations.MIGRATION_5_6)
             .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2)
             .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)
-                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (1, 'Not', 0)")
-                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (2, 'Günlük', 0)")
-                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (3, 'Önemli', 0)")
                     val now = System.currentTimeMillis()
-                    db.execSQL("INSERT OR IGNORE INTO automation_rules (id, title, triggerType, triggerConfig, actionType, actionConfig, isEnabled, createdAt) VALUES (1, 'Tüm Görevler Bitince Tamamlandı Yap', 'ALL_TASKS_COMPLETED', NULL, 'SET_STATUS_DONE', 'DONE', 1, $now)")
-                    db.execSQL("INSERT OR IGNORE INTO automation_rules (id, title, triggerType, triggerConfig, actionType, actionConfig, isEnabled, createdAt) VALUES (2, 'Hafta İçi Günlük Plan Şablonu', 'DAILY_SCHEDULED', '08:30', 'CREATE_TEMPLATE', 'Günün Planı', 1, $now)")
+                    seedDefaultCategories(db, now)
+                    db.execSQL("INSERT OR IGNORE INTO automation_rules (id, title, triggerType, triggerConfig, actionType, actionConfig, isEnabled, createdAt, syncUuid, updatedAt, deletedAt, syncVersion) VALUES (1, 'Tüm Görevler Bitince Tamamlandı Yap', 'ALL_TASKS_COMPLETED', NULL, 'SET_STATUS_DONE', 'DONE', 1, $now, 'rule-default-1', $now, NULL, 1)")
+                    db.execSQL("INSERT OR IGNORE INTO automation_rules (id, title, triggerType, triggerConfig, actionType, actionConfig, isEnabled, createdAt, syncUuid, updatedAt, deletedAt, syncVersion) VALUES (2, 'Hafta İçi Günlük Plan Şablonu', 'DAILY_SCHEDULED', '08:30', 'CREATE_TEMPLATE', 'Günün Planı', 1, $now, 'rule-default-2', $now, NULL, 1)")
                 }
 
                 override fun onOpen(db: SupportSQLiteDatabase) {
                     super.onOpen(db)
-                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (1, 'Not', 0)")
-                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (2, 'Günlük', 0)")
-                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword) VALUES (3, 'Önemli', 0)")
+                    seedDefaultCategories(db, System.currentTimeMillis())
+                }
+
+                private fun seedDefaultCategories(db: SupportSQLiteDatabase, now: Long) {
+                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword, syncUuid, updatedAt, deletedAt, syncVersion) VALUES (1, 'Not', 0, 'cat-default-1', $now, NULL, 1)")
+                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword, syncUuid, updatedAt, deletedAt, syncVersion) VALUES (2, 'Günlük', 0, 'cat-default-2', $now, NULL, 1)")
+                    db.execSQL("INSERT OR IGNORE INTO categories (id, name, isPassword, syncUuid, updatedAt, deletedAt, syncVersion) VALUES (3, 'Önemli', 0, 'cat-default-3', $now, NULL, 1)")
                 }
             })
             .build()

@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -49,9 +50,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.notes.purenoteit.domain.storage.MediaPathResolver
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.VibrantOrange
+import com.notes.purenoteit.util.MediaFileUriHelper
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -69,9 +72,11 @@ fun MediaLightboxDialog(
     imagePath: String? = null,
     previewBitmap: Bitmap? = null,
     isDrawing: Boolean = false,
+    mediaPathResolver: MediaPathResolver? = null,
     onDismiss: () -> Unit,
     onSwitchToEdit: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var containerSize by remember { mutableStateOf(IntSize(1080, 1920)) }
@@ -179,8 +184,9 @@ fun MediaLightboxDialog(
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else if (!imagePath.isNullOrBlank()) {
+                        val resolvedFile = MediaFileUriHelper.resolveReadableFile(context, imagePath, mediaPathResolver)
                         AsyncImage(
-                            model = File(imagePath),
+                            model = resolvedFile ?: File(imagePath),
                             contentDescription = "Tam Ekran Görsel",
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxWidth()

@@ -78,17 +78,23 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.R
+import com.notes.purenoteit.domain.storage.MediaPathResolver
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.CharcoalGray
 import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
 import com.notes.purenoteit.ui.theme.VibrantOrange
+import com.notes.purenoteit.util.MediaFileUriHelper
 import com.notes.purenoteit.util.showToastShort
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -139,6 +145,7 @@ private val PALETTE_COLORS = listOf(
 @Composable
 fun DrawingCanvasSheet(
     existingImagePath: String? = null,
+    mediaPathResolver: MediaPathResolver? = null,
     onDismiss: () -> Unit,
     onSaveDrawing: (filePath: String) -> Unit
 ) {
@@ -153,12 +160,9 @@ fun DrawingCanvasSheet(
     )
 
     val baseBitmap = remember(existingImagePath) {
-        existingImagePath?.let { path ->
-            val file = File(path)
-            if (file.exists()) {
-                BitmapFactory.decodeFile(file.absolutePath)
-            } else null
-        }
+        MediaFileUriHelper.resolveReadableFile(context, existingImagePath, mediaPathResolver)
+            ?.takeIf { it.exists() }
+            ?.let { file -> BitmapFactory.decodeFile(file.absolutePath) }
     }
 
     val items = remember { mutableStateListOf<CanvasItem>() }
@@ -301,18 +305,41 @@ fun DrawingCanvasSheet(
             return
         }
 
-        try {
-            val bitmap = renderCurrentCanvasToBitmap()
-            val dir = File(context.filesDir, "drawings").apply { mkdirs() }
-            val file = File(dir, "sketch_${System.currentTimeMillis()}.png")
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
-
-            onSaveDrawing(file.absolutePath)
-            onDismiss()
+        val bitmap = try {
+            renderCurrentCanvasToBitmap()
         } catch (e: Exception) {
             context.showToastShort(context.getString(R.string.drawing_save_error, e.message ?: ""))
+            return
+        }
+
+        scope.launch {
+            try {
+                val pngBytes = withContext(Dispatchers.Default) {
+                    ByteArrayOutputStream().use { baos ->
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                        baos.toByteArray()
+                    }
+                }
+                val canonicalPath = if (mediaPathResolver != null) {
+                    mediaPathResolver.storeMediaBytes(pngBytes, "drawings", "png")
+                } else {
+                    withContext(Dispatchers.IO) {
+                        val sha256 = MessageDigest.getInstance("SHA-256")
+                            .digest(pngBytes)
+                            .joinToString("") { "%02x".format(it) }
+                        val dir = File(context.filesDir, "media/drawings").apply { mkdirs() }
+                        val file = File(dir, "$sha256.png")
+                        if (!file.exists()) {
+                            FileOutputStream(file).use { out -> out.write(pngBytes) }
+                        }
+                        "media/drawings/$sha256.png"
+                    }
+                }
+                onSaveDrawing(canonicalPath)
+                onDismiss()
+            } catch (e: Exception) {
+                context.showToastShort(context.getString(R.string.drawing_save_error, e.message ?: ""))
+            }
         }
     }
 

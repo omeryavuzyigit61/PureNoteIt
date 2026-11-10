@@ -16,4 +16,6 @@ interface CategoryRepository {
     suspend fun areDefaultCategoriesPresent(): Boolean
     suspend fun isPasswordSet(categoryName: String): Boolean?
     suspend fun getCategoryIdByName(categoryName: String): Int?
+    suspend fun getCategoryBySyncUuid(syncUuid: String): Category?
+    suspend fun getCategoriesModifiedSince(sinceMillis: Long): List<Category>
 }

@@ -19,15 +19,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,8 +48,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.notes.purenoteit.R
 import com.notes.purenoteit.ui.components.LanguageSelectionSheet
+import com.notes.purenoteit.ui.mvi.CloudSyncUiEffect
+import com.notes.purenoteit.ui.mvi.CloudSyncUiEvent
 import com.notes.purenoteit.ui.theme.BorderLight
 import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
@@ -56,6 +64,9 @@ import com.notes.purenoteit.util.Constants
 import com.notes.purenoteit.util.LanguageManager
 import com.notes.purenoteit.util.SharedPrefencesUtil
 import com.notes.purenoteit.util.showToastShort
+import com.notes.purenoteit.viewmodel.CloudSyncViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,7 +77,9 @@ fun SettingsScreen(
     onShowUpdateDialog: (AppUpdateData, Boolean) -> Unit,
     onNavigateToPasswordSettings: () -> Unit = {},
     onOpenVaultBackupRestore: () -> Unit = {},
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    cloudSyncViewModel: CloudSyncViewModel? = null,
+    onNotesSynced: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val currentActivity = context as? Activity
@@ -395,6 +408,14 @@ fun SettingsScreen(
                 color = VibrantOrange
             )
             Spacer(modifier = Modifier.height(8.dp))
+
+            if (cloudSyncViewModel != null) {
+                CloudSyncSettingsSection(
+                    viewModel = cloudSyncViewModel,
+                    onNotesSynced = onNotesSynced
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
 
             // 1. Yedekle ve Geri Yükle Card
             Surface(
@@ -727,5 +748,178 @@ fun SettingsScreen(
         LanguageSelectionSheet(
             onDismiss = { showLanguageSheet = false }
         )
+    }
+}
+
+@Composable
+private fun CloudSyncSettingsSection(
+    viewModel: CloudSyncViewModel,
+    onNotesSynced: () -> Unit
+) {
+    val context = LocalContext.current
+    val currentActivity = context as? Activity
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(viewModel) {
+        viewModel.refreshStatus()
+        withContext(Dispatchers.Main.immediate) {
+            viewModel.effects.collect { effect ->
+                when (effect) {
+                    is CloudSyncUiEffect.ShowMessage -> {
+                        val message = context.getString(effect.messageRes, effect.arg1, effect.arg2)
+                        context.showToastShort(message)
+                        if (effect.messageRes == R.string.cloud_sync_completed_summary && effect.arg2 > 0) {
+                            onNotesSynced()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, BorderLight.copy(alpha = 0.6f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SoftOrangeLight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.lock),
+                        contentDescription = null,
+                        tint = VibrantOrange,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.cloud_sync_card_title),
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(
+                            if (uiState.isDriveConnected) {
+                                R.string.cloud_sync_card_connected
+                            } else {
+                                R.string.cloud_sync_card_disconnected
+                            }
+                        ),
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                    )
+                    if (uiState.lastSyncPushed != null && uiState.lastSyncPulled != null) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(
+                                R.string.cloud_sync_completed_summary,
+                                uiState.lastSyncPushed ?: 0,
+                                uiState.lastSyncPulled ?: 0
+                            ),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = VibrantOrange
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!uiState.isDriveConnected) {
+                    Button(
+                        onClick = {
+                            viewModel.onEvent(
+                                CloudSyncUiEvent.ConnectGoogleDrive(currentActivity ?: context)
+                            )
+                        },
+                        enabled = !uiState.isSyncing,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = VibrantOrange,
+                            contentColor = PureWhite
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (uiState.isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = PureWhite
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = stringResource(R.string.cloud_sync_connect_btn),
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = { viewModel.onEvent(CloudSyncUiEvent.TriggerSyncNow) },
+                        enabled = !uiState.isSyncing,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = VibrantOrange,
+                            contentColor = PureWhite
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (uiState.isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = PureWhite
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = stringResource(R.string.cloud_sync_now_btn),
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.onEvent(CloudSyncUiEvent.DisconnectGoogleDrive) },
+                        enabled = !uiState.isSyncing,
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.cloud_sync_disconnect_btn),
+                            fontSize = 12.sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
     }
 }

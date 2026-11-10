@@ -1,6 +1,6 @@
 # Privacy Policy / Gizlilik Politikası
 
-**Effective Date / Yürürlük Tarihi:** November 2, 2026 / 2 Kasım 2026  
+**Effective Date / Yürürlük Tarihi:** November 10, 2026 / 10 Kasım 2026  
 **Application / Uygulama:** PureNoteIt  
 **Developer / Geliştirici:** Ömer Yavuz Yiğit  
 **Contact / İletişim:** yavuzyigitomer52@gmail.com  
@@ -10,15 +10,16 @@
 ## English Version
 
 ### 1. Introduction
-PureNoteIt ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how our native Android mobile application operates and outlines our strict zero-data-collection, offline-first philosophy.
+PureNoteIt ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how our Android and Desktop applications operate and outlines our strict zero-data-collection, offline-first, and encrypted privacy architecture.
 
 By using PureNoteIt, you agree to the practices described in this policy.
 
-### 2. Zero Data Collection & Offline-First Architecture
-PureNoteIt is built from the ground up as a **100% Offline-First Knowledge OS**:
-- **No Cloud Synchronization:** PureNoteIt does not store, upload, or transmit your notes, sketches, recordings, or credentials to any remote server or third-party cloud.
-- **Local Storage Only:** All your notes, categories, attachments, and configurations remain strictly on your device inside a sandboxed SQLite database (Android Room Database).
-- **No Tracking or Analytics:** PureNoteIt contains **zero trackers, zero third-party advertising SDKs, and zero behavioral telemetry**. We do not track, profile, or sell user activity.
+### 2. Zero Developer Servers & Optional Encrypted Cloud Sync
+PureNoteIt is built as an **Offline-First & Private Knowledge Workspace**:
+- **Zero Developer Servers:** PureNoteIt has no backend servers of its own. The developer never collects, views, stores, or receives your notes, sketches, audio recordings, passwords, or OAuth tokens.
+- **Encrypted Local Storage:** All your notes, categories, media attachments, and settings are stored locally inside an encrypted SQLite database protected by hardware-backed OS Keystore / Keychain keys.
+- **Optional Google Drive Sync (`drive.appdata`):** If you choose to enable Google Drive Sync via one-tap OAuth 2.0 PKCE sign-in, PureNoteIt requests **only** the narrow `https://www.googleapis.com/auth/drive.appdata` permission. Encrypted note payloads and encrypted media blobs are stored strictly inside **your own private Google Drive hidden app folder (`appDataFolder`)**. PureNoteIt never accesses your emails, contacts, photos, or general Drive files.
+- **No Tracking or Analytics:** PureNoteIt contains **zero trackers, zero third-party advertising SDKs, and zero behavioral telemetry**. We never track, profile, or sell user activity.
 
 ### 3. Bitwarden-Grade AES-256 Cryptography & Vault Security
 - **Hardware-Backed Encryption:** When you lock a note or vault, the content is encrypted using military-grade **AES-256-GCM** cryptography.
@@ -58,10 +59,11 @@ PureNoteIt ("biz" veya "uygulama"), gizliliğinize en üst düzeyde saygı göst
 
 PureNoteIt uygulamasını kullanarak bu ilkeleri kabul etmiş sayılırsınız.
 
-### 2. Sıfır Veri Toplama & Çevrimdışı (Offline-First) Mimari
-PureNoteIt, düşüncelerinizin güvenliğini korumak üzere tamamen bağımsız olarak tasarlanmıştır:
-- **Bulut Senkronizasyonu Yoktur:** PureNoteIt notlarınızı, ses kayıtlarınızı, çizimlerinizi veya şifrelerinizi hiçbir harici sunucuya veya bulut servisine göndermez, yüklemez ya da yedeklemez.
-- **Yalnızca Cihaz İçi Depolama:** Tüm notlarınız, kategorileriniz, ekleriniz ve ayarlarınız yalnızca cihazınızın kendi korumalı SQLite veritabanında (Android Room) saklanır.
+### 2. Sıfır Geliştirici Sunucusu & İsteğe Bağlı Şifreli Google Drive Eşitleme
+PureNoteIt, düşüncelerinizin gizliliğini korumak üzere çevrimdışı öncelikli (offline-first) mimariyle tasarlanmıştır:
+- **Geliştirici Sunucusu Yoktur:** PureNoteIt hiçbir geliştirici sunucusu kullanmaz. Geliştirici notlarınızı, ses kayıtlarınızı, çizimlerinizi, şifrelerinizi veya oturum anahtarlarınızı asla görmez, toplamaz ya da almaz.
+- **Yerel Şifreli Depolama:** Tüm notlarınız, kategorileriniz, medya dosyalarınız ve ayarlarınız cihazınızdaki şifreli SQLite veritabanında ve donanım destekli Android Keystore / sistem anahtar kasasında saklanır.
+- **İsteğe Bağlı Google Drive Eşitleme (`drive.appdata`):** Ayarlar'dan kendi isteğinizle Google Drive'a bağlandığınızda uygulama **yalnızca** en dar kapsam olan `https://www.googleapis.com/auth/drive.appdata` iznini ister. Şifrelenmiş not ve medya verileri doğrudan **kendi Google Drive hesabınızın gizli uygulama alanına (`appDataFolder`)** yazılır; uygulama e-postalarınıza, kişilerinize, fotoğraflarınıza veya diğer Drive dosyalarınıza kesinlikle erişemez.
 - **İzleyici ve Reklam Yoktur:** Uygulama içerisinde **hiçbir üçüncü taraf reklam SDK'sı, davranışsal izleyici veya analitik aracı bulunmaz**. Verileriniz asla profillenmez ve satılmaz.
 
 ### 3. Bitwarden Seviyesinde AES-256 Şifreleme ve Kasa Güvenliği

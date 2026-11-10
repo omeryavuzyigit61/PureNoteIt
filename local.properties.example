@@ -1,0 +1,21 @@
+## Sample Google Cloud OAuth 2.0 configuration for publisher release builds
+## Copy the active keys into your git-ignored `local.properties` (or pass via CI env vars)
+## before running `:app:assembleRelease` or `:desktopApp:packageDistributionForCurrentOS`.
+
+# Android Production OAuth 2.0 Client ID (type: Android, Play App Signing SHA-1 + package com.purenoteit.app)
+purenote.android.oauth.clientId=
+
+# Android Debug OAuth 2.0 Client ID (optional for local debug builds using debug.keystore SHA-1)
+purenote.android.debug.oauth.clientId=
+
+# Optional Android Release Keystore configuration for automated signed .aab/.apk builds
+# purenote.release.storeFile=
+# purenote.release.storePassword=
+# purenote.release.keyAlias=
+# purenote.release.keyPassword=
+
+# Desktop OAuth 2.0 Client ID (type: Desktop app, loopback 127.0.0.1 redirect)
+purenote.desktop.oauth.clientId=
+
+# Desktop OAuth 2.0 Client Secret (required by Google for installed Desktop apps; leave empty if using proxy)
+purenote.desktop.oauth.clientSecret=

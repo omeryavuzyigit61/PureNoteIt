@@ -2,10 +2,15 @@ package com.notes.purenoteit.data.db
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.io.Serializable
+import java.util.UUID
 
-@Entity(tableName = "automation_rules")
+@Entity(
+    tableName = "automation_rules",
+    indices = [Index(value = ["syncUuid"], unique = true)]
+)
 data class AutomationRuleData(
     @ColumnInfo(name = "title")
     var title: String,
@@ -20,7 +25,15 @@ data class AutomationRuleData(
     @ColumnInfo(name = "isEnabled", defaultValue = "1")
     var isEnabled: Boolean = true,
     @ColumnInfo(name = "createdAt")
-    var createdAt: Long = System.currentTimeMillis()
+    var createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "syncUuid", defaultValue = "''")
+    var syncUuid: String = UUID.randomUUID().toString(),
+    @ColumnInfo(name = "updatedAt", defaultValue = "0")
+    var updatedAt: Long = 0L,
+    @ColumnInfo(name = "deletedAt")
+    var deletedAt: Long? = null,
+    @ColumnInfo(name = "syncVersion", defaultValue = "1")
+    var syncVersion: Long = 1L
 ) : Serializable {
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0

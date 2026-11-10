@@ -2,6 +2,7 @@ package com.notes.purenoteit.data.mapper
 
 import com.notes.purenoteit.data.db.NoteData
 import com.notes.purenoteit.domain.model.Note
+import java.util.UUID
 
 internal fun NoteData.toDomain(): Note = Note(
     id = id,
@@ -22,7 +23,12 @@ internal fun NoteData.toDomain(): Note = Note(
     reminderType = reminderType,
     reminderSound = reminderSound,
     isReminderDone = isReminderDone,
-    richBlocksJson = richBlocksJson
+    richBlocksJson = richBlocksJson,
+    syncUuid = syncUuid,
+    categorySyncUuid = categorySyncUuid,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncVersion = syncVersion
 )
 
 internal fun Note.toEntity(): NoteData = NoteData(
@@ -43,5 +49,10 @@ internal fun Note.toEntity(): NoteData = NoteData(
     reminderType = reminderType,
     reminderSound = reminderSound,
     isReminderDone = isReminderDone,
-    richBlocksJson = richBlocksJson
+    richBlocksJson = richBlocksJson,
+    syncUuid = syncUuid.ifBlank { UUID.randomUUID().toString() },
+    categorySyncUuid = categorySyncUuid,
+    updatedAt = updatedAt,
+    deletedAt = deletedAt,
+    syncVersion = syncVersion.coerceAtLeast(1L)
 ).also { it.id = this.id }

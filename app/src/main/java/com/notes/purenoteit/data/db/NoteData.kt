@@ -6,6 +6,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.io.Serializable
+import java.util.UUID
 
 @Entity(
     tableName = "notes",
@@ -15,7 +16,10 @@ import java.io.Serializable
         childColumns = ["categoryId"],
         onDelete = ForeignKey.CASCADE,
     )],
-    indices = [Index(value = ["categoryId"])]
+    indices = [
+        Index(value = ["categoryId"]),
+        Index(value = ["syncUuid"], unique = true)
+    ]
 )
 data class NoteData(
     @ColumnInfo(name = "title")
@@ -53,7 +57,17 @@ data class NoteData(
     @ColumnInfo(name = "isReminderDone", defaultValue = "0")
     var isReminderDone: Boolean = false,
     @ColumnInfo(name = "richBlocksJson")
-    var richBlocksJson: String? = null
+    var richBlocksJson: String? = null,
+    @ColumnInfo(name = "syncUuid", defaultValue = "''")
+    var syncUuid: String = UUID.randomUUID().toString(),
+    @ColumnInfo(name = "categorySyncUuid")
+    var categorySyncUuid: String? = null,
+    @ColumnInfo(name = "updatedAt", defaultValue = "0")
+    var updatedAt: Long = 0L,
+    @ColumnInfo(name = "deletedAt")
+    var deletedAt: Long? = null,
+    @ColumnInfo(name = "syncVersion", defaultValue = "1")
+    var syncVersion: Long = 1L
 ) : Serializable {
     @PrimaryKey(autoGenerate = true)
     var id: Int = 0

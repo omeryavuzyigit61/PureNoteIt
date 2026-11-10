@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.notes.purenoteit.R
+import com.notes.purenoteit.domain.storage.MediaPathResolver
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.ui.theme.BorderLight
@@ -57,6 +58,7 @@ import com.notes.purenoteit.ui.theme.PureWhite
 import com.notes.purenoteit.ui.theme.SoftOrangeLight
 import com.notes.purenoteit.ui.theme.VibrantOrange
 import com.notes.purenoteit.util.AudioRecorder
+import com.notes.purenoteit.util.MediaFileUriHelper
 import java.io.File
 
 @Composable
@@ -68,6 +70,7 @@ fun ZenReadingModeView(
     readingTimeMinutes: Int,
     audioRecorder: AudioRecorder,
     onExit: () -> Unit,
+    mediaPathResolver: MediaPathResolver? = null,
     modifier: Modifier = Modifier
 ) {
     var zenPreviewPath by remember { mutableStateOf<String?>(null) }
@@ -151,6 +154,7 @@ fun ZenReadingModeView(
                 ZenBlockContent(
                     block = block,
                     audioRecorder = audioRecorder,
+                    mediaPathResolver = mediaPathResolver,
                     onPreviewMedia = { path, isDrawing ->
                         zenPreviewPath = path
                         zenPreviewIsDrawing = isDrawing
@@ -219,6 +223,7 @@ fun ZenReadingModeView(
             MediaLightboxDialog(
                 imagePath = path,
                 isDrawing = zenPreviewIsDrawing,
+                mediaPathResolver = mediaPathResolver,
                 onDismiss = { zenPreviewPath = null }
             )
         }
@@ -229,6 +234,7 @@ fun ZenReadingModeView(
 private fun ZenBlockContent(
     block: NoteBlock,
     audioRecorder: AudioRecorder,
+    mediaPathResolver: MediaPathResolver? = null,
     onPreviewMedia: (path: String, isDrawing: Boolean) -> Unit
 ) {
     when (block.type) {
@@ -349,8 +355,9 @@ private fun ZenBlockContent(
         BlockType.IMAGE -> {
             val imgPath = block.mediaPath
             if (!imgPath.isNullOrBlank()) {
-                val file = File(imgPath)
-                if (file.exists()) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val file = MediaFileUriHelper.resolveReadableFile(context, imgPath, mediaPathResolver)
+                if (file != null && file.exists()) {
                     AsyncImage(
                         model = file,
                         contentDescription = null,
@@ -369,8 +376,9 @@ private fun ZenBlockContent(
         BlockType.DRAWING -> {
             val drawingPath = block.mediaPath
             if (!drawingPath.isNullOrBlank()) {
-                val file = File(drawingPath)
-                if (file.exists()) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val file = MediaFileUriHelper.resolveReadableFile(context, drawingPath, mediaPathResolver)
+                if (file != null && file.exists()) {
                     AsyncImage(
                         model = file,
                         contentDescription = stringResource(R.string.tb_drawing),

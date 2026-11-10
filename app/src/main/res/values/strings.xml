@@ -195,7 +195,7 @@
     <string name="slash_divider_title">Ayırıcı Çizgi</string>
     <string name="slash_divider_desc">Blokları birbirinden ayıran yatay çizgi</string>
     <string name="slash_code_title">Kod Bloğu (Code Block)</string>
-    <string name="slash_code_desc">Renkli sözdizimi vurgulu yazılım kod bloğu</string>
+    <string name="slash_code_desc">Renkli sözdizimi vurgusu ve SQL/JS/HTML/JSON çevrimdışı çalıştırma</string>
     <string name="slash_math_title">Matematik Formülü (LaTeX)</string>
     <string name="slash_math_desc">Denklem ve formül matematik bloğu</string>
     <string name="slash_toc_title">İçindekiler Tablosu (TOC)</string>
@@ -204,6 +204,37 @@
     <string name="code_copy">Kopyala</string>
     <string name="code_copied">Kopyalandı!</string>
     <string name="code_select_lang">Dil Seç</string>
+    <string name="code_run">Çalıştır</string>
+    <string name="code_preview">Önizle</string>
+    <string name="code_validate">Doğrula</string>
+    <string name="code_check_syntax">Kontrol Et</string>
+    <string name="code_open_web_ide">Web IDE</string>
+    <string name="code_web_ide_copied">Kod panoya kopyalandı, tarayıcıda yapıştırabilirsiniz</string>
+    <string name="code_offline_badge">Çevrimdışı</string>
+    <string name="code_output_title">Çıktı</string>
+    <string name="code_html_preview_title">Canlı HTML Önizleme (İzole)</string>
+    <string name="code_duration_ms">%1$d ms</string>
+    <string name="code_clear_output">Temizle</string>
+    <string name="code_output_empty">(Çıktı yok · undefined)</string>
+    <string name="code_sql_rows_summary">%1$d satır · %2$d ifade</string>
+    <string name="code_sql_truncated">İlk 100 satır gösteriliyor</string>
+    <string name="code_sql_affected">%1$d ifade çalıştırıldı · %2$d satır etkilendi</string>
+    <string name="code_sql_empty_table">Sorgu 0 satır döndürdü</string>
+    <string name="code_json_valid">Geçerli JSON (%1$s · %2$d öğe)</string>
+    <string name="code_json_apply_format">Biçimlendir</string>
+    <string name="code_json_applied_toast">JSON biçimlendirildi</string>
+    <string name="code_syntax_valid_msg">Yapısal denetim geçti (%1$d satır): parantez, tırnak ve yorum blokları dengeli.</string>
+    <string name="code_syntax_external_hint">Tam derleme sunucusuz modda harici tarayıcıdaki Web IDE üzerinden açılabilir.</string>
+    <string name="code_error_empty">Çalıştırılacak kod boş.</string>
+    <string name="code_error_timeout">Çalıştırma zaman aşımına uğradı (olası sonsuz döngü durduruldu).</string>
+    <string name="code_error_js_unavailable">Cihaz JavaScript motoru başlatılamadı.</string>
+    <string name="code_error_security_blocked">Güvenlik nedeniyle engellendi: %1$s</string>
+    <string name="code_error_unclosed_delimiter">Satır %1$d: Kapanmamış ayraç (%2$s bekleniyor).</string>
+    <string name="code_error_unexpected_closing">Satır %1$d: Beklenmeyen kapanış ayracı (%2$s).</string>
+    <string name="code_error_mismatched_delimiter">Satır %1$d: %2$s beklenirken %3$s bulundu.</string>
+    <string name="code_error_unclosed_string">Satır %1$d: Kapanmamış metin tırnağı (%2$s).</string>
+    <string name="code_error_unclosed_comment">Satır %1$d: Kapanmamış /* ... */ yorum bloğu.</string>
+    <string name="code_input_placeholder">// Kodu buraya yazın veya yapıştırın…</string>
     <string name="math_preview_title">Formül Önizleme</string>
     <string name="math_input_placeholder">Örn: E = mc^2 veya \frac{a}{b}</string>
     <string name="toc_title">📑 İçindekiler Tablosu</string>
@@ -567,4 +598,27 @@
     <string name="rename_subpage_title">Alt Sayfa Adını Düzenle</string>
     <string name="rename_subpage_hint">Alt sayfa adı...</string>
     <string name="rename_subpage_updated_toast">Alt sayfa adı güncellendi</string>
+
+    <!-- Cross-Device Google Drive PKCE Sync -->
+    <string name="cloud_sync_card_title">Google Drive Bulut Eşitleme</string>
+    <string name="cloud_sync_card_connected">Google Drive bağlı · Otomatik şifreli eşitleme aktif</string>
+    <string name="cloud_sync_card_disconnected">Tek tıkla bağlanın; notlarınız tüm cihazlarınızla otomatik eşitlenir</string>
+    <string name="cloud_sync_connect_btn">Drive Bağla</string>
+    <string name="cloud_sync_now_btn">Şimdi Eşitle</string>
+    <string name="cloud_sync_disconnect_btn">Çıkış</string>
+    <string name="cloud_sync_passphrase_title">Güvenlik Parolası</string>
+    <string name="cloud_sync_passphrase_desc">Notlarınız buluta yüklenmeden önce güvenle şifrelenir.</string>
+    <string name="cloud_sync_passphrase_hint">Güvenlik Parolası</string>
+    <string name="cloud_sync_passphrase_required">Şifreleme anahtarı alınamadı, lütfen tekrar bağlanın</string>
+    <string name="cloud_sync_client_unconfigured">Bu derlemede Google OAuth kimliği tanımlanmamış</string>
+    <string name="cloud_sync_connected_toast">Google Drive bağlandı</string>
+    <string name="cloud_sync_passphrase_saved">Güvenlik anahtarı kaydedildi</string>
+    <string name="cloud_sync_disconnected_toast">Drive oturumu kapatıldı</string>
+    <string name="cloud_sync_completed_summary">Eşitlendi: ↑%1$d gönderildi, ↓%2$d not alındı</string>
+    <string name="cloud_sync_error_decrypt">Not verisi çözülemedi, lütfen tekrar eşitleyin</string>
+    <string name="cloud_sync_error_security">Donanım anahtar deposuna erişilemedi</string>
+    <string name="cloud_sync_error_auth">Oturum süresi doldu veya izin verilmedi</string>
+    <string name="cloud_sync_error_network">Ağ bağlantısı kurulamadı veya zaman aşımına uğradı</string>
+    <string name="cloud_sync_error_tls">Güvenli HTTPS/TLS bağlantısı doğrulanamadı</string>
+    <string name="cloud_sync_error_generic">Eşitleme sırasında beklenmeyen bir hata oluştu</string>
 </resources>

@@ -32,6 +32,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import androidx.lifecycle.lifecycleScope
+import com.notes.purenoteit.data.security.AndroidOAuthPkceManager
 import com.notes.purenoteit.reminder.AlarmSoundPlayer
 import com.notes.purenoteit.security.AppIntegrityGuard
 import com.notes.purenoteit.ui.animation.LocalNavAnimatedVisibilityScope
@@ -52,6 +54,8 @@ import com.notes.purenoteit.util.SharedPrefencesUtil
 import com.notes.purenoteit.util.ThemeManager
 import com.notes.purenoteit.util.ThemeMode
 import com.notes.purenoteit.viewmodel.CategoryViewModel
+import com.notes.purenoteit.viewmodel.CloudSyncViewModel
+import com.notes.purenoteit.viewmodel.CodePlaygroundViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -61,13 +65,20 @@ import androidx.compose.ui.unit.sp
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
+    @Inject
+    lateinit var oauthPkceManager: AndroidOAuthPkceManager
+
     private val noteViewModel: NoteViewModel by viewModels()
     private val categoryViewModel: CategoryViewModel by viewModels()
+    private val codePlaygroundViewModel: CodePlaygroundViewModel by viewModels()
+    private val cloudSyncViewModel: CloudSyncViewModel by viewModels()
 
     private var activeIntent by mutableStateOf<Intent?>(null)
 
@@ -79,6 +90,12 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         activeIntent = intent
+        lifecycleScope.launch {
+            if (oauthPkceManager.handleRedirectIntent(intent)) {
+                cloudSyncViewModel.refreshStatus()
+                noteViewModel.getAllNotes()
+            }
+        }
         val openNoteId = intent.getIntExtra("OPEN_NOTE_ID", -1)
         if (openNoteId != -1) {
             AlarmSoundPlayer.stop()
@@ -114,6 +131,12 @@ class MainActivity : AppCompatActivity() {
         )
 
         activeIntent = intent
+        lifecycleScope.launch {
+            if (oauthPkceManager.handleRedirectIntent(intent)) {
+                cloudSyncViewModel.refreshStatus()
+                noteViewModel.getAllNotes()
+            }
+        }
 
         // Synchronous RASP gate BEFORE database initialization
         val initialIntegrity = AppIntegrityGuard.checkAppIntegritySync(this)
@@ -241,6 +264,7 @@ class MainActivity : AppCompatActivity() {
                                             HomeScreen(
                                                 noteViewModel = noteViewModel,
                                                 categoryViewModel = categoryViewModel,
+                                                cloudSyncViewModel = cloudSyncViewModel,
                                                 onNavigateToAddNote = { noteId ->
                                                     navController.navigate(AppRoute.NoteDetail(noteId = noteId)) {
                                                         launchSingleTop = true
@@ -315,6 +339,7 @@ class MainActivity : AppCompatActivity() {
                                                 originScope = routeArgs.originScope,
                                                 noteViewModel = noteViewModel,
                                                 categoryViewModel = categoryViewModel,
+                                                codePlaygroundViewModel = codePlaygroundViewModel,
                                                 onNavigateBack = {
                                                     if (navController.previousBackStackEntry != null) {
                                                         navController.popBackStack()

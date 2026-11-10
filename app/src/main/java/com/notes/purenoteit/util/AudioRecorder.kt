@@ -6,9 +6,13 @@ import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
 import android.util.Log
+import com.notes.purenoteit.domain.storage.MediaPathResolver
 import java.io.File
 
-class AudioRecorder(private val context: Context) {
+class AudioRecorder(
+    private val context: Context,
+    private val mediaPathResolver: MediaPathResolver? = null
+) {
     private var mediaRecorder: MediaRecorder? = null
     private var mediaPlayer: MediaPlayer? = null
     private var currentRecordingFilePath: String? = null
@@ -17,13 +21,16 @@ class AudioRecorder(private val context: Context) {
     private var currentSpeed: Float = 1.0f
 
     fun startRecording(): String? {
-        val fileName = "recorded_audio_${System.currentTimeMillis()}.m4a"
-        val recordingsDir = File(context.filesDir, "recordings")
-        if (!recordingsDir.exists()) {
-            recordingsDir.mkdirs()
+        val filePath = if (mediaPathResolver != null) {
+            mediaPathResolver.createStagingFilePath("recorded_audio", "m4a")
+        } else {
+            val fileName = "recorded_audio_${System.currentTimeMillis()}.m4a"
+            val recordingsDir = File(context.filesDir, "recordings")
+            if (!recordingsDir.exists()) {
+                recordingsDir.mkdirs()
+            }
+            File(recordingsDir, fileName).absolutePath
         }
-        val file = File(recordingsDir, fileName)
-        val filePath = file.absolutePath
 
         try {
             val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -80,6 +87,21 @@ class AudioRecorder(private val context: Context) {
         return currentRecordingFilePath
     }
 
+    /**
+     * Stops active capture and moves the finalized audio stream into canonical content-addressed
+     * `media/audio/<sha256>.m4a` storage when [mediaPathResolver] is configured.
+     */
+    suspend fun stopRecordingPortable(): String? {
+        val rawPath = stopRecording() ?: return null
+        val resolver = mediaPathResolver ?: return rawPath
+        return resolver.importExistingFile(
+            sourcePath = rawPath,
+            subFolder = "audio",
+            defaultExtension = "m4a",
+            deleteSource = true
+        ) ?: rawPath
+    }
+
     fun cancelRecording(dialogBinding: Any? = null) {
         try {
             mediaRecorder?.apply {
@@ -131,9 +153,10 @@ class AudioRecorder(private val context: Context) {
         // New audio playback session
         stopPlaying()
         try {
+            val resolvedPath = MediaFileUriHelper.resolveReadablePath(context, filePath, mediaPathResolver) ?: filePath
             currentPlayingFilePath = filePath
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(filePath)
+                setDataSource(resolvedPath)
                 prepare()
                 start()
                 applySpeed(currentSpeed)
@@ -205,7 +228,8 @@ class AudioRecorder(private val context: Context) {
             stopPlaying()
         }
         return try {
-            val file = File(filePath)
+            val resolvedPath = MediaFileUriHelper.resolveReadablePath(context, filePath, mediaPathResolver) ?: filePath
+            val file = File(resolvedPath)
             if (file.exists() && file.delete()) {
                 Log.i("AudioRecorder", "Dosya başarıyla silindi: $filePath")
                 true
@@ -221,8 +245,9 @@ class AudioRecorder(private val context: Context) {
 
     fun getAudioDuration(filePath: String): Int {
         return try {
+            val resolvedPath = MediaFileUriHelper.resolveReadablePath(context, filePath, mediaPathResolver) ?: filePath
             val retriever = MediaMetadataRetriever()
-            retriever.setDataSource(filePath)
+            retriever.setDataSource(resolvedPath)
             val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
             retriever.release()
             durationStr?.toIntOrNull() ?: 0

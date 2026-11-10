@@ -19,4 +19,6 @@ interface NoteRepository {
     suspend fun updatePinStatus(id: Int, isPinned: Boolean)
     suspend fun updateReminderDone(id: Int, isDone: Boolean)
     suspend fun updateReminderTime(id: Int, reminderTime: Long)
+    suspend fun getNoteBySyncUuid(syncUuid: String): Note?
+    suspend fun getNotesModifiedSince(sinceMillis: Long): List<Note>
 }

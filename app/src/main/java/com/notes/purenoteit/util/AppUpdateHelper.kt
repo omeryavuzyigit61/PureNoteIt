@@ -41,6 +41,20 @@ object AppUpdateHelper {
     private const val KEY_DISMISSED_VERSION = "dismissed_version_code"
     private const val MIN_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L // 12 saatte bir otomatik kontrol
 
+    private val DEFAULT_RELEASE_NOTES_TR = listOf(
+        "☁️ Google Drive Eşitleme: Ayarlar'dan tek dokunuşla bağlanın, notlarınızı cihazlar arasında otomatik eşitleyin.",
+        "🛡️ Güçlü Gizlilik: Tüm notlar, çizimler ve medya dosyaları cihazınızda ve bulutta güvenle şifrelenir.",
+        "🔄 Çapraz Cihaz Uyumu: Mobil ve bilgisayar arasında kategori, alt sayfa ve not bağlantıları eksiksiz aktarılır.",
+        "⚡ Akıcılık & Kararlılık: Yenilenen Ayarlar deneyimi ve daha hızlı senkronizasyon."
+    )
+
+    private val DEFAULT_RELEASE_NOTES_EN = listOf(
+        "☁️ Google Drive Sync: Connect with one tap in Settings and keep your notes synced across devices.",
+        "🛡️ Strong Privacy: All notes, drawings, and media stay securely encrypted on device and in the cloud.",
+        "🔄 Cross-Device Continuity: Seamless categories, sub-pages, and note links between mobile and desktop.",
+        "⚡ Performance & Stability: Refined Settings experience and faster sync reliability."
+    )
+
     fun getAppUpdateManager(context: Context): AppUpdateManager {
         return AppUpdateManagerFactory.create(context)
     }
@@ -48,9 +62,9 @@ object AppUpdateHelper {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val pInfo = getPackageInfo(context)
-            pInfo.versionName ?: "1.1.0"
+            pInfo.versionName ?: "1.2.1"
         } catch (e: Exception) {
-            "1.1.0"
+            "1.2.1"
         }
     }
 
@@ -64,7 +78,7 @@ object AppUpdateHelper {
                 pInfo.versionCode.toLong()
             }
         } catch (e: Exception) {
-            11L
+            18L
         }
     }
 
@@ -143,18 +157,8 @@ object AppUpdateHelper {
                     currentVersionCode = currentVerCode,
                     availableVersionCode = availableVerCode,
                     availableVersionName = dynamicTargetVersion,
-                    releaseNotesTr = listOf(
-                        "🪟 Cam Kategori Menüsü: 3D kapı açılma animasyonlu buğulu cam (glassmorphism) üst menü.",
-                        "🛡️ Güçlü Güvenlik: SQLCipher AES-256 tam veritabanı şifrelemesi ve Android Keystore kriptografik kasa.",
-                        "⚡ Clean Architecture & MVI: %100 Coroutines ve Flow ile daha hızlı, reaktif performans.",
-                        "🎨 Material 3 Tasarım: Yenilenen ızgara simgesi ve ekranda görünen net not sayımı."
-                    ),
-                    releaseNotesEn = listOf(
-                        "🪟 Glassy Tabs V7: 3D door-flip animation and frosted glassmorphism category bar.",
-                        "🛡️ Enhanced Security: SQLCipher AES-256 full-database encryption & Android Keystore cryptographic vault.",
-                        "⚡ Clean Architecture & MVI: 100% Coroutines & Flow for fast reactive performance.",
-                        "🎨 Material 3 UI: Modern grid view icon and accurate visible note count."
-                    ),
+                    releaseNotesTr = DEFAULT_RELEASE_NOTES_TR,
+                    releaseNotesEn = DEFAULT_RELEASE_NOTES_EN,
                     playUpdateInfo = appUpdateInfo
                 )
                 onUpdateFound(updateData)
@@ -222,18 +226,8 @@ object AppUpdateHelper {
             currentVersionCode = curCode,
             availableVersionCode = curCode,
             availableVersionName = "v$curName",
-            releaseNotesTr = listOf(
-                "🪟 Cam Kategori Menüsü: 3D kapı açılma animasyonlu buğulu cam (glassmorphism) üst menü.",
-                "🛡️ Güçlü Güvenlik: Donanım destekli Android Keystore 256-bit AES-GCM şifreleme altyapısı.",
-                "⚡ Clean Architecture & MVI: %100 Coroutines ve Flow ile daha hızlı, reaktif performans.",
-                "🎨 Material 3 Tasarım: Yenilenen ızgara simgesi ve ekranda görünen net not sayımı."
-            ),
-            releaseNotesEn = listOf(
-                "🪟 Glassy Tabs V7: 3D door-flip animation and frosted glassmorphism category bar.",
-                "🛡️ Enhanced Security: Hardware-backed Android Keystore 256-bit AES-GCM encryption.",
-                "⚡ Clean Architecture & MVI: 100% Coroutines & Flow for fast reactive performance.",
-                "🎨 Material 3 UI: Modern grid view icon and accurate visible note count."
-            )
+            releaseNotesTr = DEFAULT_RELEASE_NOTES_TR,
+            releaseNotesEn = DEFAULT_RELEASE_NOTES_EN
         )
     }
 }

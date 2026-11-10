@@ -18,6 +18,7 @@ import com.notes.purenoteit.domain.model.StreamItem
 import com.notes.purenoteit.domain.repository.CategoryRepository
 import com.notes.purenoteit.domain.repository.KnowledgeRepository
 import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.domain.storage.MediaPathResolver
 import com.notes.purenoteit.domain.time.AppClock
 import com.notes.purenoteit.domain.usecase.DeleteNoteUseCase
 import com.notes.purenoteit.domain.usecase.GetNotesUseCase
@@ -58,6 +59,7 @@ class NoteViewModel @Inject constructor(
     private val deleteNoteUseCase: DeleteNoteUseCase,
     private val automationEngine: AutomationEngine,
     private val clock: AppClock,
+    val mediaPathResolver: MediaPathResolver,
     @ApplicationContext private val context: Context,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
@@ -320,16 +322,17 @@ class NoteViewModel @Inject constructor(
 
             for (candidate in allNotes) {
                 if (candidate.id == targetNoteId) continue
+                val candDesc = candidate.description
                 val wasEncrypted = candidate.isEncrypted ||
                     (candidate.isPassword == true) ||
-                    SecurityUtil.isEncryptedPayload(candidate.description)
-                val rawDesc = if (wasEncrypted && !candidate.description.isNullOrBlank()) {
-                    when (val dec = SecurityUtil.decryptSafe(candidate.description)) {
+                    SecurityUtil.isEncryptedPayload(candDesc)
+                val rawDesc = if (wasEncrypted && !candDesc.isNullOrBlank()) {
+                    when (val dec = SecurityUtil.decryptSafe(candDesc)) {
                         is AppResult.Success -> dec.data
                         is AppResult.Failure -> continue // Never overwrite undecryptable encrypted notes
                     }
                 } else {
-                    candidate.description ?: ""
+                    candDesc ?: ""
                 }
                 if (rawDesc.isBlank()) continue
 
@@ -416,16 +419,17 @@ class NoteViewModel @Inject constructor(
 
             for (candidate in allNotes) {
                 if (candidate.id == deletedNoteId) continue
+                val candDesc = candidate.description
                 val wasEncrypted = candidate.isEncrypted ||
                     (candidate.isPassword == true) ||
-                    SecurityUtil.isEncryptedPayload(candidate.description)
-                val rawDesc = if (wasEncrypted && !candidate.description.isNullOrBlank()) {
-                    when (val dec = SecurityUtil.decryptSafe(candidate.description)) {
+                    SecurityUtil.isEncryptedPayload(candDesc)
+                val rawDesc = if (wasEncrypted && !candDesc.isNullOrBlank()) {
+                    when (val dec = SecurityUtil.decryptSafe(candDesc)) {
                         is AppResult.Success -> dec.data
                         is AppResult.Failure -> continue
                     }
                 } else {
-                    candidate.description ?: ""
+                    candDesc ?: ""
                 }
                 if (rawDesc.isBlank()) continue
 
@@ -505,29 +509,33 @@ class NoteViewModel @Inject constructor(
     private suspend fun restoreSubPageToParent(restoredNote: Note): Boolean {
         return try {
             val richJson = restoredNote.richBlocksJson ?: return false
-            if (!richJson.contains("\"isSubPage\":true") && !richJson.contains("\"parentNoteId\"")) {
+            val meta = BlockParser.parseRichMetadata(richJson)
+            if (meta?.isSubPage != true && !richJson.contains("\"isSubPage\":true") && !richJson.contains("\"parentNoteId\"")) {
                 return false
             }
-            val parentIdMatch = Regex(""""parentNoteId"\s*:\s*(\d+)""").find(richJson)
-            val parentId = parentIdMatch?.groupValues?.getOrNull(1)?.toIntOrNull()
+            val parentId = meta?.parentNoteId
+                ?: Regex(""""parentNoteId"\s*:\s*(\d+)""").find(richJson)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            val parentSyncUuid = meta?.parentSyncUuid?.takeIf { it.isNotBlank() }
 
-            val parentNote = if (parentId != null && parentId > 0) {
-                suspendSafeOrNull { repository.getNoteById(parentId) }
-            } else {
-                null
+            val parentNote = when {
+                parentSyncUuid != null -> suspendSafeOrNull { repository.getNoteBySyncUuid(parentSyncUuid) }
+                    ?: if (parentId != null && parentId > 0) suspendSafeOrNull { repository.getNoteById(parentId) } else null
+                parentId != null && parentId > 0 -> suspendSafeOrNull { repository.getNoteById(parentId) }
+                else -> null
             }
 
             if (parentNote != null && parentNote.status != "TRASH") {
+                val parentDesc = parentNote.description
                 val wasEncrypted = parentNote.isEncrypted ||
                     (parentNote.isPassword == true) ||
-                    SecurityUtil.isEncryptedPayload(parentNote.description)
-                val rawDesc = if (wasEncrypted && !parentNote.description.isNullOrBlank()) {
-                    when (val dec = SecurityUtil.decryptSafe(parentNote.description)) {
+                    SecurityUtil.isEncryptedPayload(parentDesc)
+                val rawDesc = if (wasEncrypted && !parentDesc.isNullOrBlank()) {
+                    when (val dec = SecurityUtil.decryptSafe(parentDesc)) {
                         is AppResult.Success -> dec.data
                         is AppResult.Failure -> return false
                     }
                 } else {
-                    parentNote.description ?: ""
+                    parentDesc ?: ""
                 }
 
                 val parsedBlocks = if (rawDesc.isBlank()) {
@@ -538,7 +546,9 @@ class NoteViewModel @Inject constructor(
 
                 val restoredTitle = restoredNote.title?.trim()?.takeIf { it.isNotBlank() } ?: "Yeni Alt Sayfa"
                 val existingIdx = parsedBlocks.indexOfFirst {
-                    it.type == BlockType.SUB_PAGE && it.subPageNoteId == restoredNote.id
+                    it.type == BlockType.SUB_PAGE &&
+                        (it.subPageNoteId == restoredNote.id ||
+                            (restoredNote.syncUuid.isNotBlank() && it.subPageSyncUuid == restoredNote.syncUuid))
                 }
 
                 var parentModified = false
@@ -547,13 +557,23 @@ class NoteViewModel @Inject constructor(
                         NoteBlock(
                             type = BlockType.SUB_PAGE,
                             content = restoredTitle,
-                            subPageNoteId = restoredNote.id
+                            subPageNoteId = restoredNote.id,
+                            subPageSyncUuid = restoredNote.syncUuid.ifBlank { null }
                         )
                     )
                     parentModified = true
-                } else if (parsedBlocks[existingIdx].content != restoredTitle) {
-                    parsedBlocks[existingIdx] = parsedBlocks[existingIdx].copy(content = restoredTitle)
-                    parentModified = true
+                } else {
+                    val curBlock = parsedBlocks[existingIdx]
+                    if (curBlock.content != restoredTitle || curBlock.subPageNoteId != restoredNote.id ||
+                        (restoredNote.syncUuid.isNotBlank() && curBlock.subPageSyncUuid != restoredNote.syncUuid)
+                    ) {
+                        parsedBlocks[existingIdx] = curBlock.copy(
+                            content = restoredTitle,
+                            subPageNoteId = restoredNote.id,
+                            subPageSyncUuid = restoredNote.syncUuid.ifBlank { curBlock.subPageSyncUuid }
+                        )
+                        parentModified = true
+                    }
                 }
 
                 if (parentModified) {
@@ -592,16 +612,17 @@ class NoteViewModel @Inject constructor(
             val activeNotes = notes.filter { it.status != "TRASH" }
             val referencedSubPageIds = activeNotes.flatMap { note ->
                 suspendSafeOrNull {
+                    val noteDesc = note.description
                     val wasEncrypted = note.isEncrypted ||
                         (note.isPassword == true) ||
-                        SecurityUtil.isEncryptedPayload(note.description)
-                    val rawDesc = if (wasEncrypted && !note.description.isNullOrBlank()) {
-                        when (val dec = SecurityUtil.decryptSafe(note.description)) {
+                        SecurityUtil.isEncryptedPayload(noteDesc)
+                    val rawDesc = if (wasEncrypted && !noteDesc.isNullOrBlank()) {
+                        when (val dec = SecurityUtil.decryptSafe(noteDesc)) {
                             is AppResult.Success -> dec.data
                             is AppResult.Failure -> ""
                         }
                     } else {
-                        note.description ?: ""
+                        noteDesc ?: ""
                     }
                     if (rawDesc.isBlank()) emptyList()
                     else BlockParser.parse(rawDesc)
@@ -1029,7 +1050,8 @@ class NoteViewModel @Inject constructor(
             categoryRepository = categoryRepository,
             knowledgeRepository = knowledgeRepository,
             onSuccess = onSuccess,
-            onError = onError
+            onError = onError,
+            mediaPathResolver = mediaPathResolver
         )
     }
 
@@ -1047,7 +1069,8 @@ class NoteViewModel @Inject constructor(
                 notifyWidgetSync()
                 onSuccess(notesCount, catsCount)
             },
-            onError = onError
+            onError = onError,
+            mediaPathResolver = mediaPathResolver
         )
     }
 
@@ -1057,7 +1080,8 @@ class NoteViewModel @Inject constructor(
                 context = context,
                 noteRepository = repository,
                 categoryRepository = categoryRepository,
-                knowledgeRepository = knowledgeRepository
+                knowledgeRepository = knowledgeRepository,
+                mediaPathResolver = mediaPathResolver
             )
         }
     }
@@ -1068,7 +1092,8 @@ class NoteViewModel @Inject constructor(
             noteRepository = repository,
             categoryRepository = categoryRepository,
             knowledgeRepository = knowledgeRepository,
-            onComplete = onComplete
+            onComplete = onComplete,
+            mediaPathResolver = mediaPathResolver
         )
     }
 

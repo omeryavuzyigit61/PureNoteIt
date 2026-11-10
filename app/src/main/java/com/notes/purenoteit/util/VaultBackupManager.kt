@@ -7,19 +7,15 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
-import com.google.gson.Gson
-import com.notes.purenoteit.data.db.CategoryData
-import com.notes.purenoteit.data.db.NoteData
-import com.notes.purenoteit.data.db.NoteLinkData
-import com.notes.purenoteit.data.db.StreamItemData
-import com.notes.purenoteit.data.mapper.toDomain
-import com.notes.purenoteit.data.mapper.toEntity
 import com.notes.purenoteit.domain.model.AppResult
 import com.notes.purenoteit.domain.model.Category
+import com.notes.purenoteit.domain.model.Note
 import com.notes.purenoteit.domain.model.NoteLink
+import com.notes.purenoteit.domain.model.StreamItem
 import com.notes.purenoteit.domain.repository.CategoryRepository
 import com.notes.purenoteit.domain.repository.KnowledgeRepository
 import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.domain.storage.MediaPathResolver
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import kotlinx.coroutines.CancellationException
@@ -27,6 +23,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -39,18 +38,95 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
+@Serializable
+data class BackupNoteDto(
+    val id: Int = 0,
+    val title: String? = null,
+    val description: String? = null,
+    val date: Long = 0L,
+    val isPassword: Boolean? = null,
+    val images: List<String>? = null,
+    val categoryId: Int? = null,
+    val sounds: List<String>? = null,
+    val isPinned: Boolean = false,
+    val icon: String? = null,
+    val isEncrypted: Boolean = false,
+    val totalTasks: Int = 0,
+    val completedTasks: Int = 0,
+    val status: String = "TODO",
+    val reminderTime: Long? = null,
+    val reminderType: String? = null,
+    val reminderSound: String? = null,
+    val isReminderDone: Boolean = false,
+    val richBlocksJson: String? = null,
+    val syncUuid: String = "",
+    val categorySyncUuid: String? = null,
+    val updatedAt: Long = 0L,
+    val deletedAt: Long? = null,
+    val syncVersion: Long = 1L
+)
+
+@Serializable
+data class BackupCategoryDto(
+    val id: Int = 0,
+    val name: String = "",
+    val isPassword: Boolean? = null,
+    val syncUuid: String = "",
+    val updatedAt: Long = 0L,
+    val deletedAt: Long? = null,
+    val syncVersion: Long = 1L
+)
+
+@Serializable
+data class BackupNoteLinkDto(
+    val id: Int = 0,
+    val sourceNoteId: Int = 0,
+    val targetNoteId: Int = 0,
+    val linkText: String = "",
+    val createdAt: Long = 0L,
+    val syncUuid: String = "",
+    val sourceSyncUuid: String = "",
+    val targetSyncUuid: String = "",
+    val updatedAt: Long = 0L,
+    val deletedAt: Long? = null,
+    val syncVersion: Long = 1L
+)
+
+@Serializable
+data class BackupStreamItemDto(
+    val id: Int = 0,
+    val content: String = "",
+    val type: String = "TEXT",
+    val audioPath: String? = null,
+    val imagePath: String? = null,
+    val timestamp: Long = 0L,
+    val isProcessed: Boolean = false,
+    val mergedNoteId: Int? = null,
+    val syncUuid: String = "",
+    val mergedNoteSyncUuid: String? = null,
+    val updatedAt: Long = 0L,
+    val deletedAt: Long? = null,
+    val syncVersion: Long = 1L
+)
+
+@Serializable
 data class VaultBackupPayload(
-    val version: Int = 3,
+    val version: Int = 4,
     val backupDate: Long = System.currentTimeMillis(),
-    val notes: List<NoteData>,
-    val categories: List<CategoryData>,
-    val links: List<NoteLinkData>,
-    val streamItems: List<StreamItemData>? = emptyList()
+    val notes: List<BackupNoteDto> = emptyList(),
+    val categories: List<BackupCategoryDto> = emptyList(),
+    val links: List<BackupNoteLinkDto> = emptyList(),
+    val streamItems: List<BackupStreamItemDto>? = emptyList()
 )
 
 object VaultBackupManager {
 
-    private val gson = Gson()
+    private val backupJson = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        coerceInputValues = true
+        isLenient = true
+    }
     private val backupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private const val MAX_ARCHIVE_ENTRIES = 2000
     private const val MAX_SINGLE_FILE_BYTES = 100L * 1024L * 1024L // 100 MB per media file limit
@@ -65,13 +141,169 @@ object VaultBackupManager {
         }
     }
 
+    private fun Note.toBackupDto(): BackupNoteDto = BackupNoteDto(
+        id = id,
+        title = title,
+        description = description,
+        date = date,
+        isPassword = isPassword,
+        images = images,
+        categoryId = categoryId,
+        sounds = sounds,
+        isPinned = isPinned,
+        icon = icon,
+        isEncrypted = isEncrypted,
+        totalTasks = totalTasks,
+        completedTasks = completedTasks,
+        status = status,
+        reminderTime = reminderTime,
+        reminderType = reminderType,
+        reminderSound = reminderSound,
+        isReminderDone = isReminderDone,
+        richBlocksJson = richBlocksJson,
+        syncUuid = syncUuid,
+        categorySyncUuid = categorySyncUuid,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncVersion = syncVersion
+    )
+
+    private fun BackupNoteDto.toDomain(): Note = Note(
+        id = id,
+        title = title,
+        description = description,
+        date = date,
+        isPassword = isPassword,
+        images = images,
+        categoryId = categoryId,
+        sounds = sounds,
+        isPinned = isPinned,
+        icon = icon,
+        isEncrypted = isEncrypted,
+        totalTasks = totalTasks,
+        completedTasks = completedTasks,
+        status = status,
+        reminderTime = reminderTime,
+        reminderType = reminderType,
+        reminderSound = reminderSound,
+        isReminderDone = isReminderDone,
+        richBlocksJson = richBlocksJson,
+        syncUuid = syncUuid,
+        categorySyncUuid = categorySyncUuid,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncVersion = syncVersion
+    )
+
+    private fun Category.toBackupDto(): BackupCategoryDto = BackupCategoryDto(
+        id = id,
+        name = name,
+        isPassword = isPassword,
+        syncUuid = syncUuid,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncVersion = syncVersion
+    )
+
+    private fun BackupCategoryDto.toDomain(): Category = Category(
+        id = id,
+        name = name,
+        isPassword = isPassword,
+        syncUuid = syncUuid,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncVersion = syncVersion
+    )
+
+    private fun NoteLink.toBackupDto(): BackupNoteLinkDto = BackupNoteLinkDto(
+        id = id,
+        sourceNoteId = sourceNoteId,
+        targetNoteId = targetNoteId,
+        linkText = linkText,
+        createdAt = createdAt,
+        syncUuid = syncUuid,
+        sourceSyncUuid = sourceSyncUuid,
+        targetSyncUuid = targetSyncUuid,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncVersion = syncVersion
+    )
+
+    private fun BackupNoteLinkDto.toDomain(): NoteLink = NoteLink(
+        id = id,
+        sourceNoteId = sourceNoteId,
+        targetNoteId = targetNoteId,
+        linkText = linkText,
+        createdAt = createdAt,
+        syncUuid = syncUuid,
+        sourceSyncUuid = sourceSyncUuid,
+        targetSyncUuid = targetSyncUuid,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncVersion = syncVersion
+    )
+
+    private fun StreamItem.toBackupDto(): BackupStreamItemDto = BackupStreamItemDto(
+        id = id,
+        content = content,
+        type = type,
+        audioPath = audioPath,
+        imagePath = imagePath,
+        timestamp = timestamp,
+        isProcessed = isProcessed,
+        mergedNoteId = mergedNoteId,
+        syncUuid = syncUuid,
+        mergedNoteSyncUuid = mergedNoteSyncUuid,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncVersion = syncVersion
+    )
+
+    private fun BackupStreamItemDto.toDomain(): StreamItem = StreamItem(
+        id = id,
+        content = content,
+        type = type,
+        audioPath = audioPath,
+        imagePath = imagePath,
+        timestamp = timestamp,
+        isProcessed = isProcessed,
+        mergedNoteId = mergedNoteId,
+        syncUuid = syncUuid,
+        mergedNoteSyncUuid = mergedNoteSyncUuid,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+        syncVersion = syncVersion
+    )
+
     /**
-     * Remaps absolute media paths (drawings, images, audio recordings) from a previous device
-     * or user profile into the current device's [currentFilesDir] so media never breaks after restore.
+     * Remaps absolute or relative media paths (drawings, images, audio recordings) into
+     * canonical relative `media/<folder>/<sha256>.<ext>` when possible, or a valid local path in [currentFilesDir].
      */
-    private fun normalizeMediaPath(rawPath: String?, currentFilesDir: File): String? {
+    private suspend fun normalizeMediaPath(
+        rawPath: String?,
+        currentFilesDir: File,
+        mediaPathResolver: MediaPathResolver?
+    ): String? {
         if (rawPath.isNullOrBlank()) return null
         val normalized = rawPath.replace("\\", "/")
+
+        if (mediaPathResolver != null) {
+            if (mediaPathResolver.isCanonicalRelativePath(normalized)) {
+                val resolved = mediaPathResolver.resolveToReadablePath(normalized)
+                if (resolved != null && File(resolved).exists()) {
+                    return normalized.trimStart('/')
+                }
+            }
+            val migrated = mediaPathResolver.migrateToCanonicalRelativeIfNeeded(normalized)
+            if (migrated != null && mediaPathResolver.isCanonicalRelativePath(migrated)) {
+                return migrated
+            }
+        }
+
+        val canonicalDirect = File(currentFilesDir, normalized.trimStart('/'))
+        if (normalized.startsWith("media/") && canonicalDirect.exists() && canonicalDirect.isFile) {
+            return normalized.trimStart('/')
+        }
 
         val filesMarker = "/files/"
         val markerIdx = normalized.indexOf(filesMarker)
@@ -79,7 +311,10 @@ object VaultBackupManager {
             val relSuffix = normalized.substring(markerIdx + filesMarker.length).trimStart('/')
             if (relSuffix.isNotBlank()) {
                 val remapped = File(currentFilesDir, relSuffix)
-                if (remapped.exists()) return remapped.absolutePath
+                if (remapped.exists()) {
+                    return mediaPathResolver?.migrateToCanonicalRelativeIfNeeded(remapped.absolutePath)
+                        ?: remapped.absolutePath
+                }
             }
         }
 
@@ -94,10 +329,17 @@ object VaultBackupManager {
 
         val fileName = directFile.name
         if (fileName.isNotBlank()) {
-            val subDirs = listOf("drawings", "shared_images", "recordings", "")
+            val subDirs = listOf("media/drawings", "media/images", "media/audio", "drawings", "shared_images", "recordings", "")
             for (sub in subDirs) {
                 val candidate = if (sub.isEmpty()) File(currentFilesDir, fileName) else File(File(currentFilesDir, sub), fileName)
-                if (candidate.exists()) return candidate.absolutePath
+                if (candidate.exists()) {
+                    return if (sub.startsWith("media/")) {
+                        "$sub/$fileName"
+                    } else {
+                        mediaPathResolver?.migrateToCanonicalRelativeIfNeeded(candidate.absolutePath)
+                            ?: candidate.absolutePath
+                    }
+                }
             }
         }
 
@@ -120,7 +362,8 @@ object VaultBackupManager {
         knowledgeRepository: KnowledgeRepository,
         onSuccess: (File) -> Unit,
         onError: (Exception) -> Unit,
-        passphrase: CharArray? = null
+        passphrase: CharArray? = null,
+        mediaPathResolver: MediaPathResolver? = null
     ) {
         val passCopy = passphrase?.copyOf()
         passphrase?.fill('\u0000')
@@ -154,16 +397,16 @@ object VaultBackupManager {
                         description = portableDesc,
                         isPassword = isNoteOrCategoryLocked,
                         isEncrypted = isNoteOrCategoryLocked
-                    ).toEntity()
+                    ).toBackupDto()
                 }
 
                 val payload = VaultBackupPayload(
                     notes = portableNotes,
-                    categories = categories.map { it.toEntity() },
-                    links = links.map { it.toEntity() },
-                    streamItems = streamItems.map { it.toEntity() }
+                    categories = categories.map { it.toBackupDto() },
+                    links = links.map { it.toBackupDto() },
+                    streamItems = streamItems.map { it.toBackupDto() }
                 )
-                val rawJsonString = gson.toJson(payload)
+                val rawJsonString = backupJson.encodeToString(payload)
                 val encryptedManifest = SecurityUtil.encryptPortable(rawJsonString, passCopy)
 
                 val backupDir = File(context.cacheDir, "backups").apply { mkdirs() }
@@ -241,7 +484,8 @@ object VaultBackupManager {
         knowledgeRepository: KnowledgeRepository,
         onSuccess: (restoredNotesCount: Int, restoredCategoriesCount: Int) -> Unit,
         onError: (Exception) -> Unit,
-        passphrase: CharArray? = null
+        passphrase: CharArray? = null,
+        mediaPathResolver: MediaPathResolver? = null
     ) {
         val passCopy = passphrase?.copyOf()
         passphrase?.fill('\u0000')
@@ -333,7 +577,7 @@ object VaultBackupManager {
                     manifestRawOrEncrypted
                 }
 
-                val payload = gson.fromJson(jsonContent, VaultBackupPayload::class.java)
+                val payload = backupJson.decodeFromString<VaultBackupPayload>(jsonContent)
 
                 // 1. Restore categories via Domain CategoryRepository
                 payload.categories.forEach { cat ->
@@ -354,19 +598,28 @@ object VaultBackupManager {
                     .filter { it.status != "TRASH" && !it.title.isNullOrBlank() }
                     .associate { it.title!!.trim().lowercase() to it.id }
 
+                val idToSyncUuid = payload.notes
+                    .filter { it.syncUuid.isNotBlank() }
+                    .associate { it.id to it.syncUuid }
+                val syncUuidToId = payload.notes
+                    .filter { it.syncUuid.isNotBlank() }
+                    .associate { it.syncUuid to it.id }
+
                 val reconstructedLinks = mutableListOf<NoteLink>()
                 val wikiRegex = Regex("""\[\[(.*?)\]\]""")
 
                 // 2. Restore notes (normalizing drawing, image & audio paths, sub-page references, and re-wrapping encryption)
-                payload.notes.forEach { note ->
-                    if (note.categoryId == null || note.categoryId !in validCategoryIds) {
-                        note.categoryId = fallbackCategoryId
+                for (rawNoteDto in payload.notes) {
+                    val fixedCategoryId = if (rawNoteDto.categoryId == null || rawNoteDto.categoryId !in validCategoryIds) {
+                        fallbackCategoryId
+                    } else {
+                        rawNoteDto.categoryId
                     }
 
-                    val rawDesc = note.description
-                    val wasEncrypted = (note.isPassword == true) ||
-                        note.isEncrypted ||
-                        (note.categoryId in lockedCategoryIds) ||
+                    val rawDesc = rawNoteDto.description
+                    val wasEncrypted = (rawNoteDto.isPassword == true) ||
+                        rawNoteDto.isEncrypted ||
+                        (fixedCategoryId in lockedCategoryIds) ||
                         SecurityUtil.isEncryptedPayload(rawDesc)
 
                     val plainDescResult = if (!rawDesc.isNullOrBlank() && SecurityUtil.isEncryptedPayload(rawDesc)) {
@@ -375,6 +628,7 @@ object VaultBackupManager {
                         AppResult.Success(rawDesc ?: "")
                     }
 
+                    var finalDescription = rawDesc
                     if (plainDescResult is AppResult.Success && plainDescResult.data.isNotBlank()) {
                         val plainDesc = plainDescResult.data
                         val blocks = BlockParser.parse(plainDesc).toMutableList()
@@ -384,7 +638,7 @@ object VaultBackupManager {
                             var blkChanged = false
 
                             if (!blk.mediaPath.isNullOrBlank()) {
-                                val remapped = normalizeMediaPath(blk.mediaPath, filesDir)
+                                val remapped = normalizeMediaPath(blk.mediaPath, filesDir, mediaPathResolver)
                                 if (remapped != blk.mediaPath) {
                                     blk = blk.copy(mediaPath = remapped)
                                     blkChanged = true
@@ -393,36 +647,46 @@ object VaultBackupManager {
 
                             if (blk.type == BlockType.SUB_PAGE) {
                                 val currentSubId = blk.subPageNoteId
-                                val resolvedSubId = if (currentSubId != null && currentSubId in noteIdsInBackup) {
-                                    currentSubId
-                                } else {
-                                    activeTitleToId[blk.content.trim().lowercase()]
+                                val resolvedByUuid = blk.subPageSyncUuid?.takeIf { it.isNotBlank() }?.let { syncUuidToId[it] }
+                                val resolvedSubId = when {
+                                    resolvedByUuid != null -> resolvedByUuid
+                                    currentSubId != null && currentSubId in noteIdsInBackup -> currentSubId
+                                    else -> activeTitleToId[blk.content.trim().lowercase()]
                                 }
-                                if (resolvedSubId != null && resolvedSubId != currentSubId) {
-                                    blk = blk.copy(subPageNoteId = resolvedSubId)
+                                val resolvedSubSyncUuid = blk.subPageSyncUuid?.takeIf { it.isNotBlank() }
+                                    ?: resolvedSubId?.let { idToSyncUuid[it] }
+                                if ((resolvedSubId != null && resolvedSubId != currentSubId) ||
+                                    (resolvedSubSyncUuid != null && resolvedSubSyncUuid != blk.subPageSyncUuid)
+                                ) {
+                                    blk = blk.copy(
+                                        subPageNoteId = resolvedSubId ?: currentSubId,
+                                        subPageSyncUuid = resolvedSubSyncUuid ?: blk.subPageSyncUuid
+                                    )
                                     blkChanged = true
                                 }
-                                if (resolvedSubId != null && note.status != "TRASH") {
+                                if (resolvedSubId != null && rawNoteDto.status != "TRASH") {
                                     reconstructedLinks.add(
                                         NoteLink(
-                                            sourceNoteId = note.id,
+                                            sourceNoteId = rawNoteDto.id,
                                             targetNoteId = resolvedSubId,
-                                            linkText = blk.content.trim().ifBlank { "Alt Sayfa" }
+                                            linkText = blk.content.trim().ifBlank { "Alt Sayfa" },
+                                            sourceSyncUuid = rawNoteDto.syncUuid,
+                                            targetSyncUuid = resolvedSubSyncUuid.orEmpty()
                                         )
                                     )
                                 }
                             }
 
-                            if (note.status != "TRASH") {
+                            if (rawNoteDto.status != "TRASH") {
                                 val textToScan = blk.content + " " + blk.toggleBody
                                 if (textToScan.contains("[[")) {
                                     wikiRegex.findAll(textToScan).forEach { match ->
                                         val linkTitle = match.groupValues[1].trim()
                                         val targetId = activeTitleToId[linkTitle.lowercase()]
-                                        if (targetId != null && targetId != note.id) {
+                                        if (targetId != null && targetId != rawNoteDto.id) {
                                             reconstructedLinks.add(
                                                 NoteLink(
-                                                    sourceNoteId = note.id,
+                                                    sourceNoteId = rawNoteDto.id,
                                                     targetNoteId = targetId,
                                                     linkText = linkTitle
                                                 )
@@ -439,15 +703,26 @@ object VaultBackupManager {
                         }
 
                         val finalPlain = if (blocksUpdated) BlockParser.serialize(blocks) else plainDesc
-                        note.description = if (wasEncrypted) SecurityUtil.encrypt(finalPlain) else finalPlain
+                        finalDescription = if (wasEncrypted) SecurityUtil.encrypt(finalPlain) else finalPlain
                     }
 
-                    note.isPassword = wasEncrypted
-                    note.isEncrypted = wasEncrypted
-                    note.images = note.images?.mapNotNull { normalizeMediaPath(it, filesDir) }
-                    note.sounds = note.sounds?.mapNotNull { normalizeMediaPath(it, filesDir) }
+                    val normalizedImages = rawNoteDto.images?.mapNotNull {
+                        normalizeMediaPath(it, filesDir, mediaPathResolver)
+                    }
+                    val normalizedSounds = rawNoteDto.sounds?.mapNotNull {
+                        normalizeMediaPath(it, filesDir, mediaPathResolver)
+                    }
 
-                    suspendSafeOrNull { noteRepository.upsertNote(note.toDomain()) }
+                    val updatedNote = rawNoteDto.copy(
+                        categoryId = fixedCategoryId,
+                        description = finalDescription,
+                        isPassword = wasEncrypted,
+                        isEncrypted = wasEncrypted,
+                        images = normalizedImages,
+                        sounds = normalizedSounds
+                    ).toDomain()
+
+                    suspendSafeOrNull { noteRepository.upsertNote(updatedNote) }
                 }
 
                 // 3. Restore and verify note links via Domain KnowledgeRepository
@@ -468,9 +743,9 @@ object VaultBackupManager {
                 if (!streamList.isNullOrEmpty()) {
                     val normalizedStream = streamList.map { item ->
                         item.copy(
-                            audioPath = normalizeMediaPath(item.audioPath, filesDir),
-                            imagePath = normalizeMediaPath(item.imagePath, filesDir)
-                        ).also { it.id = item.id }.toDomain()
+                            audioPath = normalizeMediaPath(item.audioPath, filesDir, mediaPathResolver),
+                            imagePath = normalizeMediaPath(item.imagePath, filesDir, mediaPathResolver)
+                        ).toDomain()
                     }
                     suspendSafeOrNull { knowledgeRepository.insertAllStreamItems(normalizedStream) }
                 }
@@ -588,7 +863,8 @@ object VaultBackupManager {
         context: Context,
         noteRepository: NoteRepository,
         categoryRepository: CategoryRepository,
-        knowledgeRepository: KnowledgeRepository
+        knowledgeRepository: KnowledgeRepository,
+        mediaPathResolver: MediaPathResolver? = null
     ) {
         if (!isAutoSyncEnabled(context) || getConnectedFolderUri(context) == null) return
         pendingAutoSyncRunnable?.let { autoSyncDebounceHandler.removeCallbacks(it) }
@@ -597,7 +873,8 @@ object VaultBackupManager {
                 context = context,
                 noteRepository = noteRepository,
                 categoryRepository = categoryRepository,
-                knowledgeRepository = knowledgeRepository
+                knowledgeRepository = knowledgeRepository,
+                mediaPathResolver = mediaPathResolver
             )
         }
         pendingAutoSyncRunnable = runnable
@@ -609,7 +886,8 @@ object VaultBackupManager {
         noteRepository: NoteRepository,
         categoryRepository: CategoryRepository,
         knowledgeRepository: KnowledgeRepository,
-        onComplete: ((Boolean) -> Unit)? = null
+        onComplete: ((Boolean) -> Unit)? = null,
+        mediaPathResolver: MediaPathResolver? = null
     ) {
         val treeUri = getConnectedFolderUri(context)
         if (treeUri == null || !isAutoSyncEnabled(context)) {
@@ -650,7 +928,8 @@ object VaultBackupManager {
                 Handler(Looper.getMainLooper()).post {
                     onComplete?.invoke(false)
                 }
-            }
+            },
+            mediaPathResolver = mediaPathResolver
         )
     }
 }

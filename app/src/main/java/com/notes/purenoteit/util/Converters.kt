@@ -1,21 +1,27 @@
 package com.notes.purenoteit.util
 
 import androidx.room.TypeConverter
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class Converters {
-    private val gson = Gson()
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
 
     @TypeConverter
     fun fromStringList(value: String?): List<String>? {
-        if (value.isNullOrEmpty()) return emptyList()
-        val listType = object : TypeToken<List<String>>() {}.type
-        return gson.fromJson(value, listType)
+        if (value.isNullOrBlank()) return emptyList()
+        return try {
+            json.decodeFromString<List<String>>(value)
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     @TypeConverter
     fun fromListString(list: List<String>?): String? {
-        return gson.toJson(list ?: emptyList<String>())
+        return json.encodeToString(list ?: emptyList())
     }
 }

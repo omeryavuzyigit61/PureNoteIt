@@ -22,4 +22,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "PureNoteIt"
 include(":app")
+include(":shared")
+include(":desktopApp")
  

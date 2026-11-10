@@ -20,10 +20,12 @@ class SaveNoteUseCase(
         }
 
         return try {
+            val now = clock.nowMillis()
             val sanitized = note.copy(
                 title = trimmedTitle,
                 description = trimmedDesc,
-                date = if (note.date <= 0L) clock.nowMillis() else note.date
+                date = if (note.date <= 0L) now else note.date,
+                updatedAt = now
             )
             noteRepository.upsertNote(sanitized)
             AppResult.Success(Unit)

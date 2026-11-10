@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +44,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import android.widget.Toast
+import com.notes.purenoteit.domain.model.CodeLanguageCapabilities
+import com.notes.purenoteit.domain.model.OfflineExecutionCapability
+import com.notes.purenoteit.ui.mvi.BlockExecutionUiState
 import com.notes.purenoteit.util.MathCategory
 import com.notes.purenoteit.util.MathFormulaRenderer
 import com.notes.purenoteit.util.MathFormulaView
@@ -88,6 +93,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.notes.purenoteit.R
+import com.notes.purenoteit.domain.storage.MediaPathResolver
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.ui.theme.BorderLight
@@ -97,6 +103,7 @@ import com.notes.purenoteit.ui.theme.SoftOrangeLight
 import com.notes.purenoteit.ui.theme.SoftYellowLight
 import com.notes.purenoteit.ui.theme.VibrantOrange
 import com.notes.purenoteit.util.AudioRecorder
+import com.notes.purenoteit.util.MediaFileUriHelper
 import java.io.File
 import java.util.Locale
 
@@ -172,8 +179,13 @@ fun NotionBlockRow(
     onOpenLinkedNote: ((String) -> Unit)? = null,
     onOpenSubPage: ((NoteBlock) -> Unit)? = null,
     onCodeLanguageChange: ((String) -> Unit)? = null,
+    codeExecutionState: BlockExecutionUiState? = null,
+    onRunCode: ((blockId: String, language: String, code: String) -> Unit)? = null,
+    onClearCodeOutput: ((blockId: String) -> Unit)? = null,
+    onOpenExternalPlayground: ((language: String, code: String) -> Unit)? = null,
     allBlocks: List<NoteBlock> = emptyList(),
     onScrollToBlock: ((Int) -> Unit)? = null,
+    mediaPathResolver: MediaPathResolver? = null,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -832,6 +844,8 @@ fun NotionBlockRow(
                 var currentLang by remember(block.id, block.codeLanguage) {
                     mutableStateOf(block.codeLanguage.ifBlank { "kotlin" })
                 }
+                val capability = CodeLanguageCapabilities.capabilityFor(currentLang)
+                val isRunning = codeExecutionState?.isRunning == true
 
                 Surface(
                     modifier = Modifier
@@ -839,7 +853,7 @@ fun NotionBlockRow(
                         .padding(vertical = 6.dp),
                     shape = RoundedCornerShape(14.dp),
                     color = Color(0xFF1E1E24),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF33333D)),
+                    border = BorderStroke(1.dp, Color(0xFF33333D)),
                     shadowElevation = 2.dp
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
@@ -851,28 +865,28 @@ fun NotionBlockRow(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFFF5F56)))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFFFBD2E)))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF27C93F)))
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFF5F56)))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFFBD2E)))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF27C93F)))
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 Box {
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
                                         color = Color(0xFF2C2C35),
-                                        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF454552)),
+                                        border = BorderStroke(0.5.dp, Color(0xFF454552)),
                                         modifier = Modifier.clickable { showLangMenu = true }
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             val langLabel = SyntaxHighlighter.SUPPORTED_LANGUAGES.find { it.first.equals(currentLang, true) }?.second ?: currentLang.replaceFirstChar { it.uppercase() }
                                             Text(
                                                 text = "$langLabel ▾",
-                                                fontSize = 11.sp,
+                                                fontSize = 10.5.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFFFFB74D)
                                             )
@@ -888,20 +902,41 @@ fun NotionBlockRow(
                                     ) {
                                         SyntaxHighlighter.SUPPORTED_LANGUAGES.forEach { (key, label) ->
                                             val isSelected = currentLang.equals(key, ignoreCase = true)
+                                            val isOfflineExecutable = CodeLanguageCapabilities.isFullyExecutableOffline(key)
                                             DropdownMenuItem(
                                                 text = {
-                                                    Text(
-                                                        text = (if (isSelected) "✓  " else "    ") + label,
-                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                        color = if (isSelected) Color(0xFFFFB74D) else PureWhite,
-                                                        fontSize = 13.sp
-                                                    )
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Text(
+                                                            text = (if (isSelected) "✓  " else "    ") + label,
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                            color = if (isSelected) Color(0xFFFFB74D) else PureWhite,
+                                                            fontSize = 13.sp
+                                                        )
+                                                        if (isOfflineExecutable) {
+                                                            Spacer(modifier = Modifier.width(10.dp))
+                                                            Text(
+                                                                text = stringResource(R.string.code_offline_badge),
+                                                                fontSize = 9.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = Color(0xFF50FA7B),
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(4.dp))
+                                                                    .background(Color(0xFF50FA7B).copy(alpha = 0.14f))
+                                                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                                                            )
+                                                        }
+                                                    }
                                                 },
                                                 onClick = {
                                                     showLangMenu = false
                                                     currentLang = key
                                                     block.codeLanguage = key
                                                     onCodeLanguageChange?.invoke(key)
+                                                    onClearCodeOutput?.invoke(block.id)
                                                 }
                                             )
                                         }
@@ -910,10 +945,56 @@ fun NotionBlockRow(
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (onRunCode != null) {
+                                    val runLabel = when (capability) {
+                                        OfflineExecutionCapability.SQL_IN_MEMORY,
+                                        OfflineExecutionCapability.JAVASCRIPT_SANDBOX -> "▶ " + stringResource(R.string.code_run)
+                                        OfflineExecutionCapability.HTML_PREVIEW -> "▶ " + stringResource(R.string.code_preview)
+                                        OfflineExecutionCapability.JSON_FORMAT_VALIDATE -> "⚡ " + stringResource(R.string.code_validate)
+                                        OfflineExecutionCapability.SYNTAX_CHECK_ONLY -> "✓ " + stringResource(R.string.code_check_syntax)
+                                    }
+                                    val isFullRunner = capability != OfflineExecutionCapability.SYNTAX_CHECK_ONLY
+                                    val runBg = if (isFullRunner) Color(0xFF1F4E32) else Color(0xFF282834)
+                                    val runBorder = if (isFullRunner) Color(0xFF3E8E5A) else Color(0xFF454555)
+                                    val runTint = if (isFullRunner) Color(0xFF80FFAC) else Color(0xFF8BE9FD)
+
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = runBg,
+                                        border = BorderStroke(0.5.dp, runBorder),
+                                        modifier = Modifier
+                                            .padding(end = 5.dp)
+                                            .clickable(enabled = !isRunning) {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onRunCode(block.id, currentLang, block.content)
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (isRunning) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(10.dp),
+                                                    strokeWidth = 1.5.dp,
+                                                    color = runTint
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = runLabel,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = runTint
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
                                     color = if (isCopied) Color(0xFF2E7D32) else Color(0xFF2C2C35),
-                                    border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF454552)),
+                                    border = BorderStroke(0.5.dp, Color(0xFF454552)),
                                     modifier = Modifier.clickable {
                                         val clipManager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
                                         clipManager?.setPrimaryClip(android.content.ClipData.newPlainText("Code", block.content))
@@ -921,27 +1002,20 @@ fun NotionBlockRow(
                                         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ isCopied = false }, 2000L)
                                     }
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Box(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             painter = painterResource(id = if (isCopied) R.drawable.ic_checklist else R.drawable.ic_subpage_doc),
-                                            contentDescription = null,
+                                            contentDescription = if (isCopied) stringResource(R.string.code_copied) else stringResource(R.string.code_copy),
                                             tint = if (isCopied) PureWhite else Color(0xFFE0E0E0),
-                                            modifier = Modifier.size(11.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = if (isCopied) stringResource(R.string.code_copied) else stringResource(R.string.code_copy),
-                                            fontSize = 10.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isCopied) PureWhite else Color(0xFFE0E0E0)
+                                            modifier = Modifier.size(12.dp)
                                         )
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 BlockReorderControls(isDarkContainer = true)
                             }
                         }
@@ -969,7 +1043,7 @@ fun NotionBlockRow(
                             decorationBox = { innerTextField ->
                                 if (block.content.isEmpty()) {
                                     Text(
-                                        text = "// Kodu buraya yazın veya yapıştırın...",
+                                        text = stringResource(R.string.code_input_placeholder),
                                         style = TextStyle(
                                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                             fontSize = 13.sp,
@@ -984,6 +1058,24 @@ fun NotionBlockRow(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                         )
+
+                        if (codeExecutionState != null && (codeExecutionState.output != null || codeExecutionState.error != null)) {
+                            val formatToastMsg = stringResource(R.string.code_json_applied_toast)
+                            CodeBlockExecutionPanel(
+                                executionState = codeExecutionState,
+                                hasExternalPlayground = CodeLanguageCapabilities.externalPlaygroundUrl(currentLang) != null,
+                                onApplyFormattedJson = { formatted ->
+                                    onContentChange(formatted)
+                                    Toast.makeText(context, formatToastMsg, Toast.LENGTH_SHORT).show()
+                                },
+                                onOpenExternalPlayground = {
+                                    onOpenExternalPlayground?.invoke(currentLang, block.content)
+                                },
+                                onClearOutput = {
+                                    onClearCodeOutput?.invoke(block.id)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -1530,8 +1622,14 @@ fun NotionBlockRow(
                             shadowElevation = if (isDraggingResize) 6.dp else 1.dp
                         ) {
                             Box(modifier = Modifier.fillMaxSize()) {
+                                val mediaContext = androidx.compose.ui.platform.LocalContext.current
+                                val resolvedImageFile = MediaFileUriHelper.resolveReadableFile(
+                                    context = mediaContext,
+                                    rawPath = block.mediaPath,
+                                    mediaPathResolver = mediaPathResolver
+                                )
                                 AsyncImage(
-                                    model = File(block.mediaPath ?: ""),
+                                    model = resolvedImageFile ?: File(block.mediaPath ?: ""),
                                     contentDescription = stringResource(R.string.block_image_desc),
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -1619,8 +1717,14 @@ fun NotionBlockRow(
                         .border(1.5.dp, BorderLight.copy(alpha = 0.8f), RoundedCornerShape(14.dp))
                         .background(PureWhite)
                 ) {
+                    val drawingContext = androidx.compose.ui.platform.LocalContext.current
+                    val resolvedDrawingFile = MediaFileUriHelper.resolveReadableFile(
+                        context = drawingContext,
+                        rawPath = drawingPath,
+                        mediaPathResolver = mediaPathResolver
+                    )
                     AsyncImage(
-                        model = File(drawingPath ?: ""),
+                        model = resolvedDrawingFile ?: File(drawingPath ?: ""),
                         contentDescription = stringResource(R.string.block_drawing_desc),
                         modifier = Modifier
                             .fillMaxWidth()

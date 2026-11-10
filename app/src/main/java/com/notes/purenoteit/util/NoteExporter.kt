@@ -139,15 +139,21 @@ object NoteExporter {
     /**
      * Safely decodes a bitmap from disk with appropriate sampling and EXIF rotation to prevent OOM and orientation bugs.
      */
-    private fun decodeSampledBitmap(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
+    private fun decodeSampledBitmap(
+        context: Context,
+        path: String,
+        reqWidth: Int,
+        reqHeight: Int
+    ): Bitmap? {
         return try {
+            val resolvedPath = MediaFileUriHelper.resolveReadablePath(context, path) ?: path
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(path, options)
+            BitmapFactory.decodeFile(resolvedPath, options)
             if (options.outWidth <= 0 || options.outHeight <= 0) return null
 
             var isSwapped = false
             try {
-                val exif = ExifInterface(path)
+                val exif = ExifInterface(resolvedPath)
                 val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
                 isSwapped = (orientation == ExifInterface.ORIENTATION_ROTATE_90 || orientation == ExifInterface.ORIENTATION_ROTATE_270)
             } catch (ignored: Exception) {}
@@ -166,8 +172,8 @@ object NoteExporter {
                 this.inSampleSize = inSampleSize
                 inPreferredConfig = Bitmap.Config.RGB_565
             }
-            val decoded = BitmapFactory.decodeFile(path, decodeOptions) ?: return null
-            rotateBitmapIfRequired(decoded, path)
+            val decoded = BitmapFactory.decodeFile(resolvedPath, decodeOptions) ?: return null
+            rotateBitmapIfRequired(decoded, resolvedPath)
         } catch (e: Exception) {
             null
         }
@@ -453,7 +459,7 @@ object NoteExporter {
                 BlockType.IMAGE -> {
                     val imgPath = block.mediaPath
                     if (config.includeImages && !imgPath.isNullOrBlank()) {
-                        val bitmap = decodeSampledBitmap(imgPath, 515, 420)
+                        val bitmap = decodeSampledBitmap(context, imgPath, 515, 420)
                         if (bitmap != null) {
                             val bitmapW = bitmap.width.toFloat()
                             val bitmapH = bitmap.height.toFloat()
@@ -491,7 +497,7 @@ object NoteExporter {
                 BlockType.DRAWING -> {
                     val drawingPath = block.mediaPath
                     if (config.includeDrawings && !drawingPath.isNullOrBlank()) {
-                        val bitmap = decodeSampledBitmap(drawingPath, 515, 340)
+                        val bitmap = decodeSampledBitmap(context, drawingPath, 515, 340)
                         if (bitmap != null) {
                             val bitmapW = bitmap.width.toFloat()
                             val bitmapH = bitmap.height.toFloat()

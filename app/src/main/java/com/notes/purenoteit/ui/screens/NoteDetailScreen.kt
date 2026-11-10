@@ -160,10 +160,15 @@ import com.notes.purenoteit.util.SecurityUtil
 import com.notes.purenoteit.util.TextRecognitionHelper
 import com.notes.purenoteit.util.VoiceTranscriptionHelper
 import com.notes.purenoteit.util.showToastShort
+import com.notes.purenoteit.ui.mvi.CodePlaygroundUiEffect
+import com.notes.purenoteit.ui.mvi.CodePlaygroundUiEvent
 import com.notes.purenoteit.viewmodel.CategoryViewModel
+import com.notes.purenoteit.viewmodel.CodePlaygroundViewModel
 import com.notes.purenoteit.viewmodel.NoteViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -182,11 +187,32 @@ fun NoteDetailScreen(
     originScope: String = "none",
     noteViewModel: NoteViewModel,
     categoryViewModel: CategoryViewModel,
+    codePlaygroundViewModel: CodePlaygroundViewModel? = null,
     onNavigateBack: () -> Unit,
     onNavigateToNote: ((Int) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val audioRecorder = remember { AudioRecorder(context) }
+    val codePlaygroundState = codePlaygroundViewModel?.uiState?.collectAsStateWithLifecycle()?.value
+    LaunchedEffect(codePlaygroundViewModel) {
+        if (codePlaygroundViewModel == null) return@LaunchedEffect
+        withContext(Dispatchers.Main.immediate) {
+            codePlaygroundViewModel.effects.collect { effect ->
+                when (effect) {
+                    is CodePlaygroundUiEffect.OpenExternalPlayground -> {
+                        try {
+                            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(effect.url)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(browserIntent)
+                        } catch (_: Exception) {
+                            // Tarayıcı bulunmazsa uygulama çökmez
+                        }
+                    }
+                }
+            }
+        }
+    }
+    val audioRecorder = remember { AudioRecorder(context, noteViewModel.mediaPathResolver) }
     val voiceHelper = remember { VoiceTranscriptionHelper(context) }
     var lastBackPressMark by remember { mutableStateOf<TimeMark?>(null) }
     val safeNavigateBack = {
@@ -413,18 +439,27 @@ fun NoteDetailScreen(
 
     // Parent Note resolution (Hierarchical Subpage Parent)
     val parentNoteId: Int? = remember(noteRichBlocksJson, loadedNoteRef, allNotesForLinking, currentNoteId) {
-        val json = noteRichBlocksJson
-            ?: loadedNoteRef?.takeIf { it.id == currentNoteId }?.richBlocksJson
-            ?: allNotesForLinking.find { it.id == currentNoteId }?.richBlocksJson
-        val idFromJson = if (json != null) {
+        val currentNoteObj = loadedNoteRef?.takeIf { it.id == currentNoteId }
+            ?: allNotesForLinking.find { it.id == currentNoteId }
+        val json = noteRichBlocksJson ?: currentNoteObj?.richBlocksJson
+        val meta = BlockParser.parseRichMetadata(json)
+        val parentByUuid = meta?.parentSyncUuid?.takeIf { it.isNotBlank() }?.let { uuid ->
+            allNotesForLinking.find { it.syncUuid == uuid }?.id
+        }
+        if (parentByUuid != null) return@remember parentByUuid
+
+        val idFromJson = meta?.parentNoteId ?: if (json != null) {
             Regex(""""parentNoteId"\s*:\s*(\d+)""").find(json)?.groupValues?.get(1)?.toIntOrNull()
         } else null
         if (idFromJson != null) return@remember idFromJson
 
-        // Fallback: Check if any note in allNotesForLinking has a SUB_PAGE block referencing currentNoteId
+        // Fallback: Check if any note in allNotesForLinking has a SUB_PAGE block referencing currentNoteId or syncUuid
+        val currentSyncUuid = currentNoteObj?.syncUuid?.takeIf { it.isNotBlank() }
         if (currentNoteId != -1) {
             val parent = allNotesForLinking.find { candidate ->
-                candidate.description?.contains("\"subPageNoteId\":$currentNoteId") == true
+                val desc = candidate.description ?: return@find false
+                desc.contains("\"subPageNoteId\":$currentNoteId") ||
+                    (currentSyncUuid != null && desc.contains("\"subPageSyncUuid\":\"$currentSyncUuid\""))
             }
             if (parent != null) return@remember parent.id
         }
@@ -659,17 +694,31 @@ fun NoteDetailScreen(
     val pickMediaLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        uri?.let {
-            try {
-                recordUndoState()
-                val dir = File(context.filesDir, "shared_images").apply { mkdirs() }
-                val file = File(dir, "note_image_${System.currentTimeMillis()}.jpg")
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    file.outputStream().use { output -> input.copyTo(output) }
+        uri?.let { pickedUri ->
+            recordUndoState()
+            coroutineScope.launch {
+                try {
+                    val savedCanonicalPath = withContext(Dispatchers.IO) {
+                        val stagingPath = noteViewModel.mediaPathResolver.createStagingFilePath("pick_img", "jpg")
+                        val stagingFile = File(stagingPath)
+                        context.contentResolver.openInputStream(pickedUri)?.use { input ->
+                            stagingFile.outputStream().use { output -> input.copyTo(output) }
+                        } ?: return@withContext null
+                        noteViewModel.mediaPathResolver.importExistingFile(
+                            sourcePath = stagingFile.absolutePath,
+                            subFolder = "images",
+                            defaultExtension = "jpg",
+                            deleteSource = true
+                        )
+                    }
+                    if (!savedCanonicalPath.isNullOrBlank()) {
+                        blocks.add(NoteBlock(type = BlockType.IMAGE, mediaPath = savedCanonicalPath))
+                    } else {
+                        context.showToastShort(context.getString(R.string.image_load_failed))
+                    }
+                } catch (_: Exception) {
+                    context.showToastShort(context.getString(R.string.image_load_failed))
                 }
-                blocks.add(NoteBlock(type = BlockType.IMAGE, mediaPath = file.absolutePath))
-            } catch (e: Exception) {
-                context.showToastShort(context.getString(R.string.image_load_failed))
             }
         }
     }
@@ -801,11 +850,13 @@ fun NoteDetailScreen(
                 context.showToastShort(context.getString(R.string.voice_rec_started))
             }
         } else {
-            val path = audioRecorder.stopRecording()
             isRecordingAudio = false
-            if (path != null) {
-                blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = path))
-                context.showToastShort(context.getString(R.string.voice_rec_added))
+            coroutineScope.launch {
+                val path = audioRecorder.stopRecordingPortable()
+                if (path != null) {
+                    blocks.add(NoteBlock(type = BlockType.AUDIO, mediaPath = path))
+                    context.showToastShort(context.getString(R.string.voice_rec_added))
+                }
             }
         }
     }
@@ -935,8 +986,9 @@ fun NoteDetailScreen(
                 val childNote = allNotesForLinking.find { it.id == childId && it.status != "TRASH" } ?: continue
                 val desiredTitle = if (blk.content.isBlank()) "Yeni Alt Sayfa" else blk.content.trim()
                 if (childNote.title != desiredTitle) {
+                    val currentParentSync = allNotesForLinking.find { it.id == currentNoteId }?.syncUuid
                     val ensuredRichJson = childNote.richBlocksJson
-                        ?: if (currentNoteId != -1) "{\"isSubPage\":true,\"parentNoteId\":$currentNoteId}" else null
+                        ?: if (currentNoteId != -1) BlockParser.buildSubPageMetadataJson(currentNoteId, currentParentSync) else null
                     val updatedChild = childNote.copy(
                         title = desiredTitle,
                         richBlocksJson = ensuredRichJson
@@ -1044,6 +1096,7 @@ fun NoteDetailScreen(
                 } else {
                     "Yeni Alt Sayfa"
                 }
+                val parentSyncUuid = allNotesForLinking.find { it.id == savedParentId }?.syncUuid
                 val newChild = NoteData(
                     title = initialTitle,
                     description = BlockParser.serialize(listOf(
@@ -1053,7 +1106,7 @@ fun NoteDetailScreen(
                     date = System.currentTimeMillis(),
                     categoryId = selectedCategoryId,
                     icon = "📄",
-                    richBlocksJson = "{\"isSubPage\":true,\"parentNoteId\":$savedParentId}"
+                    richBlocksJson = BlockParser.buildSubPageMetadataJson(savedParentId, parentSyncUuid)
                 )
                 noteViewModel.saveNote(newChild, contentForLinks = null) { newChildId ->
                     pendingSubPageBlockIds.remove(blockId)
@@ -1063,6 +1116,7 @@ fun NoteDetailScreen(
                         val shouldOpenImmediately = openWhenReadyBlockId == blockId
                         blocks[idx] = latest.copy(
                             subPageNoteId = newChildId,
+                            subPageSyncUuid = newChild.syncUuid,
                             content = if (shouldOpenImmediately && latest.content.isBlank()) initialTitle else latest.content
                         )
                         performSilentAutoSave {
@@ -1104,9 +1158,13 @@ fun NoteDetailScreen(
 
         performSilentAutoSave { savedParentId ->
             val subId = latestBlock.subPageNoteId
-            val existingTarget = if (subId != null) {
-                allNotesForLinking.find { it.id == subId && it.status != "TRASH" }
-            } else null
+            val subUuid = latestBlock.subPageSyncUuid?.takeIf { it.isNotBlank() }
+            val existingTarget = when {
+                subUuid != null -> allNotesForLinking.find { it.syncUuid == subUuid && it.status != "TRASH" }
+                    ?: if (subId != null) allNotesForLinking.find { it.id == subId && it.status != "TRASH" } else null
+                subId != null -> allNotesForLinking.find { it.id == subId && it.status != "TRASH" }
+                else -> null
+            }
 
             if (existingTarget != null) {
                 val desiredTitle = if (latestBlock.content.isBlank()) {
@@ -1144,6 +1202,7 @@ fun NoteDetailScreen(
                 context.showToastShort("Alt sayfa silinmiş, bağlantı kaldırıldı")
             } else {
                 val childTitle = if (latestBlock.content.isBlank()) "Yeni Alt Sayfa" else latestBlock.content.trim()
+                val parentSyncUuid = allNotesForLinking.find { it.id == savedParentId }?.syncUuid
                 val newChild = NoteData(
                     title = childTitle,
                     description = BlockParser.serialize(listOf(
@@ -1153,7 +1212,7 @@ fun NoteDetailScreen(
                     date = System.currentTimeMillis(),
                     categoryId = selectedCategoryId,
                     icon = "📄",
-                    richBlocksJson = "{\"isSubPage\":true,\"parentNoteId\":$savedParentId}"
+                    richBlocksJson = BlockParser.buildSubPageMetadataJson(savedParentId, parentSyncUuid)
                 )
                 noteViewModel.saveNote(newChild, contentForLinks = null) { newChildId ->
                     val currentIdx = blocks.indexOfFirst { it.id == latestBlock.id }
@@ -1161,6 +1220,7 @@ fun NoteDetailScreen(
                         val cur = blocks[currentIdx]
                         blocks[currentIdx] = cur.copy(
                             subPageNoteId = newChildId,
+                            subPageSyncUuid = newChild.syncUuid,
                             content = if (cur.content.isBlank()) childTitle else cur.content
                         )
                     }
@@ -1403,20 +1463,26 @@ fun NoteDetailScreen(
             }
             if (currentNoteId != -1 && pendingSubPageBlockIds.isEmpty()) {
                 val existingSubPageIds = blocks.filter { it.type == BlockType.SUB_PAGE }.mapNotNull { it.subPageNoteId }.toSet()
+                val currentSyncUuid = allNotesForLinking.find { it.id == currentNoteId }?.syncUuid?.takeIf { it.isNotBlank() }
                 val restoredChildren = allNotesForLinking.filter { candidate ->
-                    candidate.status != "TRASH" &&
-                        candidate.id !in existingSubPageIds &&
-                        candidate.id !in permanentlyDeletedSubPageIds &&
+                    val candidateMeta = BlockParser.parseRichMetadata(candidate.richBlocksJson)
+                    val matchesParentByUuid = currentSyncUuid != null && candidateMeta?.parentSyncUuid == currentSyncUuid
+                    val matchesParentById = candidateMeta?.parentNoteId == currentNoteId ||
                         candidate.richBlocksJson?.let { json ->
                             Regex(""""parentNoteId"\s*:\s*$currentNoteId\b""").containsMatchIn(json)
                         } == true
+                    candidate.status != "TRASH" &&
+                        candidate.id !in existingSubPageIds &&
+                        candidate.id !in permanentlyDeletedSubPageIds &&
+                        (matchesParentByUuid || matchesParentById)
                 }
                 for (restoredChild in restoredChildren) {
                     blocks.add(
                         NoteBlock(
                             type = BlockType.SUB_PAGE,
                             content = restoredChild.title ?: "Yeni Alt Sayfa",
-                            subPageNoteId = restoredChild.id
+                            subPageNoteId = restoredChild.id,
+                            subPageSyncUuid = restoredChild.syncUuid.ifBlank { null }
                         )
                     )
                     blocksModified = true
@@ -1581,7 +1647,8 @@ fun NoteDetailScreen(
             wordCount = wordCount,
             readingTimeMinutes = readingTimeMinutes,
             audioRecorder = audioRecorder,
-            onExit = { isZenMode = false }
+            onExit = { isZenMode = false },
+            mediaPathResolver = noteViewModel.mediaPathResolver
         )
     } else {
         Scaffold(
@@ -2844,6 +2911,31 @@ fun NoteDetailScreen(
                     onCodeLanguageChange = { newLang ->
                         blocks[index] = blocks[index].copy(codeLanguage = newLang)
                     },
+                    codeExecutionState = codePlaygroundState?.blockStates?.get(block.id),
+                    onRunCode = if (codePlaygroundViewModel != null) {
+                        { blockId, language, codeText ->
+                            codePlaygroundViewModel.onEvent(
+                                CodePlaygroundUiEvent.RunCode(
+                                    blockId = blockId,
+                                    language = language,
+                                    code = codeText
+                                )
+                            )
+                        }
+                    } else null,
+                    onClearCodeOutput = if (codePlaygroundViewModel != null) {
+                        { blockId ->
+                            codePlaygroundViewModel.onEvent(CodePlaygroundUiEvent.ClearOutput(blockId))
+                        }
+                    } else null,
+                    onOpenExternalPlayground = if (codePlaygroundViewModel != null) {
+                        { lang, codeText ->
+                            val clipManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                            clipManager?.setPrimaryClip(android.content.ClipData.newPlainText("Code", codeText))
+                            context.showToastShort(context.getString(R.string.code_web_ide_copied))
+                            codePlaygroundViewModel.requestExternalPlayground(lang)
+                        }
+                    } else null,
                     allBlocks = blocks,
                     onScrollToBlock = { targetIndex ->
                         coroutineScope.launch {
@@ -2889,7 +2981,8 @@ fun NoteDetailScreen(
                     onOpenSubPage = { subPageBlock ->
                         navigateToSubPage(subPageBlock)
                     },
-                    audioRecorder = audioRecorder
+                    audioRecorder = audioRecorder,
+                    mediaPathResolver = noteViewModel.mediaPathResolver
                 )
             }
         }
@@ -3188,6 +3281,7 @@ fun NoteDetailScreen(
         MediaLightboxDialog(
             imagePath = path,
             isDrawing = lightboxIsDrawing,
+            mediaPathResolver = noteViewModel.mediaPathResolver,
             onDismiss = {
                 lightboxMediaPath = null
                 lightboxEditAction = null
@@ -3200,6 +3294,7 @@ fun NoteDetailScreen(
     if (showDrawingSheet) {
         DrawingCanvasSheet(
             existingImagePath = editingDrawingPath,
+            mediaPathResolver = noteViewModel.mediaPathResolver,
             onDismiss = {
                 showDrawingSheet = false
                 editingDrawingPath = null
@@ -3623,6 +3718,7 @@ fun NoteDetailScreen(
             title = currentTitle,
             categoryName = selectedCategoryName,
             blocks = blocks,
+            mediaPathResolver = noteViewModel.mediaPathResolver,
             onDismiss = { showExportSheet = false },
             onExportPdf = { config ->
                 showExportSheet = false

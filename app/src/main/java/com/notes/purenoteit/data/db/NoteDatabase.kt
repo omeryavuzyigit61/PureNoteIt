@@ -13,7 +13,7 @@ import com.notes.purenoteit.util.Converters
         AutomationRuleData::class,
         StreamItemData::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -28,4 +28,7 @@ interface KnowledgeRepository {
     suspend fun getUnprocessedStreamItems(): List<StreamItem>
     suspend fun markStreamItemsProcessed(ids: List<Int>, noteId: Int)
     suspend fun deleteStreamItemById(id: Int)
+    suspend fun getLinksModifiedSince(sinceMillis: Long): List<NoteLink>
+    suspend fun getRulesModifiedSince(sinceMillis: Long): List<AutomationRule>
+    suspend fun getStreamItemsModifiedSince(sinceMillis: Long): List<StreamItem>
 }

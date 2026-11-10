@@ -195,7 +195,7 @@
     <string name="slash_divider_title">Divider</string>
     <string name="slash_divider_desc">Visually divide blocks with a line</string>
     <string name="slash_code_title">Code Block</string>
-    <string name="slash_code_desc">Syntax-highlighted software code snippet</string>
+    <string name="slash_code_desc">Syntax highlighting with offline SQL/JS/HTML/JSON runner</string>
     <string name="slash_math_title">Math Formula (LaTeX)</string>
     <string name="slash_math_desc">Mathematical equation and formula block</string>
     <string name="slash_toc_title">Table of Contents (TOC)</string>
@@ -204,6 +204,37 @@
     <string name="code_copy">Copy</string>
     <string name="code_copied">Copied!</string>
     <string name="code_select_lang">Select Language</string>
+    <string name="code_run">Run</string>
+    <string name="code_preview">Preview</string>
+    <string name="code_validate">Validate</string>
+    <string name="code_check_syntax">Check</string>
+    <string name="code_open_web_ide">Web IDE</string>
+    <string name="code_web_ide_copied">Code copied to clipboard — paste it in the browser</string>
+    <string name="code_offline_badge">Offline</string>
+    <string name="code_output_title">Output</string>
+    <string name="code_html_preview_title">Live HTML Preview (Sandboxed)</string>
+    <string name="code_duration_ms">%1$d ms</string>
+    <string name="code_clear_output">Clear</string>
+    <string name="code_output_empty">(No output · undefined)</string>
+    <string name="code_sql_rows_summary">%1$d rows · %2$d stmts</string>
+    <string name="code_sql_truncated">Showing first 100 rows</string>
+    <string name="code_sql_affected">%1$d statements executed · %2$d rows affected</string>
+    <string name="code_sql_empty_table">Query returned 0 rows</string>
+    <string name="code_json_valid">Valid JSON (%1$s · %2$d items)</string>
+    <string name="code_json_apply_format">Format</string>
+    <string name="code_json_applied_toast">JSON formatted</string>
+    <string name="code_syntax_valid_msg">Structural check passed (%1$d lines): brackets, quotes, and comments are balanced.</string>
+    <string name="code_syntax_external_hint">In zero-server mode, full compilation can be opened in the browser Web IDE.</string>
+    <string name="code_error_empty">Code block is empty.</string>
+    <string name="code_error_timeout">Execution timed out (possible infinite loop stopped).</string>
+    <string name="code_error_js_unavailable">Unable to start device JavaScript engine.</string>
+    <string name="code_error_security_blocked">Blocked by sandbox policy: %1$s</string>
+    <string name="code_error_unclosed_delimiter">Line %1$d: Unclosed delimiter (expected %2$s).</string>
+    <string name="code_error_unexpected_closing">Line %1$d: Unexpected closing delimiter (%2$s).</string>
+    <string name="code_error_mismatched_delimiter">Line %1$d: Expected %2$s but found %3$s.</string>
+    <string name="code_error_unclosed_string">Line %1$d: Unclosed string literal (%2$s).</string>
+    <string name="code_error_unclosed_comment">Line %1$d: Unclosed /* ... */ block comment.</string>
+    <string name="code_input_placeholder">// Type or paste code here…</string>
     <string name="math_preview_title">Formula Preview</string>
     <string name="math_input_placeholder">E.g.: E = mc^2 or \\frac{a}{b}</string>
     <string name="toc_title">📑 Table of Contents</string>
@@ -567,4 +598,27 @@
     <string name="rename_subpage_title">Edit Subpage Title</string>
     <string name="rename_subpage_hint">Subpage title...</string>
     <string name="rename_subpage_updated_toast">Subpage title updated</string>
+
+    <!-- Cross-Device Google Drive PKCE Sync -->
+    <string name="cloud_sync_card_title">Google Drive Cloud Sync</string>
+    <string name="cloud_sync_card_connected">Google Drive connected · Automatic encrypted sync active</string>
+    <string name="cloud_sync_card_disconnected">Connect with one tap to automatically sync notes across devices</string>
+    <string name="cloud_sync_connect_btn">Connect Drive</string>
+    <string name="cloud_sync_now_btn">Sync Now</string>
+    <string name="cloud_sync_disconnect_btn">Disconnect</string>
+    <string name="cloud_sync_passphrase_title">Security Key</string>
+    <string name="cloud_sync_passphrase_desc">Notes are securely encrypted before syncing with Google Drive.</string>
+    <string name="cloud_sync_passphrase_hint">Security Key</string>
+    <string name="cloud_sync_passphrase_required">Encryption key unavailable, please reconnect Drive</string>
+    <string name="cloud_sync_client_unconfigured">Google OAuth client ID is not configured in this build</string>
+    <string name="cloud_sync_connected_toast">Google Drive connected</string>
+    <string name="cloud_sync_passphrase_saved">Security key saved</string>
+    <string name="cloud_sync_disconnected_toast">Drive session disconnected</string>
+    <string name="cloud_sync_completed_summary">Synced: ↑%1$d pushed, ↓%2$d notes pulled</string>
+    <string name="cloud_sync_error_decrypt">Could not decrypt notes, please sync again</string>
+    <string name="cloud_sync_error_security">Hardware key storage unavailable</string>
+    <string name="cloud_sync_error_auth">Authorization expired or was denied</string>
+    <string name="cloud_sync_error_network">Network unavailable or timed out</string>
+    <string name="cloud_sync_error_tls">Secure HTTPS/TLS validation failed</string>
+    <string name="cloud_sync_error_generic">Unexpected sync error occurred</string>
 </resources>
