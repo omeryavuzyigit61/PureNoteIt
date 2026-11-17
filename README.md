@@ -6,8 +6,8 @@
   ### *Düşüncelerinizin En Saf Hali • The Purest Form of Your Thoughts*
 
   <p align="center">
-    <b>Modern, Blok Tabanlı, Çevrimdışı ve Güvenlik Odaklı Android Kişisel Bilgi İşletim Sistemi (Knowledge OS)</b><br />
-    <i>A modern, block-based, offline-first & Bitwarden-grade secure Android personal knowledge system.</i>
+    <b>Modern, Blok Tabanlı, Çevrimdışı Öncelikli ve Kriptografik Güvenlik Odaklı Kişisel Bilgi İşletim Sistemi (Android • iOS • macOS • Windows)</b><br />
+    <i>A modern, block-based, offline-first & end-to-end encrypted Personal Knowledge OS across Android, iOS, macOS & Windows.</i>
   </p>
 
   <p align="center">
@@ -21,14 +21,13 @@
   </p>
 
   <p align="center">
-    <img src="https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026%2B)-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Platform" />
-    <img src="https://img.shields.io/badge/Language-Kotlin%202.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
-    <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose" />
-    <img src="https://img.shields.io/badge/Database-Room%20%2B%20SQLCipher%20AES--256-FF8F00?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room + SQLCipher AES-256" />
-    <img src="https://img.shields.io/badge/DI-Dagger%20Hilt-00C853?style=for-the-badge&logo=dagger&logoColor=white" alt="Hilt" />
-    <img src="https://img.shields.io/badge/Security-AES--256%20Vault-175DDC?style=for-the-badge&logo=bitwarden&logoColor=white" alt="Security" />
-    <img src="https://img.shields.io/badge/Optimization-R8%20DEX%20Obfuscated-blueviolet?style=for-the-badge&logo=googleplay&logoColor=white" alt="R8 Obfuscation" />
-    <img src="https://img.shields.io/badge/Version-1.1.2-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/Android-API%2024%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" />
+    <img src="https://img.shields.io/badge/iOS-17.0%2B%20SwiftUI%20Liquid%20Glass-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS" />
+    <img src="https://img.shields.io/badge/Desktop-macOS%20%26%20Windows-0078D4?style=for-the-badge&logo=kotlin&logoColor=white" alt="Desktop" />
+    <img src="https://img.shields.io/badge/KMP-Kotlin%20Multiplatform-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin Multiplatform" />
+    <img src="https://img.shields.io/badge/Security-AES--256--GCM%20E2EE-175DDC?style=for-the-badge&logo=bitwarden&logoColor=white" alt="Security" />
+    <img src="https://img.shields.io/badge/Sync-Google%20Drive%20appDataFolder-FF900F?style=for-the-badge&logo=googledrive&logoColor=white" alt="Google Drive E2EE Sync" />
+    <img src="https://img.shields.io/badge/Version-1.2.1-orange?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
   </p>
 
@@ -38,13 +37,56 @@
 
 ## 📖 Genel Bakış / Overview
 
-**PureNoteIt**, Notion'ın dinamik blok modülerliğini, Obsidian'ın çift yönlü bağlantı ve bilgi grafiğini (`[[Bağlantı]]`), Bitwarden'ın askeri standarttaki **AES-256-GCM** yerel şifrelemesini tek bir yerel (native) Android uygulamasında birleştiren yeni nesil bir not alma ve düşünce mimarisidir.
+**PureNoteIt**, Notion'ın dinamik blok modülerliğini, Obsidian'ın çift yönlü bağlantı ve bilgi grafiğini (`[[Bağlantı]]`), Bitwarden'ın askeri standarttaki **AES-256-GCM** yerel ve bulut şifrelemesini **Kotlin Multiplatform (`:shared`)** ortak çekirdeği üzerinde **Android**, **iOS (Liquid Glass)**, **macOS** ve **Windows** uygulamalarında birleştiren yeni nesil bir kişisel bilgi işletim sistemidir.
 
-Buluta bağımlı olmayan **%100 Çevrimdışı (Offline-First)** mimarisi sayesinde verileriniz yalnızca sizin cihazınızda yaşar. Hiçbir sunucuya veri aktarılmaz, hiçbir kullanıcı takip edilmez, reklam içermez.
+**%100 Çevrimdışı Öncelikli (Offline-First)** çalışır; isteğe bağlı olarak **Google Drive `appDataFolder`** üzerinden tüm cihazlarınız arasında uçtan uca şifreli (`ENC_P3:` / `AutoSyncKeyCoordinator`) eşitleme sunar. Hiçbir reklam veya kullanıcı takibi içermez.
 
 ---
 
 ## 📱 Ekran Görüntüleri / Screenshots
+
+### 🍎 iOS (Liquid Glass & SF Symbols)
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="33%">
+        <b>Liquid Glass Ana Ekran</b><br />
+        <sub>Elastik Cam Kategori Barı & 2 Sütun Izgara</sub><br /><br />
+        <img src="assets/screenshots/ios/01_ios_home_glass.png" width="240" alt="iOS Home Liquid Glass" />
+      </td>
+      <td align="center" width="33%">
+        <b>Cam Hızlı Oluştur Menüsü (+)</b><br />
+        <sub>12 Anlık Not, Dikte, Ses, Çizim & OCR Eylemi</sub><br /><br />
+        <img src="assets/screenshots/ios/02_ios_quick_create.png" width="240" alt="iOS Quick Create Glass Menu" />
+      </td>
+      <td align="center" width="33%">
+        <b>Liquid Glass Menü Çekmecesi</b><br />
+        <sub>7 Görünüm, Drive Eşitleme & Kasa Yönetimi</sub><br /><br />
+        <img src="assets/screenshots/ios/03_ios_glass_drawer.png" width="240" alt="iOS Glass Navigation Drawer" />
+      </td>
+    </tr>
+    <tr>
+      <td align="center" width="33%">
+        <b>Notion Blok Editörü & İlişkiler</b><br />
+        <sub>Backlinks, Callout, Todo, Kod & Matematik</sub><br /><br />
+        <img src="assets/screenshots/ios/04_ios_editor_blocks.png" width="240" alt="iOS Block Editor" />
+      </td>
+      <td align="center" width="33%">
+        <b>Kanban Pano Görünümü</b><br />
+        <sub>Yapılacak • Devam Ediyor • İnceleme • Bitti</sub><br /><br />
+        <img src="assets/screenshots/ios/05_ios_kanban_board.png" width="240" alt="iOS Kanban Board" />
+      </td>
+      <td align="center" width="33%">
+        <b>2D Neon Bilgi Grafiği</b><br />
+        <sub>[[Wiki Link]] Ağı & Kategori Odak HUD</sub><br /><br />
+        <img src="assets/screenshots/ios/06_ios_knowledge_graph.png" width="240" alt="iOS 2D Knowledge Graph" />
+      </td>
+    </tr>
+  </table>
+</div>
+
+### 🤖 Android (Jetpack Compose)
 
 <div align="center">
   <table>
@@ -52,34 +94,34 @@ Buluta bağımlı olmayan **%100 Çevrimdışı (Offline-First)** mimarisi sayes
       <td align="center" width="33%">
         <b>Aydınlık Tema Ana Ekran</b><br />
         <sub>Akıllı Filtreler, Kategoriler & Kartlar</sub><br /><br />
-        <img src="assets/screenshots/01_home_light.png" width="260" alt="Home Screen Light" />
+        <img src="assets/screenshots/01_home_light.png" width="240" alt="Home Screen Light" />
       </td>
       <td align="center" width="33%">
         <b>Koyu Tema (OLED Black)</b><br />
         <sub>Staggered Grid & Checklist İlerlemesi</sub><br /><br />
-        <img src="assets/screenshots/02_home_dark.png" width="260" alt="Home Screen Dark" />
+        <img src="assets/screenshots/02_home_dark.png" width="240" alt="Home Screen Dark" />
       </td>
       <td align="center" width="33%">
         <b>Notion Blokları & Tablo</b><br />
         <sub>Dinamik Tablo, Formül & Callout</sub><br /><br />
-        <img src="assets/screenshots/03_editor_blocks.png" width="260" alt="Block Editor" />
+        <img src="assets/screenshots/03_editor_blocks.png" width="240" alt="Block Editor" />
       </td>
     </tr>
     <tr>
       <td align="center" width="33%">
         <b>Aylık İnteraktif Takvim</b><br />
         <sub>Renkli Etkinlik Noktaları (Event Dots)</sub><br /><br />
-        <img src="assets/screenshots/04_calendar_month.png" width="260" alt="Monthly Calendar View" />
+        <img src="assets/screenshots/04_calendar_month.png" width="240" alt="Monthly Calendar View" />
       </td>
       <td align="center" width="33%">
         <b>Haftalık Kolon Ajandası</b><br />
         <sub>Günlük Kolonlar & Zaman Planı</sub><br /><br />
-        <img src="assets/screenshots/05_calendar_week.png" width="260" alt="Weekly Column Planner" />
+        <img src="assets/screenshots/05_calendar_week.png" width="240" alt="Weekly Column Planner" />
       </td>
       <td align="center" width="33%">
         <b>Şablon Galerisi (Templates Hub)</b><br />
-        <sub>5 Profesyonel Notion Şablonu</sub><br /><br />
-        <img src="assets/screenshots/06_templates_hub.png" width="260" alt="Templates Hub Gallery" />
+        <sub>Profesyonel Notion Şablonları</sub><br /><br />
+        <img src="assets/screenshots/06_templates_hub.png" width="240" alt="Templates Hub Gallery" />
       </td>
     </tr>
   </table>
@@ -217,35 +259,41 @@ flowchart TD
 ## 🚀 Projeyi Derleme & Çalıştırma / Building from Source
 
 ### Gereksinimler
-- **Android Studio:** Ladybug (2024.2+) veya daha yenisi
-- **JDK:** Java 17 veya Java 21
-- **Android SDK:** Compile SDK 35, Min SDK 26 (Android 8.0 Oreo ve üzeri)
+- **Android & Desktop:** JDK 17/21, Android Studio veya Gradle (`./gradlew`)
+- **iOS (macOS):** Xcode 16+, Swift 5.0+ (`iosApp/PureNoteIt.xcodeproj` `:shared` Apple Framework'ü otomatik derler)
 
 ### Adım Adım Kurulum
 
-1. Depoyu yerel makinenize klonlayın:
+1. Depoyu yerel makinenize klonlayın ve OAuth yapılandırma şablonunu hazırlayın:
    ```bash
    git clone https://github.com/omeryavuzyigit61/PureNoteIt.git
    cd PureNoteIt
+   cp local.properties.example local.properties
    ```
 
-2. Projeyi derleyin ve birim testlerini çalıştırın:
+2. Platformlara göre test ve paketleme komutları:
    ```bash
-   # Linux / macOS
-   ./gradlew testDebugUnitTest assembleDebug
+   # Android APK & Unit Testler
+   ./gradlew :app:testDebugUnitTest :app:assembleDebug
 
-   # Windows PowerShell
-   .\gradlew.bat testDebugUnitTest assembleDebug
+   # macOS (.dmg) / Windows Masaüstü Uygulaması & KMP Testleri
+   ./gradlew :shared:desktopTest :desktopApp:test :desktopApp:packageDmg
+
+   # iOS Paylaşılan KMP Çekirdeği & Xcode Simülatör Derlemesi
+   ./gradlew :shared:iosX64Test
+   xcodebuild -project iosApp/PureNoteIt.xcodeproj -scheme PureNoteIt -configuration Debug -destination 'generic/platform=iOS Simulator' build
    ```
-
-3. Çıktı APK dosyası:
-   `app/build/outputs/apk/debug/app-debug.apk` dizininde oluşturulacaktır.
 
 ---
 
 ## 📋 Sürüm Notları / Changelog
 
-### v1.1.2 (En Son Sürüm / Latest)
+### v1.2.1 (En Son Sürüm / Latest)
+- 🍎 **Tam Özellikli Yerel iOS Uygulaması (`iosApp`):** Android ile tam özellik eşleniği — 7 görünüm (Izgara, Liste, Kanban, Takvim, 2D Grafik, 2D Sonsuz Tuval, Fikir Akışı), Liquid Glass arayüz & elastik kategori barı, modern SF Symbols ikon rozetleri, 17+ blok tipi, canlı sesli dikte & 60 FPS ses dalgası kaydı, `Vision` OCR, çizim tuvali, PDF Stüdyosu, 14 şablon ve Face ID / 6 haneli PIN kasası.
+- ☁️ **4 Platformda Google Drive E2EE Eşitleme:** Android, Windows, macOS ve iOS cihazları `:shared` `SyncEngine` + `GoogleDriveSyncDataSource` üzerinden aynı uçtan uca şifreli (`ENC_P3:`) `appDataFolder` kasasını paylaşır.
+- 🖥️ **macOS Masaüstü Paketi (`.dmg`) & Keychain Düzeltmesi:** macOS Keychain ilk açılış uyumluluğu ve Compose Desktop paketlemesi eklendi.
+
+### v1.1.2
 - 🪟 **Gelişmiş Saydam Cam Tasarımı (Frosted Glassmorphism):** Ana ekran kategori çubuğu, editör özellikler çubuğu ve alt araç çubuğu göze batmayan, matlaşmayan, gerçek yarı saydam cam zeminine kavuşturuldu.
 - ✨ **Çoklu Seçim & Dokunsal Yaylanma (Wiggle) Animasyonu:** Nota uzun basarak (`long-press`) toplu seçme modu onarıldı, kart seçildiğinde yaylanarak titreme animasyonu güçlendirildi ve koyu temadaki kontrast/renk uyumsuzlukları giderildi.
 - 📱 **Akıcı 3D Kapı Efekti & Otomatik Sekme Kaydırma:** Kategori sekmelerindeki kapı efekti sayfa kaydırma konumuna sürekli bağlanarak titreme ve basıklık sorunları yok edildi; seçili sekmeye ulaşıldığında menünün otomatik kayması sağlandı.

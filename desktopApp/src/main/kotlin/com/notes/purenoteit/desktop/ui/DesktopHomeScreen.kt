@@ -521,6 +521,9 @@ fun DesktopHomeScreenContent(
             onSelectTransport = { onEvent(DesktopUiEvent.SelectSyncTransport(it)) },
             onConnectDrive = { onEvent(DesktopUiEvent.ConnectGoogleDrive) },
             onDisconnectDrive = { onEvent(DesktopUiEvent.DisconnectGoogleDrive) },
+            onSaveDesktopOAuthConfig = { cid, csec ->
+                onEvent(DesktopUiEvent.SaveDesktopOAuthConfig(cid, csec))
+            },
             onTriggerSync = { onEvent(DesktopUiEvent.TriggerSyncNow) },
             onStartLanServer = { pin -> onEvent(DesktopUiEvent.StartLanServer(pin)) },
             onStopLanServer = { onEvent(DesktopUiEvent.StopLanServer) },

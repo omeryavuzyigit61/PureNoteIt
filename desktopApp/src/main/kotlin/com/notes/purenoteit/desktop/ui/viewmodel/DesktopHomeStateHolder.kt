@@ -69,7 +69,8 @@ internal class DesktopHomeStateHolder(
     private val vaultSecurityManager: DesktopVaultSecurityManager,
     private val clock: AppClock,
     mainDispatcher: CoroutineDispatcher = Dispatchers.Main,
-    private val autoSyncKeyCoordinator: AutoSyncKeyCoordinator? = null
+    private val autoSyncKeyCoordinator: AutoSyncKeyCoordinator? = null,
+    private val saveDesktopOAuthConfig: (suspend (String, String) -> Boolean)? = null
 ) : AutoCloseable {
 
     private val scope = CoroutineScope(SupervisorJob() + mainDispatcher)
@@ -220,7 +221,13 @@ internal class DesktopHomeStateHolder(
                 }
                 is AppResult.Failure -> false
             }
-            _uiState.update { it.copy(isDriveConnected = hasToken, hasStoredPassphrase = hasPass) }
+            _uiState.update {
+                it.copy(
+                    isDriveConnected = hasToken,
+                    isDesktopOAuthConfigured = oauthClientConfigProvider.getConfig() != null,
+                    hasStoredPassphrase = hasPass
+                )
+            }
         }
     }
 
@@ -427,6 +434,7 @@ internal class DesktopHomeStateHolder(
             is DesktopUiEvent.SelectSyncTransport -> _uiState.update { it.copy(syncTransportMode = event.mode) }
             DesktopUiEvent.ConnectGoogleDrive -> connectGoogleDrive()
             DesktopUiEvent.DisconnectGoogleDrive -> disconnectDrive()
+            is DesktopUiEvent.SaveDesktopOAuthConfig -> saveOAuthConfig(event.clientId, event.clientSecret)
             is DesktopUiEvent.StartLanServer -> startLanServer(event.pairPinChars)
             DesktopUiEvent.StopLanServer -> stopLanServer()
             is DesktopUiEvent.ConnectAndSyncLan -> syncOverLanPeer(event.remoteHttpUrl, event.pairPinChars, event.e2eePassChars)
@@ -725,6 +733,19 @@ internal class DesktopHomeStateHolder(
                 }
             } finally {
                 _uiState.update { it.copy(isSyncing = false) }
+            }
+        }
+    }
+
+    private fun saveOAuthConfig(clientId: String, clientSecret: String) {
+        val saver = saveDesktopOAuthConfig ?: return
+        scope.launch {
+            val ok = saver(clientId, clientSecret)
+            if (ok) {
+                _uiState.update { it.copy(isDesktopOAuthConfigured = oauthClientConfigProvider.getConfig() != null) }
+                emitMessage("Google Desktop OAuth bilgileri güvenli kasaya kaydedildi.")
+            } else {
+                emitMessage("Geçerli bir Google OAuth Client ID girin.", isError = true)
             }
         }
     }

@@ -22,3 +22,10 @@ local.properties
 *.keystore
 app/release/
 release/
+
+# Xcode / iOS User & Build Artifacts
+**/xcuserdata/
+iosApp/build/
+iosApp/DerivedData/
+*.ipa
+*.xcarchive

@@ -41,6 +41,7 @@ fun DesktopSyncDialog(
     onSelectTransport: (SyncTransportMode) -> Unit,
     onConnectDrive: () -> Unit,
     onDisconnectDrive: () -> Unit,
+    onSaveDesktopOAuthConfig: (clientId: String, clientSecret: String) -> Unit,
     onTriggerSync: () -> Unit,
     onStartLanServer: (CharArray) -> Unit,
     onStopLanServer: () -> Unit,
@@ -50,6 +51,9 @@ fun DesktopSyncDialog(
     var passphraseInput by remember { mutableStateOf("") }
     var lanPinInput by remember { mutableStateOf("") }
     var lanRemoteUrlInput by remember { mutableStateOf(state.lanRemoteUrl) }
+    var oauthClientIdInput by remember { mutableStateOf("") }
+    var oauthClientSecretInput by remember { mutableStateOf("") }
+    var showOAuthSetup by remember { mutableStateOf(false) }
 
     DesktopAnimatedDialog(
         onDismiss = onDismiss,
@@ -95,9 +99,23 @@ fun DesktopSyncDialog(
                                 Button(
                                     enabled = !state.isSyncing,
                                     colors = ButtonDefaults.buttonColors(containerColor = DesktopColors.VibrantOrange),
-                                    onClick = onConnectDrive
+                                    onClick = {
+                                        if (state.isDesktopOAuthConfigured) {
+                                            onConnectDrive()
+                                        } else {
+                                            showOAuthSetup = true
+                                        }
+                                    }
                                 ) {
-                                    Text("Google Drive ile Bağlan")
+                                    Text("Google ile Bağlan ve Onayla")
+                                }
+                                if (!state.isDesktopOAuthConfigured) {
+                                    OutlinedButton(
+                                        enabled = !state.isSyncing,
+                                        onClick = { showOAuthSetup = !showOAuthSetup }
+                                    ) {
+                                        Text(if (showOAuthSetup) "Gizle" else "Yayıncı Anahtarı")
+                                    }
                                 }
                             } else {
                                 Button(
@@ -113,6 +131,36 @@ fun DesktopSyncDialog(
                                 ) {
                                     Text("Çıkış Yap")
                                 }
+                            }
+                        }
+
+                        if (!state.isDriveConnected && showOAuthSetup) {
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = oauthClientIdInput,
+                                onValueChange = { oauthClientIdInput = it },
+                                label = { Text("Google Desktop OAuth Client ID") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = oauthClientSecretInput,
+                                onValueChange = { oauthClientSecretInput = it },
+                                label = { Text("Desktop Client Secret (Google istediyse)") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                enabled = oauthClientIdInput.isNotBlank() && !state.isSyncing,
+                                onClick = {
+                                    onSaveDesktopOAuthConfig(oauthClientIdInput, oauthClientSecretInput)
+                                    oauthClientSecretInput = ""
+                                }
+                            ) {
+                                Text("OAuth Bilgilerini Kaydet")
                             }
                         }
                     }

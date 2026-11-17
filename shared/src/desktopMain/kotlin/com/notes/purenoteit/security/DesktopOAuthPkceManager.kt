@@ -206,13 +206,32 @@ class DesktopOAuthPkceManager(
 
         private fun openSystemBrowser(url: String): Boolean {
             return try {
-                if (!Desktop.isDesktopSupported()) return false
-                val desktop = Desktop.getDesktop()
-                if (!desktop.isSupported(Desktop.Action.BROWSE)) return false
-                desktop.browse(URI(url))
-                true
+                if (Desktop.isDesktopSupported()) {
+                    val desktop = Desktop.getDesktop()
+                    if (desktop.isSupported(Desktop.Action.BROWSE)) {
+                        desktop.browse(URI(url))
+                        return true
+                    }
+                }
+                val os = System.getProperty("os.name").orEmpty().lowercase()
+                if (os.contains("mac")) {
+                    ProcessBuilder("open", url).start()
+                    true
+                } else {
+                    false
+                }
             } catch (_: Exception) {
-                false
+                try {
+                    val os = System.getProperty("os.name").orEmpty().lowercase()
+                    if (os.contains("mac")) {
+                        ProcessBuilder("open", url).start()
+                        true
+                    } else {
+                        false
+                    }
+                } catch (_: Exception) {
+                    false
+                }
             }
         }
     }

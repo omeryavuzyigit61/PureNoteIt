@@ -52,12 +52,17 @@ internal class JavaKeyringClient : OsKeyringClient {
         }
     }
 
-    private fun isNotFoundError(e: PasswordAccessException): Boolean {
-        val msg = e.message.orEmpty()
-        return msg.contains("not found", ignoreCase = true) ||
-            msg.contains("Element not found", ignoreCase = true) ||
-            msg.contains("1168") // Windows ERROR_NOT_FOUND
-    }
+    private fun isNotFoundError(e: PasswordAccessException): Boolean =
+        isKeyringNotFoundMessage(e.message)
+}
+
+internal fun isKeyringNotFoundMessage(message: String?): Boolean {
+    val msg = message.orEmpty()
+    return msg.contains("not found", ignoreCase = true) ||
+        msg.contains("Element not found", ignoreCase = true) ||
+        msg.contains("No stored credentials match", ignoreCase = true) ||
+        msg.contains("bulunamad", ignoreCase = true) ||
+        msg.contains("1168") // Windows ERROR_NOT_FOUND
 }
 
 /**

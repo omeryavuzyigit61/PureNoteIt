@@ -90,8 +90,59 @@ internal class DesktopAppContainer(
         ioDispatcher = Dispatchers.IO
     )
 
+    @Volatile
+    private var runtimeOAuthConfig: com.notes.purenoteit.security.OAuthPkceConfig? = null
+
     private val clientConfigProvider = OAuthClientConfigProvider {
-        BuildDesktopOAuthConfig.createPkceConfig()
+        BuildDesktopOAuthConfig.createPkceConfig() ?: runtimeOAuthConfig
+    }
+
+    init {
+        loadCustomOAuthConfigIntoMemory()
+    }
+
+    private fun loadCustomOAuthConfigIntoMemory() {
+        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            val idRes = keyringVault.readSecret(KEYRING_OAUTH_CLIENT_ID)
+            val cidChars = (idRes as? com.notes.purenoteit.domain.model.AppResult.Success)?.data
+            val cid = cidChars?.concatToString()?.trim().orEmpty()
+            cidChars?.fill('\u0000')
+            if (cid.isNotEmpty()) {
+                val secRes = keyringVault.readSecret(KEYRING_OAUTH_CLIENT_SECRET)
+                val secChars = (secRes as? com.notes.purenoteit.domain.model.AppResult.Success)?.data
+                val secret = secChars?.concatToString()?.trim()?.takeIf { it.isNotEmpty() }
+                secChars?.fill('\u0000')
+                runtimeOAuthConfig = com.notes.purenoteit.security.OAuthPkceConfig(
+                    clientId = cid,
+                    redirectUri = "http://127.0.0.1/oauth2redirect",
+                    clientSecret = secret
+                )
+            }
+        }
+    }
+
+    private suspend fun saveRuntimeOAuthConfig(clientId: String, clientSecret: String): Boolean {
+        val cleanId = clientId.trim()
+        if (cleanId.isEmpty()) return false
+        val cleanSecret = clientSecret.trim()
+        val idChars = cleanId.toCharArray()
+        val saveId = keyringVault.saveSecret(KEYRING_OAUTH_CLIENT_ID, idChars)
+        idChars.fill('\u0000')
+        if (saveId !is com.notes.purenoteit.domain.model.AppResult.Success) return false
+
+        if (cleanSecret.isNotEmpty()) {
+            val secChars = cleanSecret.toCharArray()
+            keyringVault.saveSecret(KEYRING_OAUTH_CLIENT_SECRET, secChars)
+            secChars.fill('\u0000')
+        } else {
+            keyringVault.deleteSecret(KEYRING_OAUTH_CLIENT_SECRET)
+        }
+        runtimeOAuthConfig = com.notes.purenoteit.security.OAuthPkceConfig(
+            clientId = cleanId,
+            redirectUri = "http://127.0.0.1/oauth2redirect",
+            clientSecret = cleanSecret.takeIf { it.isNotEmpty() }
+        )
+        return true
     }
 
     private val syncTokenProvider = SharedSyncFactory.createOAuthSyncTokenProvider(
@@ -140,8 +191,14 @@ internal class DesktopAppContainer(
         oauthClientConfigProvider = clientConfigProvider,
         vaultSecurityManager = vaultSecurityManager,
         clock = clock,
-        mainDispatcher = Dispatchers.Main
+        mainDispatcher = Dispatchers.Main,
+        saveDesktopOAuthConfig = ::saveRuntimeOAuthConfig
     )
+
+    companion object {
+        private const val KEYRING_OAUTH_CLIENT_ID = "desktop_oauth_custom_client_id_v1"
+        private const val KEYRING_OAUTH_CLIENT_SECRET = "desktop_oauth_custom_client_secret_v1"
+    }
 
     override fun close() {
         stateHolder.close()
