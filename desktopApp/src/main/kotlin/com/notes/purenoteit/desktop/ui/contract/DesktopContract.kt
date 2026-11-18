@@ -100,6 +100,7 @@ data class DesktopUiState(
     val showSyncDialog: Boolean = false,
     val syncTransportMode: SyncTransportMode = SyncTransportMode.GOOGLE_DRIVE,
     val isDriveConnected: Boolean = false,
+    val isDesktopOAuthConfigured: Boolean = false,
     val hasStoredPassphrase: Boolean = false,
     val isSyncing: Boolean = false,
     val lastSyncSummary: String? = null,
@@ -206,6 +207,7 @@ sealed interface DesktopUiEvent {
     data class SelectSyncTransport(val mode: SyncTransportMode) : DesktopUiEvent
     data object ConnectGoogleDrive : DesktopUiEvent
     data object DisconnectGoogleDrive : DesktopUiEvent
+    data class SaveDesktopOAuthConfig(val clientId: String, val clientSecret: String) : DesktopUiEvent
     data object NavigateHome : DesktopUiEvent
     data class StartLanServer(val pairPinChars: CharArray) : DesktopUiEvent
     data object StopLanServer : DesktopUiEvent

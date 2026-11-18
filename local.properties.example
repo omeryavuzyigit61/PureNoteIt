@@ -19,3 +19,6 @@ purenote.desktop.oauth.clientId=
 
 # Desktop OAuth 2.0 Client Secret (required by Google for installed Desktop apps; leave empty if using proxy)
 purenote.desktop.oauth.clientSecret=
+
+# iOS OAuth 2.0 Client ID (type: iOS, bundle id com.purenoteit.ios)
+purenote.ios.oauth.clientId=

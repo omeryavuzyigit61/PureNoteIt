@@ -1,0 +1,471 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000010000000000000001 /* PureNoteItApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* PureNoteItApp.swift */; };
+		A10000010000000000000002 /* PureNoteTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* PureNoteTheme.swift */; };
+		A10000010000000000000003 /* IosCryptoAndKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* IosCryptoAndKeychain.swift */; };
+		A10000010000000000000004 /* IosDatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000004 /* IosDatabaseManager.swift */; };
+		A10000010000000000000005 /* IosLocalSyncStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* IosLocalSyncStore.swift */; };
+		A10000010000000000000006 /* IosMediaAndExportServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000006 /* IosMediaAndExportServices.swift */; };
+		A10000010000000000000007 /* NoteTemplatesCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000007 /* NoteTemplatesCatalog.swift */; };
+		A10000010000000000000008 /* PureNoteStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000008 /* PureNoteStore.swift */; };
+		A10000010000000000000009 /* NotesHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* NotesHomeView.swift */; };
+		A10000010000000000000010 /* KanbanBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000010 /* KanbanBoardView.swift */; };
+		A10000010000000000000011 /* CalendarPlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000011 /* CalendarPlannerView.swift */; };
+		A10000010000000000000012 /* KnowledgeGraphView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000012 /* KnowledgeGraphView.swift */; };
+		A10000010000000000000013 /* InfiniteWhiteboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000013 /* InfiniteWhiteboardView.swift */; };
+		A10000010000000000000014 /* IdeaStreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000014 /* IdeaStreamView.swift */; };
+		A10000010000000000000015 /* BlockRowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000015 /* BlockRowViews.swift */; };
+		A10000010000000000000016 /* NoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000016 /* NoteEditorView.swift */; };
+		A10000010000000000000017 /* DrawingCanvasSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000017 /* DrawingCanvasSheet.swift */; };
+		A10000010000000000000018 /* TemplateHubSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000018 /* TemplateHubSheet.swift */; };
+		A10000010000000000000019 /* SyncAndSecuritySheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000019 /* SyncAndSecuritySheets.swift */; };
+		A10000010000000000000020 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000020 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* PureNoteIt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PureNoteIt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000010000000000000001 /* PureNoteItApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureNoteItApp.swift; sourceTree = "<group>"; };
+		A20000010000000000000002 /* PureNoteTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureNoteTheme.swift; sourceTree = "<group>"; };
+		A20000010000000000000003 /* IosCryptoAndKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosCryptoAndKeychain.swift; sourceTree = "<group>"; };
+		A20000010000000000000004 /* IosDatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosDatabaseManager.swift; sourceTree = "<group>"; };
+		A20000010000000000000005 /* IosLocalSyncStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosLocalSyncStore.swift; sourceTree = "<group>"; };
+		A20000010000000000000006 /* IosMediaAndExportServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IosMediaAndExportServices.swift; sourceTree = "<group>"; };
+		A20000010000000000000007 /* NoteTemplatesCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTemplatesCatalog.swift; sourceTree = "<group>"; };
+		A20000010000000000000008 /* PureNoteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureNoteStore.swift; sourceTree = "<group>"; };
+		A20000010000000000000009 /* NotesHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesHomeView.swift; sourceTree = "<group>"; };
+		A20000010000000000000010 /* KanbanBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanBoardView.swift; sourceTree = "<group>"; };
+		A20000010000000000000011 /* CalendarPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPlannerView.swift; sourceTree = "<group>"; };
+		A20000010000000000000012 /* KnowledgeGraphView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowledgeGraphView.swift; sourceTree = "<group>"; };
+		A20000010000000000000013 /* InfiniteWhiteboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfiniteWhiteboardView.swift; sourceTree = "<group>"; };
+		A20000010000000000000014 /* IdeaStreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdeaStreamView.swift; sourceTree = "<group>"; };
+		A20000010000000000000015 /* BlockRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlockRowViews.swift; sourceTree = "<group>"; };
+		A20000010000000000000016 /* NoteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteEditorView.swift; sourceTree = "<group>"; };
+		A20000010000000000000017 /* DrawingCanvasSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingCanvasSheet.swift; sourceTree = "<group>"; };
+		A20000010000000000000018 /* TemplateHubSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateHubSheet.swift; sourceTree = "<group>"; };
+		A20000010000000000000019 /* SyncAndSecuritySheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncAndSecuritySheets.swift; sourceTree = "<group>"; };
+		A20000010000000000000020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000010000000000000021 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000010000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000010000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A40000010000000000000002 /* PureNoteIt */,
+				A40000010000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000010000000000000002 /* PureNoteIt */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000001 /* PureNoteItApp.swift */,
+				A40000010000000000000004 /* Theme */,
+				A40000010000000000000005 /* Security */,
+				A40000010000000000000006 /* Data */,
+				A40000010000000000000007 /* Services */,
+				A40000010000000000000008 /* Model */,
+				A40000010000000000000009 /* ViewModels */,
+				A40000010000000000000010 /* UI */,
+				A20000010000000000000020 /* Assets.xcassets */,
+				A20000010000000000000021 /* Info.plist */,
+			);
+			path = PureNoteIt;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* PureNoteIt.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000004 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000002 /* PureNoteTheme.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000005 /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000003 /* IosCryptoAndKeychain.swift */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000006 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000004 /* IosDatabaseManager.swift */,
+				A20000010000000000000005 /* IosLocalSyncStore.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000007 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000006 /* IosMediaAndExportServices.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000008 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000007 /* NoteTemplatesCatalog.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000009 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000008 /* PureNoteStore.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000010 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				A40000010000000000000011 /* Home */,
+				A40000010000000000000012 /* Views */,
+				A40000010000000000000013 /* Editor */,
+				A40000010000000000000014 /* Modals */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000011 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000009 /* NotesHomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000012 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000010 /* KanbanBoardView.swift */,
+				A20000010000000000000011 /* CalendarPlannerView.swift */,
+				A20000010000000000000012 /* KnowledgeGraphView.swift */,
+				A20000010000000000000013 /* InfiniteWhiteboardView.swift */,
+				A20000010000000000000014 /* IdeaStreamView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000013 /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000015 /* BlockRowViews.swift */,
+				A20000010000000000000016 /* NoteEditorView.swift */,
+			);
+			path = Editor;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000014 /* Modals */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000017 /* DrawingCanvasSheet.swift */,
+				A20000010000000000000018 /* TemplateHubSheet.swift */,
+				A20000010000000000000019 /* SyncAndSecuritySheets.swift */,
+			);
+			path = Modals;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000010000000000000001 /* PureNoteIt */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A60000020000000000000002 /* Build configuration list for PBXNativeTarget "PureNoteIt" */;
+			buildPhases = (
+				A70000010000000000000001 /* Compile Kotlin Shared Framework */,
+				A80000010000000000000001 /* Sources */,
+				A30000010000000000000001 /* Frameworks */,
+				A90000010000000000000001 /* Resources */,
+				A70000010000000000000002 /* Inject iOS OAuth Client ID */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PureNoteIt;
+			productName = PureNoteIt;
+			productReference = A20000000000000000000001 /* PureNoteIt.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000010000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					A50000010000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = A60000010000000000000001 /* Build configuration list for PBXProject "PureNoteIt" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = tr;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				tr,
+				Base,
+			);
+			mainGroup = A40000010000000000000001;
+			productRefGroup = A40000010000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000010000000000000001 /* PureNoteIt */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A90000010000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000010000000000000020 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A70000010000000000000001 /* Compile Kotlin Shared Framework */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Compile Kotlin Shared Framework";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nexport JAVA_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null || /usr/libexec/java_home)\nexport PATH=\"$JAVA_HOME/bin:$PATH\"\ncd \"$SRCROOT/..\"\n./gradlew :shared:embedAndSignAppleFrameworkForXcode\n";
+		};
+		A70000010000000000000002 /* Inject iOS OAuth Client ID */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+				"$(SRCROOT)/../local.properties",
+			);
+			name = "Inject iOS OAuth Client ID";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "PLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\nLP=\"$SRCROOT/../local.properties\"\nif [ -f \"$PLIST\" ] && [ -f \"$LP\" ]; then\n  CID=$(grep -E '^purenote\\.ios\\.oauth\\.clientId=' \"$LP\" | head -n 1 | cut -d'=' -f2- | tr -d '[:space:]')\n  if [ -n \"$CID\" ]; then\n    /usr/libexec/PlistBuddy -c \"Delete :PURE_IOS_OAUTH_CLIENT_ID\" \"$PLIST\" 2>/dev/null || true\n    /usr/libexec/PlistBuddy -c \"Add :PURE_IOS_OAUTH_CLIENT_ID string $CID\" \"$PLIST\"\n    REV=\"com.googleusercontent.apps.${CID%.apps.googleusercontent.com}\"\n    /usr/libexec/PlistBuddy -c \"Delete :CFBundleURLTypes\" \"$PLIST\" 2>/dev/null || true\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes array\" \"$PLIST\"\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0 dict\" \"$PLIST\"\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLName string com.purenoteit.ios.oauth\" \"$PLIST\"\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLSchemes array\" \"$PLIST\"\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REV\" \"$PLIST\"\n  fi\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A80000010000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000010000000000000001 /* PureNoteItApp.swift in Sources */,
+				A10000010000000000000002 /* PureNoteTheme.swift in Sources */,
+				A10000010000000000000003 /* IosCryptoAndKeychain.swift in Sources */,
+				A10000010000000000000004 /* IosDatabaseManager.swift in Sources */,
+				A10000010000000000000005 /* IosLocalSyncStore.swift in Sources */,
+				A10000010000000000000006 /* IosMediaAndExportServices.swift in Sources */,
+				A10000010000000000000007 /* NoteTemplatesCatalog.swift in Sources */,
+				A10000010000000000000008 /* PureNoteStore.swift in Sources */,
+				A10000010000000000000009 /* NotesHomeView.swift in Sources */,
+				A10000010000000000000010 /* KanbanBoardView.swift in Sources */,
+				A10000010000000000000011 /* CalendarPlannerView.swift in Sources */,
+				A10000010000000000000012 /* KnowledgeGraphView.swift in Sources */,
+				A10000010000000000000013 /* InfiniteWhiteboardView.swift in Sources */,
+				A10000010000000000000014 /* IdeaStreamView.swift in Sources */,
+				A10000010000000000000015 /* BlockRowViews.swift in Sources */,
+				A10000010000000000000016 /* NoteEditorView.swift in Sources */,
+				A10000010000000000000017 /* DrawingCanvasSheet.swift in Sources */,
+				A10000010000000000000018 /* TemplateHubSheet.swift in Sources */,
+				A10000010000000000000019 /* SyncAndSecuritySheets.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		B10000010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		B10000020000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B20000010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 18;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PureNoteIt/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.2.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					PureNoteShared,
+					"-lsqlite3",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.purenoteit.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B20000020000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 18;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PureNoteIt/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.2.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					PureNoteShared,
+					"-lsqlite3",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.purenoteit.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A60000010000000000000001 /* Build configuration list for PBXProject "PureNoteIt" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000010000000000000001 /* Debug */,
+				B10000020000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A60000020000000000000002 /* Build configuration list for PBXNativeTarget "PureNoteIt" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B20000010000000000000001 /* Debug */,
+				B20000020000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A00000010000000000000001 /* Project object */;
+}

@@ -12,6 +12,7 @@ import com.notes.purenoteit.security.OAuthSyncTokenProvider
 import com.notes.purenoteit.security.OAuthTokenBundle
 import com.notes.purenoteit.security.OsKeyringClient
 import com.notes.purenoteit.security.SecureTokenStorage
+import com.notes.purenoteit.security.isKeyringNotFoundMessage
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.ContentType
@@ -408,6 +409,17 @@ class OAuthPkceAndDesktopAuthTest {
             assertEquals(AppResult.Success(Unit), storage.clearAll())
             assertNull((storage.getSyncPassphrase() as AppResult.Success).data)
         }
+
+    @Test
+    fun `isKeyringNotFoundMessage macOS ve Windows bulunamadi mesajlarini tanimali`() {
+        assertTrue(isKeyringNotFoundMessage("No stored credentials match com.purenoteit.desktop account: local_vault_auto_root_v1"))
+        assertTrue(isKeyringNotFoundMessage("Failed to delete password: No stored credentials match foo account: bar"))
+        assertTrue(isKeyringNotFoundMessage("Element not found"))
+        assertTrue(isKeyringNotFoundMessage("Belirtilen öğe anahtar zincirinde bulunamadı"))
+        assertTrue(isKeyringNotFoundMessage("Error 1168"))
+        assertFalse(isKeyringNotFoundMessage("Keychain access denied by user"))
+        assertFalse(isKeyringNotFoundMessage(null))
+    }
 
     private class FakeOsKeyringClient : OsKeyringClient {
         private val store = mutableMapOf<Pair<String, String>, String>()

@@ -44,6 +44,7 @@ fun DesktopSyncDialog(
     onSelectTransport: (SyncTransportMode) -> Unit,
     onConnectDrive: () -> Unit,
     onDisconnectDrive: () -> Unit,
+    onSaveDesktopOAuthConfig: (clientId: String, clientSecret: String) -> Unit,
     onTriggerSync: () -> Unit,
     onForcePushAll: () -> Unit = {},
     onCleanOrphanMedia: () -> Unit = {},
@@ -55,6 +56,9 @@ fun DesktopSyncDialog(
     var passphraseInput by remember { mutableStateOf("") }
     var lanPinInput by remember { mutableStateOf("") }
     var lanRemoteUrlInput by remember { mutableStateOf(state.lanRemoteUrl) }
+    var oauthClientIdInput by remember { mutableStateOf("") }
+    var oauthClientSecretInput by remember { mutableStateOf("") }
+    var showOAuthSetup by remember { mutableStateOf(false) }
 
     DesktopAnimatedDialog(
         onDismiss = onDismiss,
@@ -100,9 +104,23 @@ fun DesktopSyncDialog(
                                 Button(
                                     enabled = !state.isSyncing,
                                     colors = ButtonDefaults.buttonColors(containerColor = DesktopColors.VibrantOrange),
-                                    onClick = onConnectDrive
+                                    onClick = {
+                                        if (state.isDesktopOAuthConfigured) {
+                                            onConnectDrive()
+                                        } else {
+                                            showOAuthSetup = true
+                                        }
+                                    }
                                 ) {
-                                    Text("Google Drive ile Bağlan")
+                                    Text("Google ile Bağlan ve Onayla")
+                                }
+                                if (!state.isDesktopOAuthConfigured) {
+                                    OutlinedButton(
+                                        enabled = !state.isSyncing,
+                                        onClick = { showOAuthSetup = !showOAuthSetup }
+                                    ) {
+                                        Text(if (showOAuthSetup) "Gizle" else "Yayıncı Anahtarı")
+                                    }
                                 }
                             } else {
                                 Button(
@@ -151,38 +169,68 @@ fun DesktopSyncDialog(
                                         lineHeight = 16.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OutlinedButton(
-                                        enabled = !state.isSyncing && !state.isCleaningCloudMedia,
-                                        onClick = onForcePushAll
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(
-                                            text = "Tüm Notları Buluta Yeniden Gönder",
-                                            fontSize = 11.5.sp,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
-                                    OutlinedButton(
-                                        enabled = !state.isSyncing && !state.isCleaningCloudMedia,
-                                        onClick = onCleanOrphanMedia
-                                    ) {
-                                        if (state.isCleaningCloudMedia) {
-                                            CircularProgressIndicator(modifier = Modifier.height(14.dp).width(14.dp), strokeWidth = 2.dp)
-                                            Spacer(Modifier.width(6.dp))
+                                        OutlinedButton(
+                                            enabled = !state.isSyncing && !state.isCleaningCloudMedia,
+                                            onClick = onForcePushAll
+                                        ) {
+                                            Text(
+                                                text = "Tüm Notları Buluta Yeniden Gönder",
+                                                fontSize = 11.5.sp,
+                                                maxLines = 1,
+                                                softWrap = false
+                                            )
                                         }
-                                        Text(
-                                            text = if (state.isCleaningCloudMedia) "Temizleniyor..." else "Gereksiz Medyaları Temizle",
-                                            fontSize = 11.5.sp,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
+                                        OutlinedButton(
+                                            enabled = !state.isSyncing && !state.isCleaningCloudMedia,
+                                            onClick = onCleanOrphanMedia
+                                        ) {
+                                            if (state.isCleaningCloudMedia) {
+                                                CircularProgressIndicator(modifier = Modifier.height(14.dp).width(14.dp), strokeWidth = 2.dp)
+                                                Spacer(Modifier.width(6.dp))
+                                            }
+                                            Text(
+                                                text = if (state.isCleaningCloudMedia) "Temizleniyor..." else "Gereksiz Medyaları Temizle",
+                                                fontSize = 11.5.sp,
+                                                maxLines = 1,
+                                                softWrap = false
+                                            )
+                                        }
                                     }
                                 }
+                            }
+                        }
+
+                        if (!state.isDriveConnected && showOAuthSetup) {
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = oauthClientIdInput,
+                                onValueChange = { oauthClientIdInput = it },
+                                label = { Text("Google Desktop OAuth Client ID") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = oauthClientSecretInput,
+                                onValueChange = { oauthClientSecretInput = it },
+                                label = { Text("Desktop Client Secret (Google istediyse)") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                enabled = oauthClientIdInput.isNotBlank() && !state.isSyncing,
+                                onClick = {
+                                    onSaveDesktopOAuthConfig(oauthClientIdInput, oauthClientSecretInput)
+                                    oauthClientSecretInput = ""
                                 }
+                            ) {
+                                Text("OAuth Bilgilerini Kaydet")
                             }
                         }
                     }

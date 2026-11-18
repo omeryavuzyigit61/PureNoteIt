@@ -23,6 +23,17 @@ kotlin {
         }
     }
 
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "PureNoteShared"
+            isStatic = true
+        }
+    }
+
     sourceSets {
         val commonMain = getByName("commonMain") {
             dependencies {
@@ -67,6 +78,20 @@ kotlin {
             dependencies {
                 implementation(libs.junit)
             }
+        }
+
+        val iosMain = create("iosMain") {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(libs.ktor.client.darwin)
+            }
+        }
+        val iosTest = create("iosTest") {
+            dependsOn(commonTest)
+        }
+        listOf("iosX64", "iosArm64", "iosSimulatorArm64").forEach { targetName ->
+            getByName("${targetName}Main").dependsOn(iosMain)
+            getByName("${targetName}Test").dependsOn(iosTest)
         }
     }
 }

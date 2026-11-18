@@ -667,6 +667,9 @@ fun DesktopHomeScreenContent(
             onSelectTransport = { onEvent(DesktopUiEvent.SelectSyncTransport(it)) },
             onConnectDrive = { onEvent(DesktopUiEvent.ConnectGoogleDrive) },
             onDisconnectDrive = { onEvent(DesktopUiEvent.DisconnectGoogleDrive) },
+            onSaveDesktopOAuthConfig = { cid, csec ->
+                onEvent(DesktopUiEvent.SaveDesktopOAuthConfig(cid, csec))
+            },
             onTriggerSync = { onEvent(DesktopUiEvent.TriggerSyncNow) },
             onForcePushAll = { onEvent(DesktopUiEvent.ForcePushAllToDrive) },
             onCleanOrphanMedia = { onEvent(DesktopUiEvent.CleanOrphanDriveMedia) },
