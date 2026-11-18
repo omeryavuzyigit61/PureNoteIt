@@ -15,6 +15,8 @@ import com.notes.purenoteit.domain.model.StreamItem
 import com.notes.purenoteit.domain.repository.CategoryRepository
 import com.notes.purenoteit.domain.repository.KnowledgeRepository
 import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.data.storage.MediaDiskCipher
+import com.notes.purenoteit.domain.storage.MediaAtRestEncryptor
 import com.notes.purenoteit.domain.storage.MediaPathResolver
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
@@ -424,10 +426,22 @@ object VaultBackupManager {
                     val filesDir = context.filesDir
                     filesDir.walkTopDown().filter { it.isFile && it.name != zipFile.name }.forEach { file ->
                         if (file.length() <= MAX_SINGLE_FILE_BYTES) {
-                            val relativePath = "media_enc/" + file.relativeTo(filesDir).path.replace("\\", "/")
+                            val relativeName = file.relativeTo(filesDir).path.replace("\\", "/")
+                            // Media is encrypted at rest with a device-bound key; the backup must carry the plain
+                            // content (it is re-encrypted below with the user's passphrase) or it could not be
+                            // restored on another device. Undecryptable files are skipped, never exported as-is.
+                            val sourceFile = if (MediaDiskCipher.isEncrypted(file)) {
+                                mediaPathResolver?.resolveToReadablePath(relativeName)
+                                    ?.let { File(it) }
+                                    ?.takeIf { it.isFile && !MediaDiskCipher.isEncrypted(it) }
+                                    ?: return@forEach
+                            } else {
+                                file
+                            }
+                            val relativePath = "media_enc/$relativeName"
                             val entry = ZipEntry(relativePath)
                             zos.putNextEntry(entry)
-                            val rawBytes = file.readBytes()
+                            val rawBytes = sourceFile.readBytes()
                             val encBytes = try {
                                 SecurityUtil.encryptPortableBytes(rawBytes, passCopy)
                             } finally {
@@ -563,6 +577,9 @@ object VaultBackupManager {
                         }
                     }
                 }
+
+                // Restored media arrives as plaintext files: encrypt them at rest right away.
+                (mediaPathResolver as? MediaAtRestEncryptor)?.encryptPendingPlaintextMedia()
 
                 if (manifestRawOrEncrypted.isNullOrBlank()) {
                     throw IllegalStateException("Yedek dosyası geçersiz veya manifest bulunamadı")

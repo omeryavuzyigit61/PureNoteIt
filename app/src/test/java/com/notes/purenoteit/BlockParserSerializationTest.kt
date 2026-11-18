@@ -5,6 +5,7 @@ import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import com.notes.purenoteit.util.Converters
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -111,5 +112,33 @@ class BlockParserSerializationTest {
         assertEquals(true, blocks[1].isChecked)
         assertEquals(BlockType.CALLOUT, blocks[2].type)
         assertEquals(BlockType.DIVIDER, blocks[3].type)
+    }
+
+    @Test
+    fun `toPlainTextSummary medya boyut JSON verisini sızdirmaz ve temiz ozet doner`() {
+        val blocks = listOf(
+            NoteBlock(
+                type = BlockType.IMAGE,
+                content = """{"w":100,"h":545,"lock":true}""",
+                mediaPath = "media/images/${"b".repeat(64)}.jpg"
+            ),
+            NoteBlock(
+                type = BlockType.DRAWING,
+                content = """{"w":80,"h":300,"lock":false}""",
+                mediaPath = "media/drawings/${"c".repeat(64)}.png"
+            ),
+            NoteBlock(
+                type = BlockType.CALLOUT,
+                calloutIcon = "☀️",
+                content = "Günün Mottosu"
+            )
+        )
+
+        val desktopSummary = BlockParser.toPlainTextSummary(blocks, maxLines = 4, includeDecorations = false)
+        assertFalse("Summary must never leak resize JSON", desktopSummary.contains("545") || desktopSummary.contains("\"lock\""))
+        assertTrue(desktopSummary.contains("Görsel"))
+        assertTrue(desktopSummary.contains("Çizim"))
+        assertTrue(desktopSummary.contains("Günün Mottosu"))
+        assertFalse("Desktop summary hides raw callout emoji", desktopSummary.contains("☀️"))
     }
 }

@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.notes.purenoteit.R
 import com.notes.purenoteit.data.security.AndroidOAuthPkceManager
+import com.notes.purenoteit.data.security.NoOpVaultSecuritySyncBridge
+import com.notes.purenoteit.data.security.VaultSecuritySyncBridge
+import com.notes.purenoteit.data.sync.CloudSyncTriggerBus
 import com.notes.purenoteit.domain.model.AppError
 import com.notes.purenoteit.domain.model.AppResult
 import com.notes.purenoteit.domain.model.DataError
@@ -12,19 +15,24 @@ import com.notes.purenoteit.security.OAuthClientConfigProvider
 import com.notes.purenoteit.security.SecureTokenStorage
 import com.notes.purenoteit.sync.AutoSyncKeyCoordinator
 import com.notes.purenoteit.sync.SyncEngine
+import com.notes.purenoteit.sync.VaultSettingsSyncCoordinator
 import com.notes.purenoteit.ui.mvi.CloudSyncUiEffect
 import com.notes.purenoteit.ui.mvi.CloudSyncUiEvent
 import com.notes.purenoteit.ui.mvi.CloudSyncUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 @HiltViewModel
@@ -33,8 +41,15 @@ class CloudSyncViewModel @Inject constructor(
     private val configProvider: OAuthClientConfigProvider,
     private val tokenStorage: SecureTokenStorage,
     private val syncEngine: SyncEngine,
-    private val autoSyncKeyCoordinator: AutoSyncKeyCoordinator
+    private val autoSyncKeyCoordinator: AutoSyncKeyCoordinator,
+    private val syncTriggerBus: CloudSyncTriggerBus = CloudSyncTriggerBus(),
+    private val vaultSettingsCoordinator: VaultSettingsSyncCoordinator? = null,
+    private val vaultSecurityBridge: VaultSecuritySyncBridge = NoOpVaultSecuritySyncBridge
 ) : ViewModel() {
+
+    private val syncMutex = Mutex()
+    @Volatile
+    private var pendingSyncRequested = false
 
     private val _uiState = MutableStateFlow(CloudSyncUiState())
     val uiState: StateFlow<CloudSyncUiState> = _uiState.asStateFlow()
@@ -44,6 +59,46 @@ class CloudSyncViewModel @Inject constructor(
 
     init {
         refreshStatus()
+        viewModelScope.launch {
+            syncTriggerBus.immediateChangeRequests.collect {
+                triggerAutoSyncIfConnected(silent = true)
+            }
+        }
+        viewModelScope.launch {
+            syncTriggerBus.localChangeRequests.collectLatest {
+                delay(300L)
+                triggerAutoSyncIfConnected(silent = true)
+            }
+        }
+    }
+
+    fun triggerAutoSyncIfConnected(silent: Boolean = true) {
+        viewModelScope.launch {
+            if (syncMutex.isLocked) {
+                pendingSyncRequested = true
+                return@launch
+            }
+            val hasToken = (tokenStorage.getTokenBundle() as? AppResult.Success)?.data != null
+            if (!hasToken) return@launch
+            syncMutex.withLock {
+                _uiState.update {
+                    if (!silent) it.copy(isDriveConnected = true, isSyncing = true)
+                    else it.copy(isDriveConnected = true)
+                }
+                try {
+                    do {
+                        pendingSyncRequested = false
+                        executeAutoKeySyncLocked(silent = silent)
+                    } while (pendingSyncRequested)
+                } catch (e: CancellationException) {
+                    throw e
+                } finally {
+                    if (!silent) {
+                        _uiState.update { it.copy(isSyncing = false) }
+                    }
+                }
+            }
+        }
     }
 
     fun refreshStatus() {
@@ -106,34 +161,65 @@ class CloudSyncViewModel @Inject constructor(
 
     private fun syncNow() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true) }
-            try {
-                executeAutoKeySyncLocked()
-            } catch (e: CancellationException) {
-                throw e
-            } finally {
-                _uiState.update { it.copy(isSyncing = false) }
+            if (syncMutex.isLocked) {
+                pendingSyncRequested = true
+                return@launch
+            }
+            syncMutex.withLock {
+                _uiState.update { it.copy(isSyncing = true) }
+                try {
+                    do {
+                        pendingSyncRequested = false
+                        executeAutoKeySyncLocked(silent = false)
+                    } while (pendingSyncRequested)
+                } catch (e: CancellationException) {
+                    throw e
+                } finally {
+                    _uiState.update { it.copy(isSyncing = false) }
+                }
             }
         }
     }
 
-    private suspend fun executeAutoKeySyncLocked() {
+    private suspend fun executeAutoKeySyncLocked(silent: Boolean = false) {
         val passChars = when (val keyRes = autoSyncKeyCoordinator.resolveOrBootstrapPassphrase()) {
             is AppResult.Failure -> {
-                _effects.trySend(CloudSyncUiEffect.ShowMessage(mapErrorToRes(keyRes.error)))
+                if (!silent) _effects.trySend(CloudSyncUiEffect.ShowMessage(mapErrorToRes(keyRes.error)))
                 return
             }
             is AppResult.Success -> keyRes.data
         }
         _uiState.update { it.copy(hasStoredPassphrase = true) }
         try {
-            runSyncWithPassphraseLocked(passChars)
+            val settingsApplied = syncVaultSettingsBeforeDelta(passChars)
+            runSyncWithPassphraseLocked(passChars, silent = silent, settingsApplied = settingsApplied)
         } finally {
             passChars.fill('\u0000')
         }
     }
 
-    private suspend fun runSyncWithPassphraseLocked(passChars: CharArray) {
+    private suspend fun syncVaultSettingsBeforeDelta(passChars: CharArray): Boolean {
+        val coordinator = vaultSettingsCoordinator ?: return false
+        val localDoc = vaultSecurityBridge.loadLocalSecurityDoc()
+        return when (val res = coordinator.synchronize(localDoc, passChars)) {
+            is AppResult.Success -> {
+                val synced = res.data
+                if (synced != null) {
+                    vaultSecurityBridge.applySyncedSecurityDoc(synced)
+                    true
+                } else {
+                    false
+                }
+            }
+            is AppResult.Failure -> false
+        }
+    }
+
+    private suspend fun runSyncWithPassphraseLocked(
+        passChars: CharArray,
+        silent: Boolean = false,
+        settingsApplied: Boolean = false
+    ) {
         when (val res = syncEngine.synchronize(passChars)) {
             is AppResult.Success -> {
                 val s = res.data
@@ -143,16 +229,27 @@ class CloudSyncViewModel @Inject constructor(
                         lastSyncPulled = s.pulledNotes
                     )
                 }
-                _effects.trySend(
-                    CloudSyncUiEffect.ShowMessage(
-                        messageRes = R.string.cloud_sync_completed_summary,
-                        arg1 = s.pushedEntities,
-                        arg2 = s.pulledNotes
+                val hasPulledData = s.pulledNotes > 0 ||
+                    s.pulledCategories > 0 ||
+                    s.pulledLinks > 0 ||
+                    s.pulledStreamItems > 0 ||
+                    s.mediaDownloaded > 0 ||
+                    settingsApplied
+                if (hasPulledData) {
+                    syncTriggerBus.notifyRemoteApplied()
+                }
+                if (!silent) {
+                    _effects.trySend(
+                        CloudSyncUiEffect.ShowMessage(
+                            messageRes = R.string.cloud_sync_completed_summary,
+                            arg1 = s.pushedEntities,
+                            arg2 = s.pulledNotes
+                        )
                     )
-                )
+                }
             }
             is AppResult.Failure -> {
-                _effects.trySend(CloudSyncUiEffect.ShowMessage(mapErrorToRes(res.error)))
+                if (!silent) _effects.trySend(CloudSyncUiEffect.ShowMessage(mapErrorToRes(res.error)))
             }
         }
     }

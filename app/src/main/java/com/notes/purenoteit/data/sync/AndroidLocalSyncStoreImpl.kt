@@ -25,6 +25,7 @@ import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.sync.LocalSyncSnapshot
 import com.notes.purenoteit.sync.LocalSyncStore
 import com.notes.purenoteit.sync.ResolvedRemoteBatch
+import com.notes.purenoteit.sync.SubPageSyncRemapper
 import com.notes.purenoteit.sync.model.SyncCursorState
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -58,6 +59,8 @@ internal class AndroidLocalSyncStoreImpl @Inject constructor(
 ) : LocalSyncStore {
 
     private val cursorMutex = Mutex()
+    @Volatile
+    private var didCheckLegacyMedia = false
     private val cursorJson = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -71,10 +74,17 @@ internal class AndroidLocalSyncStoreImpl @Inject constructor(
     override suspend fun readModifiedSince(sinceMillis: Long): AppResult<LocalSyncSnapshot, DataError.Local> =
         withContext(ioDispatcher) {
             try {
+                if (!didCheckLegacyMedia) {
+                    migrateLegacyMediaReferencesOnce()
+                    didCheckLegacyMedia = true
+                }
+                val rawNotes = noteDao.getNotesModifiedSinceSuspend(sinceMillis).map { entity ->
+                    canonicalizeNoteEntityMediaIfNeeded(entity)?.toDomain() ?: entity.toDomain()
+                }
                 AppResult.Success(
                     LocalSyncSnapshot(
                         categories = categoryDao.getCategoriesModifiedSinceSuspend(sinceMillis).map { it.toDomain() },
-                        notes = noteDao.getNotesModifiedSinceSuspend(sinceMillis).map { it.toDomain() },
+                        notes = rawNotes,
                         noteLinks = noteLinkDao.getLinksModifiedSinceSuspend(sinceMillis).map { it.toDomain() },
                         streamItems = streamItemDao.getStreamItemsModifiedSinceSuspend(sinceMillis).map { it.toDomain() },
                         automationRules = automationRuleDao.getRulesModifiedSinceSuspend(sinceMillis).map { it.toDomain() }
@@ -86,6 +96,78 @@ internal class AndroidLocalSyncStoreImpl @Inject constructor(
                 AppResult.Failure(DataError.Local.UNKNOWN)
             }
         }
+
+    private suspend fun migrateLegacyMediaReferencesOnce() {
+        try {
+            val allNotes = noteDao.getNotesModifiedSinceSuspend(Long.MIN_VALUE)
+            for (entity in allNotes) {
+                if (entity.deletedAt != null) continue
+                canonicalizeNoteEntityMediaIfNeeded(entity)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
+    }
+
+    private suspend fun canonicalizeNoteEntityMediaIfNeeded(
+        entity: com.notes.purenoteit.data.db.NoteData
+    ): com.notes.purenoteit.data.db.NoteData? {
+        var changed = false
+        var updatedDesc = entity.description
+
+        if (!updatedDesc.isNullOrBlank() && updatedDesc.startsWith("NOTION_BLOCKS_V1:")) {
+            val blocks = BlockParser.parse(updatedDesc)
+            var blocksChanged = false
+            val migratedBlocks = blocks.map { blk ->
+                val rawPath = blk.mediaPath
+                if ((blk.type == BlockType.IMAGE || blk.type == BlockType.DRAWING || blk.type == BlockType.AUDIO) &&
+                    !rawPath.isNullOrBlank() && !mediaPathResolver.isCanonicalRelativePath(rawPath)
+                ) {
+                    val migrated = mediaPathResolver.migrateToCanonicalRelativeIfNeeded(rawPath)
+                    if (!migrated.isNullOrBlank() && migrated != rawPath && mediaPathResolver.isCanonicalRelativePath(migrated)) {
+                        blocksChanged = true
+                        blk.copy(mediaPath = migrated)
+                    } else blk
+                } else blk
+            }
+            if (blocksChanged) {
+                updatedDesc = BlockParser.serialize(migratedBlocks)
+                changed = true
+            }
+        }
+
+        val updatedImages = entity.images?.map { raw ->
+            if (!mediaPathResolver.isCanonicalRelativePath(raw)) {
+                val migrated = mediaPathResolver.migrateToCanonicalRelativeIfNeeded(raw)
+                if (!migrated.isNullOrBlank() && migrated != raw && mediaPathResolver.isCanonicalRelativePath(migrated)) {
+                    changed = true
+                    migrated
+                } else raw
+            } else raw
+        }
+
+        val updatedSounds = entity.sounds?.map { raw ->
+            if (!mediaPathResolver.isCanonicalRelativePath(raw)) {
+                val migrated = mediaPathResolver.migrateToCanonicalRelativeIfNeeded(raw)
+                if (!migrated.isNullOrBlank() && migrated != raw && mediaPathResolver.isCanonicalRelativePath(migrated)) {
+                    changed = true
+                    migrated
+                } else raw
+            } else raw
+        }
+
+        if (!changed) return null
+        val bumped = entity.copy(
+            description = updatedDesc,
+            images = updatedImages,
+            sounds = updatedSounds,
+            updatedAt = maxOf(entity.updatedAt + 1L, System.currentTimeMillis()),
+            syncVersion = entity.syncVersion + 1L
+        )
+        noteDao.upsertNote(bumped)
+        return bumped
+    }
 
     override suspend fun applyResolvedRemoteBatch(batch: ResolvedRemoteBatch): AppResult<Unit, DataError.Local> =
         withContext(ioDispatcher) {
@@ -114,8 +196,9 @@ internal class AndroidLocalSyncStoreImpl @Inject constructor(
                         noteIdByUuid[n.syncUuid] = n.id
                     }
 
-                    val insertedOrUpdatedNotes = mutableListOf<Note>()
+                    val remoteBatchNoteUuids = HashSet<String>(batch.notes.size)
                     for (note in batch.notes) {
+                        remoteBatchNoteUuids += note.syncUuid
                         val existing = noteDao.getNoteBySyncUuidIncludingDeletedSuspend(note.syncUuid)
                         val resolvedId = existing?.id ?: 0
                         val resolvedCategoryId = note.categorySyncUuid?.let { categoryIdByUuid[it] }
@@ -134,20 +217,10 @@ internal class AndroidLocalSyncStoreImpl @Inject constructor(
                         val saved = noteDao.getNoteBySyncUuidIncludingDeletedSuspend(readyNote.syncUuid)
                         if (saved != null) {
                             noteIdByUuid[saved.syncUuid] = saved.id
-                            insertedOrUpdatedNotes += saved.toDomain()
                         }
                     }
 
-                    // 2b. Remap local Int subpage/parent pointers inside blocks via cross-device UUIDs
-                    for (savedNote in insertedOrUpdatedNotes) {
-                        if (savedNote.deletedAt != null) continue
-                        val updatedNote = remapSubPageLocalIds(savedNote, noteIdByUuid)
-                        if (updatedNote != savedNote) {
-                            noteDao.upsertNote(updatedNote.toEntity())
-                        }
-                    }
-
-                    // 3. NoteLinks (require both sourceNoteId & targetNoteId to exist locally)
+                    // 3. NoteLinks (commit before subpage remapping so links assist legacy UUID lookup)
                     for (link in batch.noteLinks) {
                         val sourceId = noteIdByUuid[link.sourceSyncUuid]
                         val targetId = noteIdByUuid[link.targetSyncUuid]
@@ -159,6 +232,20 @@ internal class AndroidLocalSyncStoreImpl @Inject constructor(
                             targetNoteId = targetId
                         ).toEntity(link.updatedAt)
                         noteLinkDao.upsertSuspend(entity)
+                    }
+
+                    // 3b. Remap local Int subpage/parent pointers across all active notes & strip colliding foreign IDs
+                    if (batch.notes.isNotEmpty() || batch.noteLinks.isNotEmpty()) {
+                        val allNotes = noteDao.getNotesModifiedSinceSuspend(Long.MIN_VALUE).map { it.toDomain() }
+                        val allLinks = noteLinkDao.getLinksModifiedSinceSuspend(Long.MIN_VALUE).map { it.toDomain() }
+                        val remappedUpdates = SubPageSyncRemapper.remapActiveNotes(
+                            allNotes = allNotes,
+                            allLinks = allLinks,
+                            remoteBatchNoteUuids = remoteBatchNoteUuids
+                        )
+                        for (updatedNote in remappedUpdates) {
+                            noteDao.upsertNote(updatedNote.toEntity())
+                        }
                     }
 
                     // 4. StreamItems & AutomationRules
@@ -288,44 +375,6 @@ internal class AndroidLocalSyncStoreImpl @Inject constructor(
         if (!temp.renameTo(cursorFile)) {
             temp.copyTo(cursorFile, overwrite = true)
             temp.delete()
-        }
-    }
-
-    private fun remapSubPageLocalIds(note: Note, noteIdByUuid: Map<String, Int>): Note {
-        var changed = false
-        var updatedDesc = note.description
-        if (!updatedDesc.isNullOrBlank() && updatedDesc.startsWith("NOTION_BLOCKS_V1:")) {
-            val blocks = BlockParser.parse(updatedDesc)
-            var blocksChanged = false
-            val remapped = blocks.map { blk ->
-                if (blk.type == BlockType.SUB_PAGE && !blk.subPageSyncUuid.isNullOrBlank()) {
-                    val localSubId = noteIdByUuid[blk.subPageSyncUuid]
-                    if (localSubId != null && localSubId != blk.subPageNoteId) {
-                        blocksChanged = true
-                        blk.copy(subPageNoteId = localSubId)
-                    } else blk
-                } else blk
-            }
-            if (blocksChanged) {
-                updatedDesc = BlockParser.serialize(remapped)
-                changed = true
-            }
-        }
-
-        var updatedRich = note.richBlocksJson
-        val meta = BlockParser.parseRichMetadata(updatedRich)
-        if (meta != null && meta.isSubPage && !meta.parentSyncUuid.isNullOrBlank()) {
-            val localParentId = noteIdByUuid[meta.parentSyncUuid]
-            if (localParentId != null && localParentId != meta.parentNoteId) {
-                updatedRich = BlockParser.buildSubPageMetadataJson(localParentId, meta.parentSyncUuid)
-                changed = true
-            }
-        }
-
-        return if (changed) {
-            note.copy(description = updatedDesc, richBlocksJson = updatedRich)
-        } else {
-            note
         }
     }
 

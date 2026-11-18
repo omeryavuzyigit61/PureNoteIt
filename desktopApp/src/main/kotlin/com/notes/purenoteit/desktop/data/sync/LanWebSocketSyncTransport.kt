@@ -21,9 +21,14 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.application.install
-import io.ktor.server.cio.CIO as ServerCIO
+import io.ktor.server.netty.Netty as ServerCIO
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.engine.sslConnector
+import io.ktor.network.tls.certificates.generateCertificate
+import java.security.KeyStore
+import java.security.cert.X509Certificate
+import javax.net.ssl.X509TrustManager
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
@@ -50,6 +55,7 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -76,13 +82,43 @@ internal class LanWebSocketSyncServer : AutoCloseable {
     var activePort: Int = 0
         private set
 
+    /** SHA-256 (hex, lowercase) of the ephemeral TLS certificate; clients pin to this value. */
+    var certFingerprintHex: String = ""
+        private set
+
     suspend fun start(pairCode: CharArray, requestedPort: Int = 0): Pair<String, Int> = mutex.withLock {
         stopLocked()
         val digest = hashPasscode(pairCode)
         expectedTokenDigest = digest
+        authFailures.set(0)
+        lockoutUntilMs = 0L
         val hostAddress = resolveLocalIpv4Address()
 
-        val started = embeddedServer(ServerCIO, port = requestedPort, host = "0.0.0.0") {
+        val keyPassword = java.util.UUID.randomUUID().toString().toCharArray()
+        val keyStore: KeyStore = generateCertificate(
+            file = null,
+            algorithm = "SHA256withRSA",
+            keyAlias = TLS_ALIAS,
+            keyPassword = String(keyPassword),
+            jksPassword = String(keyPassword),
+            keySizeInBits = 2048
+        )
+        certFingerprintHex = sha256Hex((keyStore.getCertificate(TLS_ALIAS) as X509Certificate).encoded)
+
+        val started = embeddedServer(
+            ServerCIO,
+            configure = {
+                sslConnector(
+                    keyStore = keyStore,
+                    keyAlias = TLS_ALIAS,
+                    keyStorePassword = { keyPassword },
+                    privateKeyPassword = { keyPassword }
+                ) {
+                    port = requestedPort
+                    host = "0.0.0.0"
+                }
+            }
+        ) {
             install(WebSockets)
 
             routing {
@@ -192,11 +228,28 @@ internal class LanWebSocketSyncServer : AutoCloseable {
         expectedTokenDigest = null
     }
 
+    private val authFailures = AtomicInteger(0)
+
+    @Volatile
+    private var lockoutUntilMs: Long = 0L
+
+    /**
+     * Constant-time token check with brute-force throttling: after [MAX_AUTH_FAILURES] consecutive bad tokens
+     * every request is rejected for [LOCKOUT_MS], so a peer on the same Wi-Fi cannot guess the pairing code online.
+     */
     private fun isAuthorized(authHeader: String?): Boolean {
         val expected = expectedTokenDigest ?: return false
+        if (System.currentTimeMillis() < lockoutUntilMs) return false
         val provided = authHeader?.removePrefix("Bearer ")?.trim() ?: return false
         val providedBytes = provided.toByteArray(Charsets.UTF_8)
-        return MessageDigest.isEqual(expected, providedBytes)
+        val ok = MessageDigest.isEqual(expected, providedBytes)
+        if (ok) {
+            authFailures.set(0)
+        } else if (authFailures.incrementAndGet() >= MAX_AUTH_FAILURES) {
+            authFailures.set(0)
+            lockoutUntilMs = System.currentTimeMillis() + LOCKOUT_MS
+        }
+        return ok
     }
 
     private fun isValidMediaKey(key: String): Boolean =
@@ -207,6 +260,14 @@ internal class LanWebSocketSyncServer : AutoCloseable {
     }
 
     companion object {
+        const val TLS_ALIAS = "purenoteit-lan"
+
+        fun sha256Hex(bytes: ByteArray): String =
+            MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+        private const val MAX_AUTH_FAILURES = 5
+        private const val LOCKOUT_MS = 60_000L
+
         fun hashPasscode(passcode: CharArray): ByteArray {
             val bytes = String(passcode).toByteArray(Charsets.UTF_8)
             val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
@@ -237,7 +298,8 @@ internal class LanWebSocketSyncServer : AutoCloseable {
 internal class LanWebSocketSyncDataSourceImpl(
     private val baseHttpUrl: String,
     private val bearerHexToken: String,
-    httpEngine: HttpClientEngine = CIO.create()
+    pinnedCertSha256Hex: String? = null,
+    httpEngine: HttpClientEngine = createPinnedEngine(pinnedCertSha256Hex)
 ) : RemoteSyncDataSource {
 
     private val client = HttpClient(httpEngine)
@@ -324,4 +386,32 @@ internal class LanWebSocketSyncDataSourceImpl(
             AppResult.Failure(DataError.Network.NO_CONNECTION)
         }
     }
+}
+
+/** Builds a CIO engine that accepts only the server certificate whose SHA-256 equals [pinHex]. */
+internal fun createPinnedEngine(pinHex: String?): HttpClientEngine {
+    if (pinHex.isNullOrBlank()) return CIO.create()
+    val expected = pinHex.lowercase()
+    val trust = object : X509TrustManager {
+        override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) =
+            throw java.security.cert.CertificateException("client certs not accepted")
+
+        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+            val leaf = chain?.firstOrNull() ?: throw java.security.cert.CertificateException("empty chain")
+            val actual = LanWebSocketSyncServer.sha256Hex(leaf.encoded)
+            if (!MessageDigest.isEqual(actual.toByteArray(), expected.toByteArray())) {
+                throw java.security.cert.CertificateException("LAN peer certificate fingerprint mismatch")
+            }
+        }
+
+        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+    }
+    return CIO.create { https { trustManager = trust } }
+}
+
+/** Splits `https://host:port#<sha256hex>` into base URL and pin. */
+internal fun parseLanPeerUrl(raw: String): Pair<String, String?> {
+    val clean = raw.trim()
+    val idx = clean.indexOf('#')
+    return if (idx < 0) clean to null else clean.substring(0, idx) to clean.substring(idx + 1).trim().ifEmpty { null }
 }

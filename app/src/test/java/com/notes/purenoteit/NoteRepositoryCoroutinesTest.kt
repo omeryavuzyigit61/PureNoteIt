@@ -74,4 +74,35 @@ class NoteRepositoryCoroutinesTest {
             })
         }
     }
+
+    @Test
+    fun `updateNote mevcut notun syncUuid degerini yeni rastgele UUID ile ezmemelidir`() = runTest(testDispatcher) {
+        val existingEntity = NoteData(
+            title = "Eski Başlık",
+            description = "İçerik",
+            date = 1000L,
+            syncUuid = "original-immutable-uuid",
+            categorySyncUuid = "cat-default-1",
+            syncVersion = 3L
+        ).apply { id = 7 }
+        coEvery { mockDao.getNoteByIdIncludingDeletedSuspend(7) } returns existingEntity
+
+        val uiSavedNote = Note(
+            id = 7,
+            title = "Yeni Başlık",
+            description = "Güncel",
+            date = 1000L,
+            syncUuid = "brand-new-random-uuid"
+        )
+        repository.updateNote(uiSavedNote)
+
+        coVerify(exactly = 1) {
+            mockDao.updateNote(match {
+                it.id == 7 &&
+                    it.syncUuid == "original-immutable-uuid" &&
+                    it.categorySyncUuid == "cat-default-1" &&
+                    it.syncVersion == 4L
+            })
+        }
+    }
 }

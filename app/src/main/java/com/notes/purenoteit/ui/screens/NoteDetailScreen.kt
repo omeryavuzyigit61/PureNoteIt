@@ -242,6 +242,7 @@ fun NoteDetailScreen(
     var currentNoteId by rememberSaveable(noteId) { mutableIntStateOf(noteId) }
     var noteRichBlocksJson by rememberSaveable(noteId) { mutableStateOf<String?>(null) }
     var isInitialLoadCompleted by remember(noteId) { mutableStateOf(noteId == -1 && currentNoteId == -1) }
+    var lastPersistedSignature by remember(noteId) { mutableStateOf<String?>(null) }
 
     var title by remember(noteId) { mutableStateOf("") }
     var selectedIcon by remember(noteId) { mutableStateOf<String?>(null) }
@@ -336,6 +337,7 @@ fun NoteDetailScreen(
 
     // Gatekeeper & Vault Security states
     var loadedNoteRef by remember { mutableStateOf<NoteData?>(null) }
+    var currentNoteSyncUuid by rememberSaveable(noteId) { mutableStateOf(java.util.UUID.randomUUID().toString()) }
     var isAccessGranted by remember(noteId) { mutableStateOf(noteId == -1 || SecurityUtil.isVaultUnlocked) }
     var showGatekeeperPinDialog by remember { mutableStateOf(false) }
     var gatekeeperPinInput by remember { mutableStateOf("") }
@@ -443,15 +445,25 @@ fun NoteDetailScreen(
             ?: allNotesForLinking.find { it.id == currentNoteId }
         val json = noteRichBlocksJson ?: currentNoteObj?.richBlocksJson
         val meta = BlockParser.parseRichMetadata(json)
-        val parentByUuid = meta?.parentSyncUuid?.takeIf { it.isNotBlank() }?.let { uuid ->
-            allNotesForLinking.find { it.syncUuid == uuid }?.id
+        val parentUuid = meta?.parentSyncUuid?.takeIf { it.isNotBlank() }
+        if (parentUuid != null) {
+            return@remember allNotesForLinking.find { it.syncUuid == parentUuid }?.id
         }
-        if (parentByUuid != null) return@remember parentByUuid
 
         val idFromJson = meta?.parentNoteId ?: if (json != null) {
             Regex(""""parentNoteId"\s*:\s*(\d+)""").find(json)?.groupValues?.get(1)?.toIntOrNull()
         } else null
-        if (idFromJson != null) return@remember idFromJson
+        if (idFromJson != null) {
+            val candidateParent = allNotesForLinking.find { it.id == idFromJson }
+            val currentSyncUuid = currentNoteObj?.syncUuid?.takeIf { it.isNotBlank() }
+            if (candidateParent != null && candidateParent.description?.let { desc ->
+                    (currentSyncUuid != null && desc.contains("\"subPageSyncUuid\":\"$currentSyncUuid\"")) ||
+                        desc.contains("\"subPageNoteId\":$currentNoteId")
+                } == true
+            ) {
+                return@remember candidateParent.id
+            }
+        }
 
         // Fallback: Check if any note in allNotesForLinking has a SUB_PAGE block referencing currentNoteId or syncUuid
         val currentSyncUuid = currentNoteObj?.syncUuid?.takeIf { it.isNotBlank() }
@@ -538,6 +550,32 @@ fun NoteDetailScreen(
         }
     }
 
+    fun buildEditorPersistedSignature(): String {
+        val persistedBlocks = blocks
+            .filterNot { it.type == BlockType.PAGE_RELATIONS }
+            .map { blk ->
+                if (blk.type == BlockType.SUB_PAGE && !blk.subPageSyncUuid.isNullOrBlank()) {
+                    blk.copy(subPageNoteId = null)
+                } else {
+                    blk
+                }
+            }
+        return listOf(
+            title.trim(),
+            BlockParser.serialize(persistedBlocks),
+            isPinned.toString(),
+            selectedCategoryId.toString(),
+            selectedIcon.orEmpty(),
+            noteRichBlocksJson.orEmpty(),
+            reminderTime?.toString().orEmpty(),
+            reminderType,
+            reminderSound,
+            isReminderDone.toString(),
+            noteStatus,
+            isPassword.toString()
+        ).joinToString("|#|")
+    }
+
     fun populateNoteBlocks(note: NoteData): Boolean {
         val rawDesc = if (note.isEncrypted || SecurityUtil.isEncryptedPayload(note.description)) {
             when (val decrypted = SecurityUtil.decryptSafe(note.description ?: "")) {
@@ -574,6 +612,7 @@ fun NoteDetailScreen(
         if (blocks.isEmpty()) {
             blocks.add(NoteBlock())
         }
+        lastPersistedSignature = buildEditorPersistedSignature()
         return true
     }
 
@@ -619,6 +658,7 @@ fun NoteDetailScreen(
             if (note != null) {
                 loadedNoteRef = note
                 currentNoteId = note.id
+                note.syncUuid.takeIf { it.isNotBlank() }?.let { currentNoteSyncUuid = it }
                 noteRichBlocksJson = note.richBlocksJson
                 selectedIcon = note.icon
                 val isCatLocked = categoryList.find { it.id == (note.categoryId ?: 1) }?.isPassword == true
@@ -704,6 +744,7 @@ fun NoteDetailScreen(
                         context.contentResolver.openInputStream(pickedUri)?.use { input ->
                             stagingFile.outputStream().use { output -> input.copyTo(output) }
                         } ?: return@withContext null
+                        com.notes.purenoteit.util.AndroidImageOptimizer.optimizeStagingImageFile(stagingFile)
                         noteViewModel.mediaPathResolver.importExistingFile(
                             sourcePath = stagingFile.absolutePath,
                             subFolder = "images",
@@ -942,11 +983,24 @@ fun NoteDetailScreen(
 
         val isSelectedCategoryLocked = categoryList.find { it.id == validCategoryId }?.isPassword == true
         val effectiveLocked = isPassword || isSelectedCategoryLocked
-        val finalContent = if (effectiveLocked) SecurityUtil.encrypt(jsonContent) else jsonContent
+        val finalContent = if (effectiveLocked) SecurityUtil.encryptForVault(context, jsonContent) else jsonContent
+
+        val existingRef = loadedNoteRef?.takeIf { it.id == currentNoteId }
+            ?: allNotesForLinking.find { it.id == currentNoteId }
 
         val preservedRichJson = noteRichBlocksJson
-            ?: loadedNoteRef?.takeIf { it.id == currentNoteId }?.richBlocksJson
-            ?: allNotesForLinking.find { it.id == currentNoteId }?.richBlocksJson
+            ?: existingRef?.richBlocksJson
+
+        val preservedSyncUuid = existingRef?.syncUuid?.takeIf { it.isNotBlank() }
+            ?: currentNoteSyncUuid
+        val resolvedCategorySyncUuid = categoryList.find { it.id == validCategoryId }?.syncUuid?.takeIf { it.isNotBlank() }
+            ?: existingRef?.categorySyncUuid
+
+        val resolvedDeletedAt = if (targetStatus == "TRASH") {
+            existingRef?.deletedAt ?: System.currentTimeMillis()
+        } else {
+            null
+        }
 
         val note = NoteData(
             title = if (title.isBlank()) "Başlıksız Not" else title.trim(),
@@ -966,7 +1020,10 @@ fun NoteDetailScreen(
             reminderType = reminderType,
             reminderSound = reminderSound,
             isReminderDone = isReminderDone,
-            richBlocksJson = preservedRichJson
+            richBlocksJson = preservedRichJson,
+            syncUuid = preservedSyncUuid,
+            categorySyncUuid = resolvedCategorySyncUuid,
+            deletedAt = resolvedDeletedAt
         )
         if (currentNoteId != -1) {
             note.id = currentNoteId
@@ -979,11 +1036,51 @@ fun NoteDetailScreen(
     var openWhenReadyBlockId by remember { mutableStateOf<String?>(null) }
     var lastParentSubPageEditTime by remember { mutableLongStateOf(0L) }
 
+    fun resolveSubPageTarget(block: NoteBlock): NoteData? {
+        val subUuid = block.subPageSyncUuid?.takeIf { it.isNotBlank() }
+        if (subUuid != null) {
+            return allNotesForLinking.find { it.syncUuid == subUuid }
+        }
+        val subId = block.subPageNoteId
+        val cleanTitle = block.content.trim()
+        if (subId != null) {
+            allNotesForLinking.find { candidate ->
+                candidate.id == subId && (
+                    BlockParser.isSubPageMetadata(candidate.richBlocksJson) ||
+                        (cleanTitle.isNotBlank() && candidate.title.orEmpty().trim().equals(cleanTitle, ignoreCase = true))
+                    )
+            }?.let { return it }
+        }
+        if (cleanTitle.isNotBlank()) {
+            return allNotesForLinking.find { candidate ->
+                candidate.status != "TRASH" &&
+                    BlockParser.isSubPageMetadata(candidate.richBlocksJson) &&
+                    candidate.title.orEmpty().trim().equals(cleanTitle, ignoreCase = true)
+            }
+        }
+        return null
+    }
+
+    /**
+     * Cleans local pending subpage tracking and soft-deletes the referenced child note only
+     * when it is a verified subpage, preventing collided legacy IDs from deleting unrelated notes.
+     */
+    fun removeSubPageChildReference(subBlock: NoteBlock) {
+        pendingSubPageBlockIds.remove(subBlock.id)
+        if (openWhenReadyBlockId == subBlock.id) {
+            openWhenReadyBlockId = null
+        }
+        val childNote = resolveSubPageTarget(subBlock)
+        if (childNote != null && BlockParser.isSubPageMetadata(childNote.richBlocksJson)) {
+            permanentlyDeletedSubPageIds.add(childNote.id)
+            noteViewModel.deleteNoteById(childNote.id)
+        }
+    }
+
     fun syncSubPageTitlesToChildren() {
         for (blk in blocks) {
             if (blk.type == BlockType.SUB_PAGE) {
-                val childId = blk.subPageNoteId ?: continue
-                val childNote = allNotesForLinking.find { it.id == childId && it.status != "TRASH" } ?: continue
+                val childNote = resolveSubPageTarget(blk)?.takeIf { it.status != "TRASH" } ?: continue
                 val desiredTitle = if (blk.content.isBlank()) "Yeni Alt Sayfa" else blk.content.trim()
                 if (childNote.title != desiredTitle) {
                     val currentParentSync = allNotesForLinking.find { it.id == currentNoteId }?.syncUuid
@@ -1020,6 +1117,7 @@ fun NoteDetailScreen(
                 block.content + " " + block.toggleBody
             }
         }
+        lastPersistedSignature = buildEditorPersistedSignature()
         noteViewModel.saveNote(note, contentForLinks = allContentText) { actualId ->
             currentNoteId = actualId
             onDone?.invoke(actualId)
@@ -1037,6 +1135,7 @@ fun NoteDetailScreen(
                 block.content + " " + block.toggleBody
             }
         }
+        lastPersistedSignature = buildEditorPersistedSignature()
         noteViewModel.saveNote(note, contentForLinks = allContentText) { actualId ->
             currentNoteId = actualId
             if (reminderTime != null && reminderTime!! > System.currentTimeMillis() && !isReminderDone) {
@@ -1065,6 +1164,10 @@ fun NoteDetailScreen(
 
     fun handleExitWithAutoSave() {
         if (isPassword && !isAccessGranted) {
+            safeNavigateBack()
+            return
+        }
+        if (currentNoteId != -1 && isInitialLoadCompleted && buildEditorPersistedSignature() == lastPersistedSignature) {
             safeNavigateBack()
             return
         }
@@ -1328,12 +1431,20 @@ fun NoteDetailScreen(
         }
     }
 
-    // Debounced real-time auto-save (800ms) - preserves Undo/Redo history in memory
-    LaunchedEffect(title, blocks.toList(), isPinned, selectedCategoryId, selectedIcon) {
-        if (!isInitialLoadCompleted) return@LaunchedEffect
-        delay(800L)
-        if (hasContent || currentNoteId != -1) {
-            performSilentAutoSave()
+    // Save & sync cleanly when leaving / backgrounding if edits are unsaved (no per-keystroke mid-typing sync)
+    val editorLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(editorLifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && isInitialLoadCompleted) {
+                val dirty = currentNoteId == -1 || buildEditorPersistedSignature() != lastPersistedSignature
+                if (dirty && (hasContent || currentNoteId != -1)) {
+                    performSilentAutoSave()
+                }
+            }
+        }
+        editorLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            editorLifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -1362,10 +1473,11 @@ fun NoteDetailScreen(
             for (i in blocks.indices) {
                 var b = blocks[i]
                 if (b.type == BlockType.SUB_PAGE) {
+                    val subUuid = b.subPageSyncUuid?.takeIf { it.isNotBlank() }
                     val subId = b.subPageNoteId
-                    if (subId != null) {
-                        val targetNote = allNotesForLinking.find { it.id == subId }
-                        if (targetNote == null || targetNote.status == "TRASH") {
+                    val targetNote = resolveSubPageTarget(b)
+                    if (targetNote != null) {
+                        if (targetNote.status == "TRASH") {
                             toRemove.add(b)
                             blocksModified = true
                         } else {
@@ -1375,12 +1487,34 @@ fun NoteDetailScreen(
                                 newTitle.isNotBlank() &&
                                 b.content != newTitle &&
                                 !(b.content.isEmpty() && newTitle == "Yeni Alt Sayfa")
-                            if (needTitleUpdate) {
-                                b = b.copy(content = newTitle)
+                            val needUuidBackfill = subUuid == null && targetNote.syncUuid.isNotBlank()
+                            val needLocalIdFix = b.subPageNoteId != targetNote.id
+                            if (needTitleUpdate || needUuidBackfill || needLocalIdFix) {
+                                b = b.copy(
+                                    content = if (needTitleUpdate) newTitle else b.content,
+                                    subPageNoteId = targetNote.id,
+                                    subPageSyncUuid = targetNote.syncUuid.ifBlank { b.subPageSyncUuid }
+                                )
                                 blocks[i] = b
-                                blocksModified = true
+                                if (needTitleUpdate || needUuidBackfill) {
+                                    blocksModified = true
+                                }
                             }
                         }
+                    } else if (subId != null && subUuid == null) {
+                        val colliding = allNotesForLinking.find { it.id == subId }
+                        if (colliding == null || colliding.status == "TRASH") {
+                            toRemove.add(b)
+                            blocksModified = true
+                        } else {
+                            // Drop foreign colliding integer ID instead of hijacking an unrelated note
+                            b = b.copy(subPageNoteId = null)
+                            blocks[i] = b
+                            blocksModified = true
+                        }
+                    } else if (subUuid != null) {
+                        toRemove.add(b)
+                        blocksModified = true
                     }
                 }
 
@@ -1467,10 +1601,12 @@ fun NoteDetailScreen(
                 val restoredChildren = allNotesForLinking.filter { candidate ->
                     val candidateMeta = BlockParser.parseRichMetadata(candidate.richBlocksJson)
                     val matchesParentByUuid = currentSyncUuid != null && candidateMeta?.parentSyncUuid == currentSyncUuid
-                    val matchesParentById = candidateMeta?.parentNoteId == currentNoteId ||
-                        candidate.richBlocksJson?.let { json ->
-                            Regex(""""parentNoteId"\s*:\s*$currentNoteId\b""").containsMatchIn(json)
-                        } == true
+                    val matchesParentById = candidateMeta?.parentSyncUuid.isNullOrBlank() && (
+                        candidateMeta?.parentNoteId == currentNoteId ||
+                            candidate.richBlocksJson?.let { json ->
+                                Regex(""""parentNoteId"\s*:\s*$currentNoteId\b""").containsMatchIn(json)
+                            } == true
+                        )
                     candidate.status != "TRASH" &&
                         candidate.id !in existingSubPageIds &&
                         candidate.id !in permanentlyDeletedSubPageIds &&
@@ -1796,12 +1932,18 @@ fun NoteDetailScreen(
                                     if (!isPassword) {
                                         if (SecurityUtil.isPasswordSet(context)) {
                                             isPassword = true
+                                            if (currentNoteId != -1 || hasContent) {
+                                                performSilentAutoSave()
+                                            }
                                             context.showToastShort(context.getString(R.string.note_aes_encrypted_toast))
                                         } else {
                                             showPasswordDialog = true
                                         }
                                     } else {
                                         isPassword = false
+                                        if (currentNoteId != -1 || hasContent) {
+                                            performSilentAutoSave()
+                                        }
                                         context.showToastShort(context.getString(R.string.note_lock_removed_toast))
                                     }
                                 }
@@ -2843,15 +2985,7 @@ fun NoteDetailScreen(
                         },
                         onDeleteSubPage = { subBlock ->
                             recordUndoState()
-                            pendingSubPageBlockIds.remove(subBlock.id)
-                            if (openWhenReadyBlockId == subBlock.id) {
-                                openWhenReadyBlockId = null
-                            }
-                            val childId = subBlock.subPageNoteId
-                            if (childId != null) {
-                                permanentlyDeletedSubPageIds.add(childId)
-                                noteViewModel.deleteNoteById(childId)
-                            }
+                            removeSubPageChildReference(subBlock)
                             blocks.removeAll { it.id == subBlock.id }
                             performSilentAutoSave()
                             context.showToastShort(context.getString(R.string.delete) + ": " + (subBlock.content.ifBlank { context.getString(R.string.new_subpage_default) }))
@@ -2946,15 +3080,7 @@ fun NoteDetailScreen(
                         recordUndoState()
                         val blockToDelete = blocks.getOrNull(index)
                         if (blockToDelete?.type == BlockType.SUB_PAGE) {
-                            pendingSubPageBlockIds.remove(blockToDelete.id)
-                            if (openWhenReadyBlockId == blockToDelete.id) {
-                                openWhenReadyBlockId = null
-                            }
-                            val childId = blockToDelete.subPageNoteId
-                            if (childId != null) {
-                                permanentlyDeletedSubPageIds.add(childId)
-                                noteViewModel.deleteNoteById(childId)
-                            }
+                            removeSubPageChildReference(blockToDelete)
                         }
                         if (blocks.size > 1) {
                             blocks.removeAt(index)
@@ -2965,6 +3091,15 @@ fun NoteDetailScreen(
                     },
                     onMoveUp = if (canMoveUp) moveBlockUpVisible else null,
                     onMoveDown = if (canMoveDown) moveBlockDownVisible else null,
+                    onInkChange = { ink, preview ->
+                        if (index in blocks.indices) {
+                            blocks[index] = blocks[index].copy(
+                                inkJson = ink,
+                                mediaPath = preview ?: blocks[index].mediaPath
+                            )
+                            performSilentAutoSave()
+                        }
+                    },
                     onEditDrawing = { existingPath ->
                         editingDrawingPath = existingPath
                         editingDrawingBlockIndex = index
@@ -3067,9 +3202,12 @@ fun NoteDetailScreen(
             onSelectBlock = { type ->
                 if (type == BlockType.DRAWING) {
                     recordUndoState()
-                    editingDrawingPath = null
-                    editingDrawingBlockIndex = null
-                    showDrawingSheet = true
+                    blocks.add(
+                        NoteBlock(
+                            type = BlockType.DRAWING,
+                            inkJson = com.notes.purenoteit.model.InkCodec.encode(com.notes.purenoteit.model.InkDocument())
+                        )
+                    )
                 } else if (type == BlockType.SUB_PAGE) {
                     addSubPageBlock()
                 } else {
@@ -4041,6 +4179,7 @@ fun NoteDetailScreen(
                     onClick = {
                         if (SecurityUtil.verifyPassword(context, gatekeeperPinInput.toCharArray())) {
                             SecurityUtil.unlockVault()
+                            noteViewModel.migrateUnlockedLegacyEncryptedNotes()
                             isAccessGranted = true
                             showGatekeeperPinDialog = false
                             val pendingAction = gatekeeperSuccessAction

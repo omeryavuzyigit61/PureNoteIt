@@ -136,6 +136,21 @@ class DesktopHomeStateHolderTest {
                     waitUntil { stateHolder.uiState.value.allActiveNotes.size == 2 }
                     assertEquals(SplitViewMode.SUB_PAGE, stateHolder.uiState.value.splitViewMode)
 
+                    // Sub-pages MUST stay hidden from root listing (Kartlar/Liste/Pano/Takvim), while visual modes toggle cleanly
+                    assertEquals(1, stateHolder.uiState.value.rootActiveNotes.size)
+                    assertTrue(stateHolder.uiState.value.filteredNotes.none { it.title == "Faz 4 Kontrolü" })
+                    assertTrue(stateHolder.uiState.value.showSubPagesInVisualModes)
+                    stateHolder.onEvent(DesktopUiEvent.ToggleShowSubPagesInVisualModes)
+                    assertFalse(stateHolder.uiState.value.showSubPagesInVisualModes)
+                    stateHolder.onEvent(DesktopUiEvent.ToggleShowSubPagesInVisualModes)
+                    assertTrue(stateHolder.uiState.value.showSubPagesInVisualModes)
+
+                    // Explicit search surfaces sub-page and clearing hides it again
+                    stateHolder.onEvent(DesktopUiEvent.UpdateSearchQuery("Faz 4"))
+                    assertTrue(stateHolder.uiState.value.filteredNotes.any { it.title == "Faz 4 Kontrolü" })
+                    stateHolder.onEvent(DesktopUiEvent.UpdateSearchQuery(""))
+                    assertTrue(stateHolder.uiState.value.filteredNotes.none { it.title == "Faz 4 Kontrolü" })
+
                     stateHolder.onEvent(
                         DesktopUiEvent.RunCodeBlock("sql-1", "sql", "SELECT 40 + 2 AS answer;")
                     )
@@ -155,11 +170,15 @@ class DesktopHomeStateHolderTest {
                     waitUntil { stateHolder.uiState.value.allActiveNotes.any { it.syncUuid == createdUuid } }
                     assertFalse(stateHolder.uiState.value.trashedNotes.any { it.syncUuid == createdUuid })
 
-                    // Open note -> NavigateHome brings user cleanly back to Home cards grid
+                    // Open note -> Edit -> NavigateHome preserves existing syncUuid without creating duplicates
                     stateHolder.onEvent(DesktopUiEvent.SelectNote(createdUuid))
                     waitUntil { stateHolder.uiState.value.selectedNoteSyncUuid == createdUuid }
+                    stateHolder.onEvent(DesktopUiEvent.UpdateTitle("Masaüstü Mimari Güncel"))
                     stateHolder.onEvent(DesktopUiEvent.NavigateHome)
-                    waitUntil { stateHolder.uiState.value.selectedNoteSyncUuid == null }
+                    waitUntil {
+                        stateHolder.uiState.value.selectedNoteSyncUuid == null &&
+                            stateHolder.uiState.value.allActiveNotes.any { it.syncUuid == createdUuid && it.title == "Masaüstü Mimari Güncel" }
+                    }
                     assertEquals(2, stateHolder.uiState.value.allActiveNotes.size)
 
                     // Starter Template, Home View Mode, Note Status & Category Dialog Lifecycle
@@ -193,8 +212,47 @@ class DesktopHomeStateHolderTest {
                     waitUntil {
                         stateHolder.uiState.value.allActiveNotes.first { it.syncUuid == templateNoteUuid }.status == "IN_PROGRESS"
                     }
+                    stateHolder.onEvent(DesktopUiEvent.UpdateNoteStatus(templateNoteUuid, "IN_REVIEW"))
+                    waitUntil {
+                        stateHolder.uiState.value.allActiveNotes.first { it.syncUuid == templateNoteUuid }.status == "IN_REVIEW"
+                    }
                     stateHolder.onEvent(DesktopUiEvent.NavigateHome)
                     waitUntil { stateHolder.uiState.value.selectedNoteSyncUuid == null }
+
+                    // Creating a task note directly inside a Kanban column sets initial status
+                    stateHolder.onEvent(DesktopUiEvent.CreateNewNoteWithStatus("IN_REVIEW"))
+                    waitUntil {
+                        val uuid = stateHolder.uiState.value.selectedNoteSyncUuid
+                        uuid != null && stateHolder.uiState.value.allActiveNotes.any { it.syncUuid == uuid }
+                    }
+                    val reviewUuid = stateHolder.uiState.value.selectedNoteSyncUuid!!
+                    assertEquals(
+                        "IN_REVIEW",
+                        stateHolder.uiState.value.allActiveNotes.first { it.syncUuid == reviewUuid }.status
+                    )
+                    stateHolder.onEvent(DesktopUiEvent.SoftDeleteNote(reviewUuid))
+                    assertTrue((awaitItem() as DesktopUiEffect.ShowMessage).message.contains("çöp kutusuna"))
+                    stateHolder.onEvent(DesktopUiEvent.PermanentDeleteNote(reviewUuid))
+                    assertTrue((awaitItem() as DesktopUiEffect.ShowMessage).message.contains("kalıcı"))
+                    waitUntil { stateHolder.uiState.value.trashedNotes.none { it.syncUuid == reviewUuid } }
+
+                    // Typing does NOT trigger auto-flush per keystroke; note stays dirty in RAM until Kaydet or NavigateHome
+                    stateHolder.onEvent(DesktopUiEvent.UpdateSearchQuery(""))
+                    stateHolder.onEvent(DesktopUiEvent.SelectNote(createdUuid))
+                    waitUntil { stateHolder.uiState.value.selectedNoteSyncUuid == createdUuid }
+                    stateHolder.onEvent(DesktopUiEvent.UpdateTitle("Bekleyen Taslak Başlık"))
+                    delay(600L)
+                    assertTrue(stateHolder.uiState.value.isEditorDirty)
+                    assertEquals(
+                        "Masaüstü Mimari Güncel",
+                        stateHolder.uiState.value.allActiveNotes.first { it.syncUuid == createdUuid }.title
+                    )
+                    stateHolder.onEvent(DesktopUiEvent.NavigateHome)
+                    waitUntil {
+                        stateHolder.uiState.value.selectedNoteSyncUuid == null &&
+                            !stateHolder.uiState.value.isEditorDirty &&
+                            stateHolder.uiState.value.allActiveNotes.first { it.syncUuid == createdUuid }.title == "Bekleyen Taslak Başlık"
+                    }
 
                     // Enable Master Password, lock vault -> UI clears notes from RAM, then unlock again
                     stateHolder.onEvent(DesktopUiEvent.EnableMasterPassword("MasterKasa#2026".toCharArray(), 5))
@@ -214,6 +272,33 @@ class DesktopHomeStateHolderTest {
                     // Correct password unlocks & restores note visibility
                     stateHolder.onEvent(DesktopUiEvent.UnlockVault("MasterKasa#2026".toCharArray()))
                     waitUntil { !stateHolder.uiState.value.isVaultLocked && stateHolder.uiState.value.allActiveNotes.size == 3 }
+
+                    // Thought Stream (Zaman Tüneli / Akış) -> Add & Convert to Note
+                    stateHolder.onEvent(DesktopUiEvent.SetHomeViewMode(DesktopViewMode.STREAM))
+                    assertEquals(DesktopViewMode.STREAM, stateHolder.uiState.value.homeViewMode)
+                    stateHolder.onEvent(DesktopUiEvent.AddStreamItem("Hızlı fikir testi"))
+                    waitUntil { stateHolder.uiState.value.streamItems.size == 1 }
+                    val streamUuid = stateHolder.uiState.value.streamItems.first().syncUuid
+                    stateHolder.onEvent(DesktopUiEvent.ConvertStreamItemsToNote(listOf(streamUuid), "Akış Notu"))
+                    assertTrue((awaitItem() as DesktopUiEffect.ShowMessage).message.contains("Akış Notu"))
+                    waitUntil {
+                        stateHolder.uiState.value.allActiveNotes.size == 4 &&
+                            stateHolder.uiState.value.streamItems.first().isProcessed
+                    }
+
+                    // Daily Agenda & Reminder + Zen Mode + Category Lock
+                    stateHolder.onEvent(DesktopUiEvent.CreateDailyAgenda)
+                    waitUntil { stateHolder.uiState.value.allActiveNotes.size == 5 }
+                    val agendaUuid = stateHolder.uiState.value.selectedNoteSyncUuid!!
+                    stateHolder.onEvent(DesktopUiEvent.SetNoteReminder(agendaUuid, clockMs + 3_600_000L))
+                    assertTrue((awaitItem() as DesktopUiEffect.ShowMessage).message.contains("takvime"))
+                    stateHolder.onEvent(DesktopUiEvent.SetZenReadingMode(true))
+                    assertTrue(stateHolder.uiState.value.showZenReadingMode)
+                    stateHolder.onEvent(DesktopUiEvent.SetZenReadingMode(false))
+                    val cat1 = stateHolder.uiState.value.categories.first()
+                    stateHolder.onEvent(DesktopUiEvent.ToggleCategoryLock(cat1.syncUuid))
+                    assertTrue((awaitItem() as DesktopUiEffect.ShowMessage).message.contains("kilit"))
+                    waitUntil { stateHolder.uiState.value.categories.first { it.syncUuid == cat1.syncUuid }.isPassword == true }
 
                     cancelAndIgnoreRemainingEvents()
                 }

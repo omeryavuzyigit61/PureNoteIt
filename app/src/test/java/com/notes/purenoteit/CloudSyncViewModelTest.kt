@@ -3,6 +3,7 @@ package com.notes.purenoteit
 import android.content.Context
 import app.cash.turbine.test
 import com.notes.purenoteit.data.security.AndroidOAuthPkceManager
+import com.notes.purenoteit.data.sync.CloudSyncTriggerBus
 import com.notes.purenoteit.domain.model.AppResult
 import com.notes.purenoteit.domain.model.DataError
 import com.notes.purenoteit.security.OAuthClientConfigProvider
@@ -44,6 +45,7 @@ class CloudSyncViewModelTest {
     private lateinit var syncEngine: SyncEngine
     private lateinit var autoSyncKeyCoordinator: AutoSyncKeyCoordinator
     private lateinit var activityContext: Context
+    private lateinit var triggerBus: CloudSyncTriggerBus
 
     @Before
     fun setup() {
@@ -54,6 +56,7 @@ class CloudSyncViewModelTest {
         syncEngine = mockk(relaxed = true)
         autoSyncKeyCoordinator = mockk()
         activityContext = mockk(relaxed = true)
+        triggerBus = CloudSyncTriggerBus()
 
         coEvery { tokenStorage.getTokenBundle() } returns AppResult.Success(null)
         coEvery { tokenStorage.getSyncPassphrase() } returns AppResult.Success(null)
@@ -229,11 +232,61 @@ class CloudSyncViewModelTest {
         assertNull(viewModel.uiState.value.lastSyncPulled)
     }
 
+    @Test
+    fun `debounced local change trigger runs auto sync and emits remoteAppliedEvents when notes pulled`() = runTest(testDispatcher) {
+        coEvery { tokenStorage.getTokenBundle() } returns AppResult.Success(
+            OAuthTokenBundle(accessToken = "tok", expiresAtEpochMillis = 9_999_999L)
+        )
+        coEvery { autoSyncKeyCoordinator.resolveOrBootstrapPassphrase() } returns AppResult.Success("auto-pass".toCharArray())
+        coEvery { syncEngine.synchronize(any()) } returns AppResult.Success(
+            SyncSummary(pulledNotes = 2, pushedEntities = 1, syncedAt = 5_000L)
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        triggerBus.remoteAppliedEvents.test {
+            triggerBus.requestAutoSync()
+            advanceUntilIdle()
+
+            awaitItem()
+            assertEquals(1, viewModel.uiState.value.lastSyncPushed)
+            assertEquals(2, viewModel.uiState.value.lastSyncPulled)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { syncEngine.synchronize(any()) }
+    }
+
+    @Test
+    fun `silent auto sync does not queue ShowMessage toasts or flip Settings manual isSyncing spinner`() = runTest(testDispatcher) {
+        coEvery { tokenStorage.getTokenBundle() } returns AppResult.Success(
+            OAuthTokenBundle(accessToken = "tok", expiresAtEpochMillis = 9_999_999L)
+        )
+        coEvery { autoSyncKeyCoordinator.resolveOrBootstrapPassphrase() } returns AppResult.Success("auto-pass".toCharArray())
+        coEvery { syncEngine.synchronize(any()) } returns AppResult.Success(
+            SyncSummary(pulledNotes = 3, pushedEntities = 2, syncedAt = 9_000L)
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.effects.test {
+            viewModel.triggerAutoSyncIfConnected(silent = true)
+            advanceUntilIdle()
+            expectNoEvents()
+            assertFalse(viewModel.uiState.value.isSyncing)
+            assertEquals(2, viewModel.uiState.value.lastSyncPushed)
+            assertEquals(3, viewModel.uiState.value.lastSyncPulled)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     private fun createViewModel(): CloudSyncViewModel = CloudSyncViewModel(
         oauthPkceManager = oauthPkceManager,
         configProvider = configProvider,
         tokenStorage = tokenStorage,
         syncEngine = syncEngine,
-        autoSyncKeyCoordinator = autoSyncKeyCoordinator
+        autoSyncKeyCoordinator = autoSyncKeyCoordinator,
+        syncTriggerBus = triggerBus
     )
 }

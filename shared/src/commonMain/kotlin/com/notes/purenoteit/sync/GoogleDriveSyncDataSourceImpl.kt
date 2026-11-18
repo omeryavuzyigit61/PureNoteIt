@@ -9,8 +9,10 @@ import com.notes.purenoteit.sync.model.RemoteSyncPullPage
 import com.notes.purenoteit.sync.model.RemoteSyncPushAck
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -203,21 +205,10 @@ internal class GoogleDriveSyncDataSourceImpl(
                 ?: return AppResult.Failure(DataError.Network.SERIALIZATION)
         }
 
-        val tokenResp = executeWithAuthAndBackoff { token ->
-            client.get("$DRIVE_API_BASE/changes/startPageToken") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-                url { parameters.append("spaces", "appDataFolder") }
-            }
-        }
-        val latestCursor = when (tokenResp) {
-            is AppResult.Failure -> encryptedDelta.baseCursor ?: ""
-            is AppResult.Success -> decodeStartPageToken(tokenResp.data) ?: (encryptedDelta.baseCursor ?: "")
-        }
-
         return AppResult.Success(
             RemoteSyncPushAck(
                 remoteId = uploadedMeta.id,
-                newCursor = latestCursor,
+                newCursor = encryptedDelta.baseCursor ?: "",
                 committedAt = clock.nowMillis()
             )
         )
@@ -313,6 +304,148 @@ internal class GoogleDriveSyncDataSourceImpl(
                 downloadTextFileContent(earliestId)
             }
         }
+    }
+
+    override suspend fun upsertAppDataConfigFile(
+        fileName: String,
+        content: String
+    ): AppResult<Unit, DataError.Network> {
+        val safeName = toSafeConfigFileName(fileName) ?: return AppResult.Failure(DataError.Network.UNKNOWN)
+        val existingId = when (val existing = findFileIdByExactName(safeName)) {
+            is AppResult.Failure -> return existing
+            is AppResult.Success -> existing.data
+        }
+
+        val contentBytes = content.encodeToByteArray()
+        if (existingId != null) {
+            val safeId = sanitizeFileSegment(existingId)
+            return when (
+                val patchRes = executeWithAuthAndBackoff { token ->
+                    client.patch("$DRIVE_UPLOAD_BASE/files/$safeId") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                        url { parameters.append("uploadType", "media") }
+                        contentType(ContentType.Application.Json)
+                        setBody(contentBytes)
+                    }
+                }
+            ) {
+                is AppResult.Failure -> patchRes
+                is AppResult.Success -> AppResult.Success(Unit)
+            }
+        }
+
+        val metadataJson = json.encodeToString(
+            DriveFileCreateMetadata(
+                name = safeName,
+                parents = listOf("appDataFolder"),
+                mimeType = "application/json"
+            )
+        )
+        return when (val up = uploadMultipartRelated(metadataJson, "application/json; charset=UTF-8", contentBytes)) {
+            is AppResult.Failure -> up
+            is AppResult.Success -> AppResult.Success(Unit)
+        }
+    }
+
+    override suspend fun getAppDataUsageSummary(): AppResult<RemoteMediaUsageSummary, DataError.Network> {
+        var mediaCount = 0
+        var mediaBytes = 0L
+        var deltaCount = 0
+        var deltaBytes = 0L
+        var pageToken: String? = null
+        var loop = 0
+
+        do {
+            val resp = executeWithAuthAndBackoff { token ->
+                client.get("$DRIVE_API_BASE/files") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    url {
+                        parameters.append("spaces", "appDataFolder")
+                        parameters.append("q", "trashed = false")
+                        parameters.append("fields", "files(id,name,size),nextPageToken")
+                        parameters.append("pageSize", "100")
+                        pageToken?.let { parameters.append("pageToken", it) }
+                    }
+                }
+            }
+            val parsed = when (resp) {
+                is AppResult.Failure -> return resp
+                is AppResult.Success -> decodeFileList(resp.data) ?: return AppResult.Failure(DataError.Network.SERIALIZATION)
+            }
+            for (item in parsed.files) {
+                val name = item.name.orEmpty()
+                val sz = item.size?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+                when {
+                    name.startsWith(MEDIA_BLOB_PREFIX) -> {
+                        mediaCount++
+                        mediaBytes += sz
+                    }
+                    name.startsWith(DELTA_FILE_PREFIX) -> {
+                        deltaCount++
+                        deltaBytes += sz
+                    }
+                }
+            }
+            pageToken = parsed.nextPageToken?.takeIf { it.isNotBlank() }
+            loop++
+        } while (pageToken != null && loop < 25)
+
+        return AppResult.Success(
+            RemoteMediaUsageSummary(
+                mediaFileCount = mediaCount,
+                totalMediaBytes = mediaBytes,
+                deltaFileCount = deltaCount,
+                totalDeltaBytes = deltaBytes
+            )
+        )
+    }
+
+    override suspend fun pruneOrphanMediaBlobs(activeCanonicalMediaKeys: Set<String>): AppResult<Int, DataError.Network> {
+        val activeBlobNames = activeCanonicalMediaKeys.mapNotNull { toSafeMediaBlobName(it) }.toSet()
+        val orphanIds = mutableListOf<String>()
+        var pageToken: String? = null
+        var loop = 0
+
+        do {
+            val resp = executeWithAuthAndBackoff { token ->
+                client.get("$DRIVE_API_BASE/files") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    url {
+                        parameters.append("spaces", "appDataFolder")
+                        parameters.append("q", "trashed = false and name contains '$MEDIA_BLOB_PREFIX'")
+                        parameters.append("fields", "files(id,name),nextPageToken")
+                        parameters.append("pageSize", "100")
+                        pageToken?.let { parameters.append("pageToken", it) }
+                    }
+                }
+            }
+            val parsed = when (resp) {
+                is AppResult.Failure -> return resp
+                is AppResult.Success -> decodeFileList(resp.data) ?: return AppResult.Failure(DataError.Network.SERIALIZATION)
+            }
+            for (item in parsed.files) {
+                val name = item.name.orEmpty()
+                if (name.startsWith(MEDIA_BLOB_PREFIX) && name !in activeBlobNames) {
+                    orphanIds += item.id
+                }
+            }
+            pageToken = parsed.nextPageToken?.takeIf { it.isNotBlank() }
+            loop++
+        } while (pageToken != null && loop < 25)
+
+        var deletedCount = 0
+        for (fileId in orphanIds) {
+            val safeId = sanitizeFileSegment(fileId)
+            when (val delRes = executeBinaryWithAuthAndBackoff { token ->
+                client.delete("$DRIVE_API_BASE/files/$safeId") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+            }) {
+                is AppResult.Success -> deletedCount++
+                is AppResult.Failure -> return delRes
+            }
+        }
+        return AppResult.Success(deletedCount)
     }
 
     private fun toSafeConfigFileName(fileName: String): String? {
@@ -582,6 +715,7 @@ private data class DriveFileCreateMetadata(
 private data class DriveFileItem(
     @SerialName("id") val id: String,
     @SerialName("name") val name: String? = null,
+    @SerialName("size") val size: String? = null,
     @SerialName("modifiedTime") val modifiedTime: String? = null,
     @SerialName("trashed") val trashed: Boolean = false
 )

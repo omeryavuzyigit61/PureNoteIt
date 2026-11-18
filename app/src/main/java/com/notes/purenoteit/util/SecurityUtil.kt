@@ -20,6 +20,8 @@ import androidx.fragment.app.FragmentActivity
 import com.notes.purenoteit.domain.model.AppResult
 import com.notes.purenoteit.domain.model.DataError
 import com.notes.purenoteit.security.ObfuscatedSecrets
+import com.notes.purenoteit.security.SyncedVaultSecurityDocument
+import com.notes.purenoteit.security.VaultPinSyncProtocol
 import com.notes.purenoteit.util.Constants.SHARED_PREFENCES_KEY
 import java.security.GeneralSecurityException
 import java.security.KeyStore
@@ -67,10 +69,19 @@ object SecurityUtil {
     private const val PORTABLE_SALT_LENGTH = 16
     private val MEDIA_MAGIC_V3 = byteArrayOf(0x50, 0x56, 0x4D, 0x33) // "PVM3"
 
-    // Vault Session Lock State
+    // Vault Session Lock State & In-Memory Portable Vault Content Key (zeroized on lockVault)
     @Volatile
     var isVaultUnlocked: Boolean = false
         private set
+
+    @Volatile
+    private var sessionVaultKeyChars: CharArray? = null
+
+    private const val KEY_PIN_ITERATIONS = "pin_kdf_iterations_v3"
+    private const val KEY_WRAPPED_VAULT_KEY = "pin_wrapped_vault_key_v1"
+    private const val KEY_HW_WRAPPED_VAULT_KEY = "hw_wrapped_vault_key_v1"
+    private const val KEY_PIN_UPDATED_AT = "pin_updated_at_v1"
+    private const val KEY_PIN_UPDATED_BY = "pin_updated_by_v1"
 
     fun unlockVault() {
         isVaultUnlocked = true
@@ -78,6 +89,13 @@ object SecurityUtil {
 
     fun lockVault() {
         isVaultUnlocked = false
+        sessionVaultKeyChars?.fill('\u0000')
+        sessionVaultKeyChars = null
+    }
+
+    private fun setSessionVaultKeyCopy(keyChars: CharArray?) {
+        sessionVaultKeyChars?.fill('\u0000')
+        sessionVaultKeyChars = keyChars?.takeIf { it.isNotEmpty() }?.copyOf()
     }
 
     // --- Brute-Force Protection (Monotonic Clock + Exponential Backoff) ---
@@ -138,9 +156,13 @@ object SecurityUtil {
 
     // --- Salted PBKDF2-HMAC-SHA256 PIN Hashing (CharArray Zeroization Compliant) ---
 
-    private fun derivePinHashV2(pinChars: CharArray, salt: ByteArray): ByteArray {
+    private fun derivePinHash(
+        pinChars: CharArray,
+        salt: ByteArray,
+        iterations: Int = PBKDF2_ITERATIONS_V2
+    ): ByteArray {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val spec = PBEKeySpec(pinChars, salt, PBKDF2_ITERATIONS_V2, PBKDF2_KEY_BITS)
+        val spec = PBEKeySpec(pinChars, salt, iterations, PBKDF2_KEY_BITS)
         return try {
             factory.generateSecret(spec).encoded
         } finally {
@@ -189,9 +211,10 @@ object SecurityUtil {
 
             val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
 
-            // 1. Check V2 PBKDF2-HMAC-SHA256 with per-device random salt & constant-time comparison
+            // 1. Check V2/V3 PBKDF2-HMAC-SHA256 with per-device/synced salt & constant-time comparison
             val savedHashV2Base64 = prefs.getString(KEY_PIN_HASH_V2, null)
             val savedSaltV2Base64 = prefs.getString(KEY_PIN_SALT_V2, null)
+            val storedIterations = prefs.getInt(KEY_PIN_ITERATIONS, PBKDF2_ITERATIONS_V2).coerceAtLeast(PBKDF2_ITERATIONS_V2)
             if (savedHashV2Base64 != null && savedSaltV2Base64 != null) {
                 var saltBytes: ByteArray? = null
                 var expectedHash: ByteArray? = null
@@ -199,11 +222,11 @@ object SecurityUtil {
                 return try {
                     saltBytes = Base64.decode(savedSaltV2Base64, Base64.NO_WRAP)
                     expectedHash = Base64.decode(savedHashV2Base64, Base64.NO_WRAP)
-                    candidateHash = derivePinHashV2(enteredPin, saltBytes)
+                    candidateHash = derivePinHash(enteredPin, saltBytes, storedIterations)
                     val valid = MessageDigest.isEqual(expectedHash, candidateHash)
                     if (valid) {
                         resetFailedAttempts(context)
-                        unlockVault()
+                        unlockWithVerifiedPin(context, enteredPin)
                     } else {
                         recordFailedAttempt(context)
                     }
@@ -260,30 +283,196 @@ object SecurityUtil {
     }
 
     /**
-     * Derives a random-salted PBKDF2-HMAC-SHA256 verifier from [newPin] and zeroizes [newPin]
-     * and intermediate byte arrays immediately after persistence.
+     * Derives a 120,000-iteration random-salted PBKDF2-HMAC-SHA256 verifier from [newPin], wraps the
+     * portable note vault content key for E2EE sync across devices, and zeroizes sensitive buffers.
      */
     fun savePassword(context: Context, newPin: CharArray) {
-        val randomSalt = ByteArray(16)
-        var derivedHash: ByteArray? = null
+        var existingKeyCopy: CharArray? = null
+        var createdKeyChars: CharArray? = null
         try {
             val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
-            SecureRandom().nextBytes(randomSalt)
-            derivedHash = derivePinHashV2(newPin, randomSalt)
+            existingKeyCopy = sessionVaultKeyChars?.copyOf() ?: loadHardwareUnwrappedVaultKey(prefs)
+            val docRes = SHARED_PIN_PROTOCOL.createPinDocument(
+                pinChars = newPin.copyOf(),
+                existingVaultKeyChars = existingKeyCopy,
+                currentDoc = exportSyncedPinDocument(context),
+                nowMillis = System.currentTimeMillis(),
+                deviceId = "android-local"
+            )
+            if (docRes is AppResult.Success) {
+                val (doc, keyChars) = docRes.data
+                createdKeyChars = keyChars
+                persistPinDocumentLocally(context, doc, hardwareWrapKeyChars = keyChars)
+                resetFailedAttempts(context)
+                setSessionVaultKeyCopy(keyChars)
+                unlockVault()
+                return
+            }
 
-            prefs.edit()
-                .putString(KEY_PIN_SALT_V2, Base64.encodeToString(randomSalt, Base64.NO_WRAP))
-                .putString(KEY_PIN_HASH_V2, Base64.encodeToString(derivedHash, Base64.NO_WRAP))
-                .remove(KEY_PIN_HASH)
-                .remove(KEY_LEGACY_PIN)
-                .remove(KEY_FAILED_ATTEMPTS)
-                .remove(KEY_LOCKOUT_UNTIL_MS)
-                .apply()
-            unlockVault()
+            // Defensive fallback if crypto initialization somehow failed
+            val randomSalt = ByteArray(16)
+            var derivedHash: ByteArray? = null
+            try {
+                SecureRandom().nextBytes(randomSalt)
+                derivedHash = derivePinHash(newPin, randomSalt, PBKDF2_ITERATIONS_V3)
+                prefs.edit()
+                    .putString(KEY_PIN_SALT_V2, Base64.encodeToString(randomSalt, Base64.NO_WRAP))
+                    .putString(KEY_PIN_HASH_V2, Base64.encodeToString(derivedHash, Base64.NO_WRAP))
+                    .putInt(KEY_PIN_ITERATIONS, PBKDF2_ITERATIONS_V3)
+                    .putLong(KEY_PIN_UPDATED_AT, System.currentTimeMillis())
+                    .remove(KEY_PIN_HASH)
+                    .remove(KEY_LEGACY_PIN)
+                    .remove(KEY_FAILED_ATTEMPTS)
+                    .remove(KEY_LOCKOUT_UNTIL_MS)
+                    .apply()
+                unlockVault()
+            } finally {
+                randomSalt.fill(0)
+                derivedHash?.fill(0)
+            }
         } finally {
             newPin.fill('\u0000')
-            randomSalt.fill(0)
-            derivedHash?.fill(0)
+            existingKeyCopy?.fill('\u0000')
+            createdKeyChars?.fill('\u0000')
+        }
+    }
+
+    private fun unlockWithVerifiedPin(context: Context, verifiedPin: CharArray) {
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        val wrapped = prefs.getString(KEY_WRAPPED_VAULT_KEY, null)
+        var unwrappedKey: CharArray? = null
+        try {
+            if (!wrapped.isNullOrBlank()) {
+                val doc = exportSyncedPinDocument(context)
+                if (doc != null) {
+                    val res = SHARED_PIN_PROTOCOL.verifyPinAndUnwrapKey(verifiedPin.copyOf(), doc)
+                    if (res is AppResult.Success) {
+                        unwrappedKey = res.data
+                        setSessionVaultKeyCopy(unwrappedKey)
+                        if (prefs.getString(KEY_HW_WRAPPED_VAULT_KEY, null).isNullOrBlank()) {
+                            storeHardwareWrappedVaultKey(prefs, unwrappedKey)
+                        }
+                    }
+                }
+            }
+            // Transparently initialize portable synced PIN wrapper & upgrade legacy 60k PINs on first valid verify
+            if (unwrappedKey == null) {
+                val existingHw = loadHardwareUnwrappedVaultKey(prefs)
+                try {
+                    val createdRes = SHARED_PIN_PROTOCOL.createPinDocument(
+                        pinChars = verifiedPin.copyOf(),
+                        existingVaultKeyChars = existingHw,
+                        currentDoc = exportSyncedPinDocument(context),
+                        nowMillis = System.currentTimeMillis(),
+                        deviceId = "android-local"
+                    )
+                    if (createdRes is AppResult.Success) {
+                        val (doc, keyChars) = createdRes.data
+                        unwrappedKey = keyChars
+                        persistPinDocumentLocally(context, doc, hardwareWrapKeyChars = keyChars)
+                        setSessionVaultKeyCopy(keyChars)
+                    }
+                } finally {
+                    existingHw?.fill('\u0000')
+                }
+            }
+            unlockVault()
+        } finally {
+            unwrappedKey?.fill('\u0000')
+        }
+    }
+
+    private fun persistPinDocumentLocally(
+        context: Context,
+        doc: SyncedVaultSecurityDocument,
+        hardwareWrapKeyChars: CharArray?
+    ) {
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+            .putString(KEY_PIN_SALT_V2, doc.pinSaltB64)
+            .putString(KEY_PIN_HASH_V2, doc.pinHashB64)
+            .putInt(KEY_PIN_ITERATIONS, doc.kdfIterations)
+            .putString(KEY_WRAPPED_VAULT_KEY, doc.wrappedVaultKeyEnvelope)
+            .putLong(KEY_PIN_UPDATED_AT, doc.pinUpdatedAt)
+            .putString(KEY_PIN_UPDATED_BY, doc.pinUpdatedByDeviceId)
+            .remove(KEY_PIN_HASH)
+            .remove(KEY_LEGACY_PIN)
+            .remove(KEY_FAILED_ATTEMPTS)
+            .remove(KEY_LOCKOUT_UNTIL_MS)
+
+        if (hardwareWrapKeyChars != null && hardwareWrapKeyChars.isNotEmpty()) {
+            val wrappedHw = encryptHardwareOnly(String(hardwareWrapKeyChars))
+            if (wrappedHw != null) {
+                editor.putString(KEY_HW_WRAPPED_VAULT_KEY, wrappedHw)
+            }
+        } else {
+            editor.remove(KEY_HW_WRAPPED_VAULT_KEY)
+        }
+        editor.apply()
+    }
+
+    fun exportSyncedPinDocument(context: Context): SyncedVaultSecurityDocument? {
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        val hash = prefs.getString(KEY_PIN_HASH_V2, null)
+        val salt = prefs.getString(KEY_PIN_SALT_V2, null)
+        val wrapped = prefs.getString(KEY_WRAPPED_VAULT_KEY, null)
+        val updatedAt = prefs.getLong(KEY_PIN_UPDATED_AT, 0L)
+        if (hash.isNullOrBlank() || salt.isNullOrBlank()) return null
+        return SyncedVaultSecurityDocument(
+            version = 1,
+            hasPin = true,
+            pinSaltB64 = salt,
+            pinHashB64 = hash,
+            kdfIterations = prefs.getInt(KEY_PIN_ITERATIONS, PBKDF2_ITERATIONS_V2),
+            wrappedVaultKeyEnvelope = wrapped,
+            pinUpdatedAt = updatedAt,
+            pinUpdatedByDeviceId = prefs.getString(KEY_PIN_UPDATED_BY, "").orEmpty()
+        )
+    }
+
+    fun applySyncedPinDocument(context: Context, doc: SyncedVaultSecurityDocument) {
+        if (!doc.hasPin || doc.pinHashB64.isNullOrBlank() || doc.pinSaltB64.isNullOrBlank()) return
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        val localUpdatedAt = prefs.getLong(KEY_PIN_UPDATED_AT, 0L)
+        val localHash = prefs.getString(KEY_PIN_HASH_V2, null)
+        val localWrapped = prefs.getString(KEY_WRAPPED_VAULT_KEY, null)
+        val isRemoteNewer = doc.pinUpdatedAt > localUpdatedAt ||
+            (localHash == null && !doc.pinHashB64.isNullOrBlank()) ||
+            (localWrapped.isNullOrBlank() && !doc.wrappedVaultKeyEnvelope.isNullOrBlank())
+        if (!isRemoteNewer) return
+
+        val hashChanged = localHash != null && localHash != doc.pinHashB64
+        if (hashChanged) {
+            // Remote device updated the PIN: clear current unlocked key & require fresh PIN entry
+            lockVault()
+        }
+        persistPinDocumentLocally(context, doc, hardwareWrapKeyChars = null)
+    }
+
+    private fun storeHardwareWrappedVaultKey(prefs: android.content.SharedPreferences, keyChars: CharArray) {
+        val wrappedHw = encryptHardwareOnly(String(keyChars)) ?: return
+        prefs.edit().putString(KEY_HW_WRAPPED_VAULT_KEY, wrappedHw).apply()
+    }
+
+    private fun loadHardwareUnwrappedVaultKey(prefs: android.content.SharedPreferences): CharArray? {
+        val raw = prefs.getString(KEY_HW_WRAPPED_VAULT_KEY, null) ?: return null
+        if (!raw.startsWith("ENC_V2:")) return null
+        return when (val dec = decryptHardwareV2(raw)) {
+            is AppResult.Success -> dec.data.takeIf { it.isNotEmpty() }?.toCharArray()
+            is AppResult.Failure -> null
+        }
+    }
+
+    fun restoreBiometricVaultKey(context: Context) {
+        if (sessionVaultKeyChars != null) return
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        val loaded = loadHardwareUnwrappedVaultKey(prefs)
+        if (loaded != null) {
+            try {
+                setSessionVaultKeyCopy(loaded)
+            } finally {
+                loaded.fill('\u0000')
+            }
         }
     }
 
@@ -387,6 +576,7 @@ object SecurityUtil {
                         val validProof = proof != null && proof.isNotEmpty()
                         proof?.fill(0)
                         if (validProof) {
+                            restoreBiometricVaultKey(activity)
                             unlockVault()
                             onUnlocked()
                         } else {
@@ -487,6 +677,7 @@ object SecurityUtil {
     }
 
     private val SHARED_CRYPTO by lazy { com.notes.purenoteit.SharedCryptoFactory.createVaultCrypto() }
+    private val SHARED_PIN_PROTOCOL by lazy { VaultPinSyncProtocol(SHARED_CRYPTO) }
 
     private fun defaultFallbackChars(): CharArray = (APP_SALT + "_" + AES_KEY_SALT).toCharArray()
 
@@ -494,26 +685,53 @@ object SecurityUtil {
         return SHARED_CRYPTO.isEncryptedPayload(text)
     }
 
+    private fun encryptHardwareOnly(plainText: String): String? {
+        return try {
+            val hardwareKey = getOrCreateHardwareKey() ?: return null
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, hardwareKey)
+            val iv = cipher.iv
+            val cipherText = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
+
+            val combined = ByteArray(1 + iv.size + cipherText.size)
+            combined[0] = iv.size.toByte()
+            System.arraycopy(iv, 0, combined, 1, iv.size)
+            System.arraycopy(cipherText, 0, combined, 1 + iv.size, cipherText.size)
+            "ENC_V2:" + Base64.encodeToString(combined, Base64.NO_WRAP)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Encrypts locked/protected note payloads using the synced cross-device portable Vault Content Key
+     * (`ENC_P3_PWD:`) when unlocked or hardware-wrapped locally, enabling seamless decryption on PC
+     * after PIN verification. Falls back to [encrypt] (`ENC_V2:` / `ENC_P3:`) only if no PIN key exists yet.
+     */
+    fun encryptForVault(context: Context, plainText: String): String {
+        if (plainText.isEmpty() || isEncryptedPayload(plainText)) return plainText
+        val keyCopy = sessionVaultKeyChars?.copyOf()
+            ?: run {
+                val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+                loadHardwareUnwrappedVaultKey(prefs)
+            }
+        if (keyCopy != null && keyCopy.isNotEmpty()) {
+            try {
+                when (val res = SHARED_CRYPTO.encryptWithPassphrase(plainText, keyCopy)) {
+                    is AppResult.Success -> return res.data
+                    is AppResult.Failure -> Unit
+                }
+            } finally {
+                keyCopy.fill('\u0000')
+            }
+        }
+        return encrypt(plainText)
+    }
+
     fun encrypt(plainText: String): String {
         if (plainText.isEmpty() || isEncryptedPayload(plainText)) return plainText
         // 1. Prefer Hardware-Backed AndroidKeyStore (ENC_V2:)
-        try {
-            val hardwareKey = getOrCreateHardwareKey()
-            if (hardwareKey != null) {
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                cipher.init(Cipher.ENCRYPT_MODE, hardwareKey)
-                val iv = cipher.iv
-                val cipherText = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-
-                val combined = ByteArray(1 + iv.size + cipherText.size)
-                combined[0] = iv.size.toByte()
-                System.arraycopy(iv, 0, combined, 1, iv.size)
-                System.arraycopy(cipherText, 0, combined, 1 + iv.size, cipherText.size)
-
-                return "ENC_V2:" + Base64.encodeToString(combined, Base64.NO_WRAP)
-            }
-        } catch (_: Exception) {
-        }
+        encryptHardwareOnly(plainText)?.let { return it }
 
         // 2. Fallback to 120,000-iteration random-salted AES-256-GCM (ENC_P3:)
         return encryptPortable(plainText)
@@ -566,6 +784,41 @@ object SecurityUtil {
         }
     }
 
+    private fun decryptHardwareV2(encryptedText: String): AppResult<String, DataError.Security> {
+        return try {
+            val rawBase64 = encryptedText.removePrefix("ENC_V2:")
+            val combined = Base64.decode(rawBase64, Base64.NO_WRAP)
+            if (combined.size < 2) {
+                return AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
+            }
+
+            val ivLength = combined[0].toInt() and 0xFF
+            if (ivLength <= 0 || combined.size <= 1 + ivLength) {
+                return AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
+            }
+
+            val iv = ByteArray(ivLength)
+            System.arraycopy(combined, 1, iv, 0, ivLength)
+
+            val cipherText = ByteArray(combined.size - 1 - ivLength)
+            System.arraycopy(combined, 1 + ivLength, cipherText, 0, cipherText.size)
+
+            val hardwareKey = getOrCreateHardwareKey()
+                ?: return AppResult.Failure(DataError.Security.KEYSTORE_UNAVAILABLE)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, hardwareKey, GCMParameterSpec(GCM_TAG_LENGTH, iv))
+
+            val original = cipher.doFinal(cipherText)
+            AppResult.Success(String(original, Charsets.UTF_8))
+        } catch (_: KeyPermanentlyInvalidatedException) {
+            AppResult.Failure(DataError.Security.KEYSTORE_UNAVAILABLE)
+        } catch (_: GeneralSecurityException) {
+            AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
+        } catch (_: Exception) {
+            AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
+        }
+    }
+
     /**
      * Safe decryption returning [AppResult] without ever falling back to plaintext or silently
      * returning corrupted data on [KeyPermanentlyInvalidatedException] / [GeneralSecurityException].
@@ -576,57 +829,27 @@ object SecurityUtil {
         }
 
         if (encryptedText.startsWith("ENC_V2:")) {
-            return try {
-                val rawBase64 = encryptedText.removePrefix("ENC_V2:")
-                val combined = Base64.decode(rawBase64, Base64.NO_WRAP)
-                if (combined.size < 2) {
-                    lockVault()
-                    return AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
-                }
-
-                val ivLength = combined[0].toInt() and 0xFF
-                if (ivLength <= 0 || combined.size <= 1 + ivLength) {
-                    lockVault()
-                    return AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
-                }
-
-                val iv = ByteArray(ivLength)
-                System.arraycopy(combined, 1, iv, 0, ivLength)
-
-                val cipherText = ByteArray(combined.size - 1 - ivLength)
-                System.arraycopy(combined, 1 + ivLength, cipherText, 0, cipherText.size)
-
-                val hardwareKey = getOrCreateHardwareKey() ?: run {
-                    lockVault()
-                    return AppResult.Failure(DataError.Security.KEYSTORE_UNAVAILABLE)
-                }
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                cipher.init(Cipher.DECRYPT_MODE, hardwareKey, GCMParameterSpec(GCM_TAG_LENGTH, iv))
-
-                val original = cipher.doFinal(cipherText)
-                AppResult.Success(String(original, Charsets.UTF_8))
-            } catch (_: KeyPermanentlyInvalidatedException) {
-                lockVault()
-                AppResult.Failure(DataError.Security.KEYSTORE_UNAVAILABLE)
-            } catch (_: GeneralSecurityException) {
-                lockVault()
-                AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
-            } catch (_: Exception) {
-                lockVault()
-                AppResult.Failure(DataError.Security.DECRYPTION_FAILED)
-            }
+            val res = decryptHardwareV2(encryptedText)
+            if (res is AppResult.Failure) lockVault()
+            return res
         }
 
         if (encryptedText.startsWith("ENC_P3_PWD:") || encryptedText.startsWith("ENC_P3:") || encryptedText.startsWith("ENC_P2:")) {
             val fallback = defaultFallbackChars()
+            val effectivePass = when {
+                passphrase != null && passphrase.isNotEmpty() -> passphrase.copyOf()
+                encryptedText.startsWith("ENC_P3_PWD:") && isVaultUnlocked -> sessionVaultKeyChars?.copyOf()
+                else -> null
+            }
             return try {
                 SHARED_CRYPTO.decryptEnvelope(
                     encryptedText = encryptedText,
-                    passphrase = passphrase,
+                    passphrase = effectivePass,
                     legacyFallbackSecret = fallback
                 )
             } finally {
                 fallback.fill('\u0000')
+                effectivePass?.fill('\u0000')
             }
         }
 

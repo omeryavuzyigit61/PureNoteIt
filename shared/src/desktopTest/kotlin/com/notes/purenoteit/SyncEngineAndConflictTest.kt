@@ -15,6 +15,7 @@ import com.notes.purenoteit.sync.LocalSyncSnapshot
 import com.notes.purenoteit.sync.LocalSyncStore
 import com.notes.purenoteit.sync.RemoteSyncDataSource
 import com.notes.purenoteit.sync.ResolvedRemoteBatch
+import com.notes.purenoteit.sync.SubPageSyncRemapper
 import com.notes.purenoteit.sync.model.EncryptedDeltaEnvelope
 import com.notes.purenoteit.sync.model.RemoteEncryptedChange
 import com.notes.purenoteit.sync.model.RemoteSyncPullPage
@@ -27,6 +28,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -228,6 +230,195 @@ class SyncEngineAndConflictTest {
         assertTrue(phoneEngine.synchronize(masterPassphrase) is AppResult.Success)
         assertNotNull(phoneStore.notes["n-del"]?.deletedAt)
         assertEquals("DELETED", phoneStore.notes["n-del"]?.status)
+    }
+
+    @Test
+    fun `Android ve Desktop metadata farklari ile saat kaymasi sahte Cakisma Kopyasi ve yanki dongusu uretmemelidir`() = runTest {
+        var phoneClockMs = 200_000L // Phone wall-clock 100s ahead of PC wall-clock
+        var pcClockMs = 100_000L
+        val remote = FakeRemoteDrive()
+        val phoneStore = InMemorySyncStore(deviceId = "phone-A")
+        val pcStore = InMemorySyncStore(deviceId = "pc-B")
+
+        val phoneEngine = SharedSyncFactory.createSyncEngine(phoneStore, remote, AppClock { phoneClockMs })
+        val pcEngine = SharedSyncFactory.createSyncEngine(pcStore, remote, AppClock { pcClockMs })
+
+        val drawingBytes = byteArrayOf(1, 2, 3, 4)
+        val drawingKey = "media/drawings/${sha256Hex(drawingBytes)}.png"
+        phoneStore.media[drawingKey] = drawingBytes
+
+        val parentBlocks = listOf(
+            NoteBlock(type = BlockType.DRAWING, mediaPath = drawingKey),
+            NoteBlock(type = BlockType.SUB_PAGE, content = "Alt", subPageNoteId = 99, subPageSyncUuid = "sub-1")
+        )
+        val descJson = BlockParser.serialize(parentBlocks)
+
+        // Phone pushes initial note with isPassword=false, icon=null, images=empty
+        phoneStore.notes["n-skew"] = Note(
+            id = 5,
+            title = "Başlıksız Not",
+            description = descJson,
+            date = 50_000L,
+            isPassword = false,
+            icon = null,
+            images = emptyList(),
+            syncUuid = "n-skew",
+            updatedAt = phoneClockMs,
+            syncVersion = 1L
+        )
+        assertTrue(phoneEngine.synchronize(masterPassphrase) is AppResult.Success)
+
+        // PC pulls despite being 100s behind Phone's clock; PC also represents images=[drawingKey], isPassword=null, subPageNoteId=12, icon="📝"
+        val pcFirst = pcEngine.synchronize(masterPassphrase) as AppResult.Success
+        assertEquals(1, pcFirst.data.pulledNotes)
+        assertEquals(0, pcFirst.data.conflictCopiesCreated)
+        assertEquals(0, pcFirst.data.pushedEntities)
+
+        // PC second sync must NOT echo-push Phone's fast-forwarded note
+        pcClockMs += 5_000L
+        val pcEcho = pcEngine.synchronize(masterPassphrase) as AppResult.Success
+        assertEquals(0, pcEcho.data.pushedEntities)
+
+        // Simulate BOTH devices stamping updatedAt > lastSyncedAt concurrently with ONLY platform metadata diffs -> STILL 0 [Çakışma Kopyası]
+        pcClockMs += 5_000L
+        pcStore.notes["n-skew"] = pcStore.notes["n-skew"]!!.copy(
+            updatedAt = pcClockMs,
+            isPassword = null,
+            icon = "📝",
+            images = listOf(drawingKey),
+            description = BlockParser.serialize(
+                listOf(
+                    NoteBlock(type = BlockType.DRAWING, mediaPath = drawingKey),
+                    NoteBlock(type = BlockType.SUB_PAGE, content = "Alt", subPageNoteId = 12, subPageSyncUuid = "sub-1")
+                )
+            )
+        )
+        phoneClockMs += 10_000L
+        phoneStore.notes["n-skew"] = phoneStore.notes["n-skew"]!!.copy(
+            updatedAt = phoneClockMs,
+            syncVersion = 2L
+        )
+        assertTrue(phoneEngine.synchronize(masterPassphrase) is AppResult.Success)
+
+        pcClockMs += 5_000L
+        val pcMetaSync = pcEngine.synchronize(masterPassphrase) as AppResult.Success
+        assertEquals(0, pcMetaSync.data.conflictCopiesCreated)
+        assertEquals(1, pcStore.notes.size)
+
+        // Now simulate Phone genuinely editing title AFTER pulling while PC did NOT edit locally -> ZERO false [Çakışma Kopyası]
+        phoneClockMs += 10_000L
+        phoneStore.notes["n-skew"] = phoneStore.notes["n-skew"]!!.copy(
+            title = "Başlıksız Not Güncel",
+            updatedAt = phoneClockMs,
+            syncVersion = 3L
+        )
+        assertTrue(phoneEngine.synchronize(masterPassphrase) is AppResult.Success)
+
+        pcClockMs += 5_000L
+        val pcSecondPull = pcEngine.synchronize(masterPassphrase) as AppResult.Success
+        assertEquals(0, pcSecondPull.data.conflictCopiesCreated)
+        assertEquals(1, pcStore.notes.size)
+        assertEquals("Başlıksız Not Güncel", pcStore.notes["n-skew"]?.title)
+
+        // Now PC edits AFTER pulling (PC clock still 100s behind Phone's lastSyncedAt!), Phone pulls PC update -> ZERO false conflict!
+        pcClockMs += 5_000L
+        pcStore.notes["n-skew"] = pcStore.notes["n-skew"]!!.copy(
+            title = "PC Son Hal",
+            updatedAt = pcClockMs,
+            syncVersion = 4L
+        )
+        val pcPush = pcEngine.synchronize(masterPassphrase) as AppResult.Success
+        assertEquals(1, pcPush.data.pushedEntities)
+
+        phoneClockMs += 5_000L
+        val phonePull = phoneEngine.synchronize(masterPassphrase) as AppResult.Success
+        assertEquals(0, phonePull.data.conflictCopiesCreated)
+        assertEquals(1, phoneStore.notes.size)
+        assertEquals("PC Son Hal", phoneStore.notes["n-skew"]?.title)
+    }
+
+    @Test
+    fun `legacy subpage integer IDs never collide with unrelated notes or spawn conflict copies`() {
+        val parentUuid = "parent-work-uuid"
+        val realChildUuid = "child-site1-uuid"
+        val ajandaUuid = "ajanda-8-uuid"
+
+        val ajandaLocalNote = Note(
+            id = 4,
+            title = "Ajanda: 8 Kasım 2026, Pazar",
+            description = BlockParser.serialize(listOf(NoteBlock(type = BlockType.PARAGRAPH, content = "Not"))),
+            richBlocksJson = null,
+            syncUuid = ajandaUuid,
+            updatedAt = 1_000L
+        )
+        // Remote legacy parent references subPageNoteId = 4 without subPageSyncUuid
+        val remoteParentInitiallyWithoutChild = Note(
+            id = 2,
+            title = "İş",
+            description = BlockParser.serialize(
+                listOf(
+                    NoteBlock(type = BlockType.SUB_PAGE, content = "Site1", subPageNoteId = 4, subPageSyncUuid = null),
+                    NoteBlock(type = BlockType.SUB_PAGE, content = "SilinenAlt", subPageNoteId = 99, subPageSyncUuid = null)
+                )
+            ),
+            syncUuid = parentUuid,
+            updatedAt = 2_000L
+        )
+
+        // Pass 1: Child hasn't arrived yet -> foreign subPageNoteId MUST be cleared to null so Ajanda: 8 is neither hidden nor hijacked
+        val updatesPass1 = SubPageSyncRemapper.remapActiveNotes(
+            allNotes = listOf(ajandaLocalNote, remoteParentInitiallyWithoutChild),
+            allLinks = emptyList(),
+            remoteBatchNoteUuids = setOf(parentUuid)
+        )
+        assertEquals(1, updatesPass1.size)
+        val cleanedParentPass1 = updatesPass1.single()
+        val parsedPass1 = BlockParser.parse(cleanedParentPass1.description)
+        assertNull(parsedPass1[0].subPageNoteId)
+        assertNull(parsedPass1[0].subPageSyncUuid)
+        assertNull(parsedPass1[1].subPageNoteId)
+
+        // Root filter check: Ajanda: 8 must NOT be hidden as a subpage!
+        val refsPass1 = BlockParser.collectSubPageHierarchyRefs(listOf(cleanedParentPass1.description, remoteParentInitiallyWithoutChild.description))
+        assertFalse(
+            BlockParser.isSubPageNote(
+                noteId = ajandaLocalNote.id,
+                noteSyncUuid = ajandaLocalNote.syncUuid,
+                noteTitle = ajandaLocalNote.title,
+                richBlocksJson = ajandaLocalNote.richBlocksJson,
+                refs = refsPass1
+            )
+        )
+
+        // Pass 2: Child "Site1" arrives later with new local id = 19 -> parent gets remapped across batches + UUID backfilled
+        val childArrivedLater = Note(
+            id = 19,
+            title = "Site1",
+            description = BlockParser.serialize(listOf(NoteBlock(type = BlockType.PARAGRAPH, content = "icerik"))),
+            richBlocksJson = BlockParser.buildSubPageMetadataJson(parentNoteId = 777, parentSyncUuid = parentUuid),
+            syncUuid = realChildUuid,
+            updatedAt = 2_500L
+        )
+        val updatesPass2 = SubPageSyncRemapper.remapActiveNotes(
+            allNotes = listOf(ajandaLocalNote, cleanedParentPass1, childArrivedLater),
+            allLinks = emptyList(),
+            remoteBatchNoteUuids = setOf(realChildUuid)
+        )
+        val updatedParentPass2 = updatesPass2.first { it.syncUuid == parentUuid }
+        val updatedChildPass2 = updatesPass2.first { it.syncUuid == realChildUuid }
+        val parsedPass2 = BlockParser.parse(updatedParentPass2.description)
+        assertEquals(19, parsedPass2[0].subPageNoteId)
+        assertEquals(realChildUuid, parsedPass2[0].subPageSyncUuid)
+        assertEquals(2, BlockParser.parseRichMetadata(updatedChildPass2.richBlocksJson)?.parentNoteId)
+
+        // ConflictResolver must treat cleaned/remapped subpage pointers as identical payload -> zero false conflict copy
+        val resolver = com.notes.purenoteit.sync.ConflictResolver(clock = AppClock { 5_000L })
+        val res = resolver.mergeNote(
+            local = updatedParentPass2.copy(updatedAt = 2_100L),
+            remote = remoteParentInitiallyWithoutChild.copy(updatedAt = 2_200L),
+            lastSyncedAt = 1_500L
+        )
+        assertNull(res.conflictCopy)
     }
 
     private fun assertNullIfMissing(bytes: ByteArray?) {

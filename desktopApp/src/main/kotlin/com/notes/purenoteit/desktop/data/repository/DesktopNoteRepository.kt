@@ -6,6 +6,7 @@ import com.notes.purenoteit.domain.model.Category
 import com.notes.purenoteit.domain.model.DataError
 import com.notes.purenoteit.domain.model.Note
 import com.notes.purenoteit.domain.model.NoteLink
+import com.notes.purenoteit.domain.model.StreamItem
 import com.notes.purenoteit.domain.time.AppClock
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
@@ -27,13 +28,22 @@ interface DesktopNoteRepository {
     fun observeCategories(): Flow<List<Category>>
     fun observeNotes(includeDeleted: Boolean = false): Flow<List<Note>>
     fun observeNoteLinks(): Flow<List<NoteLink>>
+    fun observeStreamItems(): Flow<List<StreamItem>>
 
     suspend fun upsertNote(note: Note): AppResult<Note, DataError.Local>
     suspend fun softDeleteNote(syncUuid: String): AppResult<Unit, DataError.Local>
     suspend fun restoreNote(syncUuid: String): AppResult<Unit, DataError.Local>
+    suspend fun permanentDeleteNote(syncUuid: String): AppResult<Unit, DataError.Local> = AppResult.Success(Unit)
+    suspend fun emptyTrash(): AppResult<Int, DataError.Local>
+    suspend fun purgeExpiredTrashNotes(thresholdMillis: Long): AppResult<Int, DataError.Local> = AppResult.Success(0)
     suspend fun togglePin(syncUuid: String): AppResult<Unit, DataError.Local>
     suspend fun upsertCategory(name: String): AppResult<Category, DataError.Local>
+    suspend fun renameCategory(syncUuid: String, newName: String): AppResult<Category, DataError.Local>
+    suspend fun toggleCategoryLock(syncUuid: String): AppResult<Unit, DataError.Local>
     suspend fun softDeleteCategory(syncUuid: String): AppResult<Unit, DataError.Local>
+    suspend fun addStreamItem(content: String, type: String = "TEXT"): AppResult<StreamItem, DataError.Local>
+    suspend fun deleteStreamItem(syncUuid: String): AppResult<Unit, DataError.Local>
+    suspend fun convertStreamItemsToNote(streamSyncUuids: List<String>, title: String): AppResult<Note, DataError.Local>
     suspend fun createSubPage(
         parentNoteSyncUuid: String,
         subPageTitle: String
@@ -66,6 +76,10 @@ internal class DesktopNoteRepositoryImpl(
         db.withConnection { conn -> queryNoteLinks(conn, includeDeleted = false) }
     }
 
+    override fun observeStreamItems(): Flow<List<StreamItem>> = db.changeVersion.mapLatest {
+        db.withConnection { conn -> queryStreamItems(conn) }
+    }
+
     override suspend fun upsertNote(note: Note): AppResult<Note, DataError.Local> {
         return try {
             val saved = db.inTransaction { conn ->
@@ -79,9 +93,12 @@ internal class DesktopNoteRepositoryImpl(
 
                 val blocks = BlockParser.parse(note.description)
                 val (totalTasks, completedTasks) = BlockParser.calculateTasks(blocks)
+                val drawingPaths = blocks.mapNotNull { b ->
+                    b.mediaPath?.takeIf { b.type == BlockType.DRAWING }
+                }.toSet()
                 val extractedImages = blocks.mapNotNull { b ->
-                    b.mediaPath?.takeIf { b.type == BlockType.IMAGE || b.type == BlockType.DRAWING }
-                }.ifEmpty { note.images.orEmpty() }
+                    b.mediaPath?.takeIf { b.type == BlockType.IMAGE }
+                }.ifEmpty { note.images.orEmpty().filterNot { it in drawingPaths } }
 
                 val nextVersion = if (existing != null) existing.syncVersion + 1L else note.syncVersion.coerceAtLeast(1L)
                 val nextDate = if (note.date > 0L) note.date else now
@@ -137,7 +154,7 @@ internal class DesktopNoteRepositoryImpl(
                 val now = clock.nowMillis()
                 val existing = findNoteBySyncUuidLocked(conn, syncUuid) ?: return@inTransaction
                 conn.prepareStatement(
-                    "UPDATE notes SET deletedAt = ?, updatedAt = ?, syncVersion = syncVersion + 1 WHERE syncUuid = ?"
+                    "UPDATE notes SET deletedAt = ?, status = 'TRASH', updatedAt = ?, syncVersion = syncVersion + 1 WHERE syncUuid = ?"
                 ).use { ps ->
                     ps.setLong(1, now)
                     ps.setLong(2, now)
@@ -168,7 +185,7 @@ internal class DesktopNoteRepositoryImpl(
             db.inTransaction { conn ->
                 val now = clock.nowMillis()
                 conn.prepareStatement(
-                    "UPDATE notes SET deletedAt = NULL, updatedAt = ?, syncVersion = syncVersion + 1 WHERE syncUuid = ?"
+                    "UPDATE notes SET deletedAt = NULL, status = CASE WHEN UPPER(status) IN ('TRASH', 'DELETED') THEN 'TODO' ELSE status END, updatedAt = ?, syncVersion = syncVersion + 1 WHERE syncUuid = ?"
                 ).use { ps ->
                     ps.setLong(1, now)
                     ps.setString(2, syncUuid)
@@ -176,6 +193,87 @@ internal class DesktopNoteRepositoryImpl(
                 }
             }
             AppResult.Success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            AppResult.Failure(DataError.Local.UNKNOWN)
+        }
+    }
+
+    override suspend fun permanentDeleteNote(syncUuid: String): AppResult<Unit, DataError.Local> {
+        return try {
+            db.inTransaction { conn ->
+                val now = clock.nowMillis()
+                val existing = findNoteBySyncUuidLocked(conn, syncUuid) ?: return@inTransaction
+                conn.prepareStatement(
+                    "UPDATE notes SET deletedAt = ?, status = 'DELETED', updatedAt = ?, syncVersion = syncVersion + 1 WHERE syncUuid = ?"
+                ).use { ps ->
+                    ps.setLong(1, now)
+                    ps.setLong(2, now)
+                    ps.setString(3, syncUuid)
+                    ps.executeUpdate()
+                }
+                conn.prepareStatement(
+                    "UPDATE note_links SET deletedAt = COALESCE(deletedAt, ?), updatedAt = ?, syncVersion = syncVersion + 1 WHERE (sourceNoteId = ? OR targetNoteId = ?) AND deletedAt IS NULL"
+                ).use { ps ->
+                    ps.setLong(1, now)
+                    ps.setLong(2, now)
+                    ps.setInt(3, existing.id)
+                    ps.setInt(4, existing.id)
+                    ps.executeUpdate()
+                }
+            }
+            AppResult.Success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            AppResult.Failure(DataError.Local.UNKNOWN)
+        }
+    }
+
+    override suspend fun emptyTrash(): AppResult<Int, DataError.Local> {
+        return try {
+            val count = db.inTransaction { conn ->
+                val now = clock.nowMillis()
+                conn.prepareStatement(
+                    "UPDATE notes SET deletedAt = ?, status = 'DELETED', updatedAt = ?, syncVersion = syncVersion + 1 WHERE (deletedAt IS NOT NULL OR UPPER(status) = 'TRASH') AND UPPER(status) != 'DELETED'"
+                ).use { ps ->
+                    ps.setLong(1, now)
+                    ps.setLong(2, now)
+                    ps.executeUpdate()
+                }
+            }
+            AppResult.Success(count)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            AppResult.Failure(DataError.Local.UNKNOWN)
+        }
+    }
+
+    override suspend fun purgeExpiredTrashNotes(thresholdMillis: Long): AppResult<Int, DataError.Local> {
+        return try {
+            val count = db.inTransaction { conn ->
+                val now = clock.nowMillis()
+                conn.prepareStatement(
+                    """
+                    UPDATE notes
+                    SET deletedAt = ?,
+                        status = 'DELETED',
+                        updatedAt = ?,
+                        syncVersion = syncVersion + 1
+                    WHERE (deletedAt IS NOT NULL OR UPPER(COALESCE(status, 'TODO')) = 'TRASH')
+                      AND UPPER(COALESCE(status, 'TODO')) != 'DELETED'
+                      AND COALESCE(deletedAt, CASE WHEN updatedAt > 0 THEN updatedAt ELSE date END) < ?
+                    """.trimIndent()
+                ).use { ps ->
+                    ps.setLong(1, now)
+                    ps.setLong(2, now)
+                    ps.setLong(3, thresholdMillis)
+                    ps.executeUpdate()
+                }
+            }
+            AppResult.Success(count)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -245,6 +343,186 @@ internal class DesktopNoteRepositoryImpl(
             AppResult.Success(created)
         } catch (e: CancellationException) {
             throw e
+        } catch (_: Exception) {
+            AppResult.Failure(DataError.Local.UNKNOWN)
+        }
+    }
+
+    override suspend fun renameCategory(syncUuid: String, newName: String): AppResult<Category, DataError.Local> {
+        val clean = newName.trim()
+        if (clean.isEmpty()) return AppResult.Failure(DataError.Local.VALIDATION_FAILED)
+        return try {
+            val updated = db.inTransaction { conn ->
+                val now = clock.nowMillis()
+                val existing = findCategoryBySyncUuidLocked(conn, syncUuid) ?: return@inTransaction null
+                conn.prepareStatement(
+                    "UPDATE categories SET name = ?, updatedAt = ?, syncVersion = syncVersion + 1 WHERE syncUuid = ?"
+                ).use { ps ->
+                    ps.setString(1, clean)
+                    ps.setLong(2, now)
+                    ps.setString(3, syncUuid)
+                    ps.executeUpdate()
+                }
+                existing.copy(name = clean, updatedAt = now, syncVersion = existing.syncVersion + 1L)
+            }
+            if (updated != null) AppResult.Success(updated) else AppResult.Failure(DataError.Local.NOT_FOUND)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            AppResult.Failure(DataError.Local.UNKNOWN)
+        }
+    }
+
+    override suspend fun toggleCategoryLock(syncUuid: String): AppResult<Unit, DataError.Local> {
+        return try {
+            db.inTransaction { conn ->
+                val now = clock.nowMillis()
+                conn.prepareStatement(
+                    "UPDATE categories SET isPassword = CASE WHEN COALESCE(isPassword, 0) = 1 THEN 0 ELSE 1 END, updatedAt = ?, syncVersion = syncVersion + 1 WHERE syncUuid = ? AND deletedAt IS NULL"
+                ).use { ps ->
+                    ps.setLong(1, now)
+                    ps.setString(2, syncUuid)
+                    ps.executeUpdate()
+                }
+            }
+            AppResult.Success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            AppResult.Failure(DataError.Local.UNKNOWN)
+        }
+    }
+
+    override suspend fun addStreamItem(content: String, type: String): AppResult<StreamItem, DataError.Local> {
+        val clean = content.trim()
+        if (clean.isEmpty()) return AppResult.Failure(DataError.Local.VALIDATION_FAILED)
+        return try {
+            val created = db.inTransaction { conn ->
+                val now = clock.nowMillis()
+                val uuid = UUID.randomUUID().toString()
+                val newId = conn.prepareStatement(
+                    """
+                    INSERT INTO stream_items (content, type, audioPath, imagePath, timestamp, isProcessed, mergedNoteId, syncUuid, mergedNoteSyncUuid, updatedAt, deletedAt, syncVersion)
+                    VALUES (?, ?, NULL, NULL, ?, 0, NULL, ?, NULL, ?, NULL, 1)
+                    """.trimIndent(),
+                    Statement.RETURN_GENERATED_KEYS
+                ).use { ps ->
+                    ps.setString(1, clean)
+                    ps.setString(2, type)
+                    ps.setLong(3, now)
+                    ps.setString(4, uuid)
+                    ps.setLong(5, now)
+                    ps.executeUpdate()
+                    ps.generatedKeys.use { gk -> if (gk.next()) gk.getInt(1) else 0 }
+                }
+                StreamItem(
+                    id = newId,
+                    content = clean,
+                    type = type,
+                    timestamp = now,
+                    isProcessed = false,
+                    syncUuid = uuid,
+                    updatedAt = now,
+                    syncVersion = 1L
+                )
+            }
+            AppResult.Success(created)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            AppResult.Failure(DataError.Local.UNKNOWN)
+        }
+    }
+
+    override suspend fun deleteStreamItem(syncUuid: String): AppResult<Unit, DataError.Local> {
+        return try {
+            db.inTransaction { conn ->
+                val now = clock.nowMillis()
+                conn.prepareStatement(
+                    "UPDATE stream_items SET deletedAt = ?, updatedAt = ?, syncVersion = syncVersion + 1 WHERE syncUuid = ?"
+                ).use { ps ->
+                    ps.setLong(1, now)
+                    ps.setLong(2, now)
+                    ps.setString(3, syncUuid)
+                    ps.executeUpdate()
+                }
+            }
+            AppResult.Success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            AppResult.Failure(DataError.Local.UNKNOWN)
+        }
+    }
+
+    override suspend fun convertStreamItemsToNote(
+        streamSyncUuids: List<String>,
+        title: String
+    ): AppResult<Note, DataError.Local> {
+        val uniqueUuids = streamSyncUuids.distinct()
+        if (uniqueUuids.isEmpty()) return AppResult.Failure(DataError.Local.VALIDATION_FAILED)
+        return try {
+            val savedNote = db.inTransaction { conn ->
+                val now = clock.nowMillis()
+                val allItems = queryStreamItems(conn)
+                val selected = allItems.filter { it.syncUuid in uniqueUuids }
+                if (selected.isEmpty()) throw IllegalStateException("No matching stream items")
+
+                val blocks = mutableListOf(NoteBlock(type = BlockType.HEADING_2, content = "Hızlı Fikirler Akışı"))
+                for (item in selected) {
+                    when (item.type.uppercase()) {
+                        "AUDIO" -> if (!item.audioPath.isNullOrBlank()) {
+                            blocks += NoteBlock(type = BlockType.AUDIO, mediaPath = item.audioPath, content = item.content)
+                        } else {
+                            blocks += NoteBlock(type = BlockType.BULLET_LIST, content = item.content)
+                        }
+                        "IMAGE" -> if (!item.imagePath.isNullOrBlank()) {
+                            blocks += NoteBlock(type = BlockType.IMAGE, mediaPath = item.imagePath, content = item.content)
+                        } else {
+                            blocks += NoteBlock(type = BlockType.BULLET_LIST, content = item.content)
+                        }
+                        else -> blocks += NoteBlock(type = BlockType.BULLET_LIST, content = item.content)
+                    }
+                }
+
+                val defaultCatId = resolveCategoryIdLocked(conn, null, null)
+                val defaultCatUuid = findCategorySyncUuidByIdLocked(conn, defaultCatId)
+                val cleanTitle = title.trim().ifEmpty { "Fikir Notu (${selected.size} Madde)" }
+                val noteUuid = UUID.randomUUID().toString()
+                val insertedNote = insertNoteLocked(
+                    conn = conn,
+                    note = Note(
+                        title = cleanTitle,
+                        description = BlockParser.serialize(blocks),
+                        date = now,
+                        categoryId = defaultCatId,
+                        categorySyncUuid = defaultCatUuid,
+                        icon = "⚡",
+                        status = "TODO",
+                        syncUuid = noteUuid,
+                        updatedAt = now,
+                        syncVersion = 1L
+                    )
+                )
+
+                conn.prepareStatement(
+                    "UPDATE stream_items SET isProcessed = 1, mergedNoteId = ?, mergedNoteSyncUuid = ?, updatedAt = ?, syncVersion = syncVersion + 1 WHERE syncUuid = ?"
+                ).use { ps ->
+                    for (item in selected) {
+                        ps.setInt(1, insertedNote.id)
+                        ps.setString(2, insertedNote.syncUuid)
+                        ps.setLong(3, now)
+                        ps.setString(4, item.syncUuid)
+                        ps.executeUpdate()
+                    }
+                }
+                insertedNote
+            }
+            AppResult.Success(savedNote)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: IllegalStateException) {
+            AppResult.Failure(DataError.Local.NOT_FOUND)
         } catch (_: Exception) {
             AppResult.Failure(DataError.Local.UNKNOWN)
         }
@@ -588,6 +866,32 @@ internal class DesktopNoteRepositoryImpl(
         }
         return list
     }
+
+    private fun queryStreamItems(conn: Connection): List<StreamItem> {
+        val list = mutableListOf<StreamItem>()
+        conn.createStatement().use { s ->
+            s.executeQuery("SELECT * FROM stream_items WHERE deletedAt IS NULL ORDER BY timestamp DESC, id DESC").use { rs ->
+                while (rs.next()) list += mapStreamItem(rs)
+            }
+        }
+        return list
+    }
+
+    private fun mapStreamItem(rs: ResultSet): StreamItem = StreamItem(
+        id = rs.getInt("id"),
+        content = rs.getString("content"),
+        type = rs.getString("type") ?: "TEXT",
+        audioPath = rs.getString("audioPath"),
+        imagePath = rs.getString("imagePath"),
+        timestamp = rs.getLong("timestamp"),
+        isProcessed = rs.getInt("isProcessed") != 0,
+        mergedNoteId = (rs.getObject("mergedNoteId") as? Number)?.toInt(),
+        syncUuid = rs.getString("syncUuid"),
+        mergedNoteSyncUuid = rs.getString("mergedNoteSyncUuid"),
+        updatedAt = rs.getLong("updatedAt"),
+        deletedAt = (rs.getObject("deletedAt") as? Number)?.toLong(),
+        syncVersion = rs.getLong("syncVersion")
+    )
 
     private fun mapCategory(rs: ResultSet): Category {
         val isPwdObj = rs.getObject("isPassword")

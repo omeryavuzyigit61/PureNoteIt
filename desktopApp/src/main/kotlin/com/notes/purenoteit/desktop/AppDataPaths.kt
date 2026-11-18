@@ -8,7 +8,9 @@ data class DesktopAppPaths(
     val mediaFilesDir: File,
     val cacheDir: File,
     val syncCursorFile: File,
-    val vaultSecurityFile: File
+    val vaultSecurityFile: File,
+    val preferencesFile: File = File(rootDir, "desktop_settings.json"),
+    val pinSecurityFile: File = File(rootDir, "vault_pin_sync.json")
 ) {
     fun ensureDirectories() {
         rootDir.mkdirs()

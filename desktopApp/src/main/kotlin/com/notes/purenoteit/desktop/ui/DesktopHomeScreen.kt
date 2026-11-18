@@ -48,10 +48,15 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.EventNote
 import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckBox
 import androidx.compose.material.icons.rounded.Checklist
@@ -61,23 +66,34 @@ import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.DashboardCustomize
+import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.Pin
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.RestoreFromTrash
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.VerticalSplit
 import androidx.compose.material.icons.rounded.ViewWeek
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -100,7 +116,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -112,6 +130,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.notes.purenoteit.desktop.BuildDesktopOAuthConfig
@@ -120,11 +139,25 @@ import com.notes.purenoteit.desktop.ui.components.CreateCategoryDialog
 import com.notes.purenoteit.desktop.ui.components.CreateSubPageDialog
 import com.notes.purenoteit.desktop.ui.components.DesktopAnimatedDialog
 import com.notes.purenoteit.desktop.ui.components.DesktopBlockRow
+import com.notes.purenoteit.desktop.ui.components.DesktopCalendarView
+import com.notes.purenoteit.desktop.ui.components.DesktopCategoryManagementDialog
 import com.notes.purenoteit.desktop.ui.components.DesktopDrawingCanvasDialog
+import com.notes.purenoteit.desktop.ui.components.DesktopExportStudioDialog
 import com.notes.purenoteit.desktop.ui.components.DesktopGraphView
+import com.notes.purenoteit.desktop.ui.components.DesktopNoteIconBadge
+import com.notes.purenoteit.desktop.ui.components.DesktopNotePinSetupDialog
+import com.notes.purenoteit.desktop.ui.components.DesktopNotePinUnlockDialog
+import com.notes.purenoteit.desktop.ui.components.DesktopReminderDialog
+import com.notes.purenoteit.desktop.ui.components.DesktopSettingsDialog
+import com.notes.purenoteit.desktop.ui.components.DesktopStreamView
+import com.notes.purenoteit.desktop.ui.DesktopStrings
 import com.notes.purenoteit.desktop.ui.components.DesktopSyncDialog
+import com.notes.purenoteit.desktop.ui.components.DesktopTaskProgressBadge
+import com.notes.purenoteit.desktop.ui.components.DesktopTemplateGalleryDialog
 import com.notes.purenoteit.desktop.ui.components.DesktopVaultLockScreen
 import com.notes.purenoteit.desktop.ui.components.DesktopVaultSettingsDialog
+import com.notes.purenoteit.desktop.ui.components.DesktopWhiteboardView
+import com.notes.purenoteit.desktop.ui.components.DesktopZenReadingView
 import com.notes.purenoteit.desktop.ui.components.NoteEmojiPickerDialog
 import com.notes.purenoteit.desktop.ui.contract.DesktopUiEffect
 import com.notes.purenoteit.desktop.ui.contract.DesktopUiEvent
@@ -145,6 +178,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -154,6 +188,7 @@ internal fun DesktopHomeScreenRoot(
 ) {
     val state by stateHolder.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val rootScope = rememberCoroutineScope()
 
     LaunchedEffect(stateHolder) {
         withContext(Dispatchers.Main.immediate) {
@@ -196,6 +231,7 @@ internal fun DesktopHomeScreenRoot(
                         state = state,
                         mediaPathResolver = mediaPathResolver,
                         readMediaBytes = stateHolder::readMediaBytes,
+                        onLocalFeedback = { msg -> rootScope.launch { snackbarHostState.showSnackbar(msg) } },
                         onEvent = stateHolder::onEvent
                     )
                 }
@@ -210,10 +246,16 @@ fun DesktopHomeScreenContent(
     state: DesktopUiState,
     mediaPathResolver: MediaPathResolver,
     onEvent: (DesktopUiEvent) -> Unit,
-    readMediaBytes: suspend (String) -> ByteArray? = { null }
+    readMediaBytes: suspend (String) -> ByteArray? = { null },
+    onLocalFeedback: (String) -> Unit = {}
 ) {
+    val strings = remember(state.language) { DesktopStrings.forLanguage(state.language) }
+    val lockedCategoryUuids = remember(state.categories) {
+        state.categories.filter { it.isPassword == true }.map { it.syncUuid }.toHashSet()
+    }
     var compactDrawerOpen by remember { mutableStateOf(false) }
     var categoryPendingDelete by remember { mutableStateOf<Category?>(null) }
+    var confirmEmptyTrash by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(
@@ -298,7 +340,7 @@ fun DesktopHomeScreenContent(
                                 ) {
                                     Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("Yeni Not", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                                    Text(strings.newNoteShortcut.substringBefore(" ("), fontSize = 12.sp, maxLines = 1, softWrap = false)
                                 }
                             }
                         }
@@ -333,6 +375,7 @@ fun DesktopHomeScreenContent(
                                 DesktopHomeDashboard(
                                     state = state,
                                     onEvent = onEvent,
+                                    onRequestEmptyTrash = { confirmEmptyTrash = true },
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxHeight()
@@ -491,6 +534,67 @@ fun DesktopHomeScreenContent(
             onDismiss = { categoryPendingDelete = null }
         )
     }
+
+    if (confirmEmptyTrash) {
+        ConfirmActionDialog(
+            title = "Çöp Kutusunu Boşalt",
+            message = "Çöp kutusundaki ${state.trashedNotes.size} not kalıcı olarak silinecek ve bu işlem geri alınamayacaktır.",
+            confirmLabel = "Tümünü Sil",
+            isDestructive = true,
+            onConfirm = {
+                confirmEmptyTrash = false
+                onEvent(DesktopUiEvent.EmptyTrash)
+            },
+            onDismiss = { confirmEmptyTrash = false }
+        )
+    }
+
+    if (state.showTemplateGalleryDialog) {
+        DesktopTemplateGalleryDialog(
+            onSelectTemplate = { tpl ->
+                onEvent(
+                    DesktopUiEvent.CreateNoteFromTemplate(
+                        title = tpl.title,
+                        icon = tpl.icon,
+                        blocks = tpl.buildBlocks()
+                    )
+                )
+            },
+            onDismiss = { onEvent(DesktopUiEvent.SetTemplateGalleryVisible(false)) }
+        )
+    }
+
+    if (state.showCategoryManagementDialog) {
+        DesktopCategoryManagementDialog(
+            categories = state.categories,
+            onCreateCategory = { name -> onEvent(DesktopUiEvent.CreateCategory(name)) },
+            onRenameCategory = { uuid, name -> onEvent(DesktopUiEvent.RenameCategory(uuid, name)) },
+            onToggleCategoryLock = { uuid -> onEvent(DesktopUiEvent.ToggleCategoryLock(uuid)) },
+            onDeleteCategory = { cat -> categoryPendingDelete = cat },
+            onDismiss = { onEvent(DesktopUiEvent.SetCategoryManagementVisible(false)) }
+        )
+    }
+
+    if (state.showExportDialog && state.selectedNote != null) {
+        val catName = state.categories.firstOrNull { it.syncUuid == state.editorCategorySyncUuid }?.name.orEmpty()
+        DesktopExportStudioDialog(
+            title = state.editorTitle,
+            categoryName = catName,
+            blocks = state.editorBlocks,
+            readMediaBytes = readMediaBytes,
+            onExportFeedback = { msg, _ -> onLocalFeedback(msg) },
+            onDismiss = { onEvent(DesktopUiEvent.SetExportDialogVisible(false)) }
+        )
+    }
+
+    if (state.showReminderDialog && state.selectedNote != null) {
+        val selectedNote = state.selectedNote!!
+        DesktopReminderDialog(
+            currentReminderMillis = selectedNote.reminderTime,
+            onSaveReminder = { ts -> onEvent(DesktopUiEvent.SetNoteReminder(selectedNote.syncUuid, ts)) },
+            onDismiss = { onEvent(DesktopUiEvent.SetReminderDialogVisible(false)) }
+        )
+    }
     if (state.showQuickSwitcher) {
         QuickSwitcherDialog(
             state = state,
@@ -509,9 +613,51 @@ fun DesktopHomeScreenContent(
     }
 
     state.activeDrawingBlockId?.let { drawingBlockId ->
+        val drawingBlock = state.editorBlocks.firstOrNull { it.id == drawingBlockId }
+        val existingPath = drawingBlock?.mediaPath
+        val initialDrawingBytes by produceState<ByteArray?>(initialValue = null, drawingBlockId, existingPath) {
+            value = if (existingPath.isNullOrBlank()) null else withContext(Dispatchers.IO) { readMediaBytes(existingPath) }
+        }
         DesktopDrawingCanvasDialog(
+            initialImageBytes = initialDrawingBytes,
+            canvasKey = "$drawingBlockId:${existingPath.orEmpty()}",
+            strings = strings,
             onSavePng = { pngBytes -> onEvent(DesktopUiEvent.SaveDrawingPng(drawingBlockId, pngBytes)) },
             onDismiss = { onEvent(DesktopUiEvent.CloseDrawingEditor) }
+        )
+    }
+
+    if (state.showSettingsDialog) {
+        DesktopSettingsDialog(
+            state = state,
+            strings = strings,
+            onSelectLanguage = { onEvent(DesktopUiEvent.SetLanguage(it)) },
+            onSelectRetentionDays = { onEvent(DesktopUiEvent.SetTrashRetentionDays(it)) },
+            onToggleHideLockedNotes = { onEvent(DesktopUiEvent.SetHideLockedNotes(it)) },
+            onOpenPinSetup = { onEvent(DesktopUiEvent.SetNotePinSetupDialogVisible(true)) },
+            onOpenMasterLockSettings = { onEvent(DesktopUiEvent.SetVaultSecurityDialogVisible(true)) },
+            onOpenSyncSettings = { onEvent(DesktopUiEvent.SetSyncDialogVisible(true)) },
+            onDismiss = { onEvent(DesktopUiEvent.SetSettingsDialogVisible(false)) }
+        )
+    }
+
+    if (state.showNotePinUnlockDialog) {
+        DesktopNotePinUnlockDialog(
+            language = state.language,
+            errorMessage = state.notePinError,
+            cooldownSeconds = state.notePinCooldownSeconds,
+            onUnlock = { pinChars -> onEvent(DesktopUiEvent.SubmitNotePinUnlock(pinChars)) },
+            onDismiss = { onEvent(DesktopUiEvent.DismissNotePinUnlock) }
+        )
+    }
+
+    if (state.showNotePinSetupDialog) {
+        DesktopNotePinSetupDialog(
+            language = state.language,
+            hasExistingPin = state.isNotePinSet,
+            errorMessage = state.notePinError,
+            onSavePin = { curr, next -> onEvent(DesktopUiEvent.SaveNotePin(curr, next)) },
+            onDismiss = { onEvent(DesktopUiEvent.SetNotePinSetupDialogVisible(false)) }
         )
     }
 
@@ -522,6 +668,8 @@ fun DesktopHomeScreenContent(
             onConnectDrive = { onEvent(DesktopUiEvent.ConnectGoogleDrive) },
             onDisconnectDrive = { onEvent(DesktopUiEvent.DisconnectGoogleDrive) },
             onTriggerSync = { onEvent(DesktopUiEvent.TriggerSyncNow) },
+            onForcePushAll = { onEvent(DesktopUiEvent.ForcePushAllToDrive) },
+            onCleanOrphanMedia = { onEvent(DesktopUiEvent.CleanOrphanDriveMedia) },
             onStartLanServer = { pin -> onEvent(DesktopUiEvent.StartLanServer(pin)) },
             onStopLanServer = { onEvent(DesktopUiEvent.StopLanServer) },
             onConnectAndSyncLan = { url, pin, pass ->
@@ -555,6 +703,7 @@ private fun DesktopSidebar(
     onCloseDrawer: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val strings = remember(state.language) { DesktopStrings.forLanguage(state.language) }
     Column(modifier = modifier.padding(12.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -569,19 +718,30 @@ private fun DesktopSidebar(
                     color = DesktopColors.VibrantOrange
                 )
                 Text(
-                    text = "Çalışma Alanı · v${BuildDesktopOAuthConfig.APP_VERSION}",
+                    text = "${strings.appSubtitle} · v${BuildDesktopOAuthConfig.APP_VERSION}",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Row {
                 IconButton(
+                    onClick = { onEvent(DesktopUiEvent.SetSettingsDialogVisible(true)) },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = strings.settings,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
                     onClick = { onEvent(DesktopUiEvent.SetVaultSecurityDialogVisible(true)) },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = if (state.isMasterLockEnabled) Icons.Rounded.Lock else Icons.Rounded.Security,
-                        contentDescription = "Uygulama Kilidi",
+                        contentDescription = strings.appLock,
                         tint = if (state.isMasterLockEnabled) DesktopColors.EmeraldGreen else DesktopColors.VibrantOrange,
                         modifier = Modifier.size(18.dp)
                     )
@@ -592,7 +752,7 @@ private fun DesktopSidebar(
                 ) {
                     Icon(
                         imageVector = if (state.isDarkTheme) Icons.Rounded.LightMode else Icons.Rounded.DarkMode,
-                        contentDescription = "Tema Değiştir",
+                        contentDescription = "Tema",
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(18.dp)
                     )
@@ -604,7 +764,7 @@ private fun DesktopSidebar(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
-                            contentDescription = "Menüyü Kapat",
+                            contentDescription = strings.closeBtn,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp)
                         )
@@ -621,7 +781,7 @@ private fun DesktopSidebar(
         ) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Yeni Not (Ctrl+N)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(strings.newNoteShortcut, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -629,34 +789,109 @@ private fun DesktopSidebar(
         LazyColumn(modifier = Modifier.weight(1f)) {
             item {
                 SidebarNavItem(
-                    label = "Tüm Notlar (${state.allActiveNotes.size})",
+                    label = "${strings.allNotes} (${state.rootActiveNotes.size})",
                     icon = Icons.Rounded.Description,
                     selected = state.sidebarSection == SidebarSection.ALL,
                     onClick = { onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.ALL)) }
                 )
                 SidebarNavItem(
-                    label = "Sabitlenenler",
+                    label = strings.pinned,
                     icon = Icons.Rounded.PushPin,
                     selected = state.sidebarSection == SidebarSection.PINNED,
                     onClick = { onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.PINNED)) }
                 )
                 SidebarNavItem(
-                    label = "Görevler",
+                    label = strings.tasks,
                     icon = Icons.Rounded.CheckBox,
                     selected = state.sidebarSection == SidebarSection.TASKS,
                     onClick = { onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.TASKS)) }
                 )
                 SidebarNavItem(
-                    label = "Ajanda",
+                    label = strings.agenda,
                     icon = Icons.Rounded.CalendarMonth,
                     selected = state.sidebarSection == SidebarSection.AGENDA,
                     onClick = { onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.AGENDA)) }
                 )
                 SidebarNavItem(
-                    label = "Çöp Kutusu (${state.trashedNotes.size})",
+                    label = "${strings.trash} (${state.trashedNotes.size})",
                     icon = Icons.Rounded.DeleteOutline,
-                    selected = state.sidebarSection == SidebarSection.TRASH,
+                    selected = state.sidebarSection == SidebarSection.TRASH && state.selectedNoteSyncUuid == null,
                     onClick = { onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.TRASH)) }
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outline)
+
+                Text(
+                    text = strings.workspaceToolsHeader,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+
+                fun openWorkspaceMode(mode: DesktopViewMode) {
+                    if (state.sidebarSection == SidebarSection.TRASH) {
+                        onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.ALL))
+                    }
+                    if (state.selectedNoteSyncUuid != null) {
+                        onEvent(DesktopUiEvent.NavigateHome)
+                    }
+                    onEvent(DesktopUiEvent.SetHomeViewMode(mode))
+                }
+
+                SidebarNavItem(
+                    label = strings.taskBoard,
+                    icon = Icons.Rounded.ViewWeek,
+                    selected = state.selectedNoteSyncUuid == null && state.homeViewMode == DesktopViewMode.BOARD,
+                    onClick = { openWorkspaceMode(DesktopViewMode.BOARD) }
+                )
+                SidebarNavItem(
+                    label = strings.streamTimeline,
+                    icon = Icons.Rounded.Bolt,
+                    selected = state.selectedNoteSyncUuid == null && state.homeViewMode == DesktopViewMode.STREAM,
+                    onClick = { openWorkspaceMode(DesktopViewMode.STREAM) }
+                )
+                SidebarNavItem(
+                    label = strings.whiteboard,
+                    icon = Icons.Rounded.Brush,
+                    selected = state.selectedNoteSyncUuid == null && state.homeViewMode == DesktopViewMode.WHITEBOARD,
+                    onClick = { openWorkspaceMode(DesktopViewMode.WHITEBOARD) }
+                )
+                SidebarNavItem(
+                    label = strings.calendar,
+                    icon = Icons.Rounded.CalendarMonth,
+                    selected = state.selectedNoteSyncUuid == null && state.homeViewMode == DesktopViewMode.CALENDAR,
+                    onClick = { openWorkspaceMode(DesktopViewMode.CALENDAR) }
+                )
+                SidebarNavItem(
+                    label = strings.graph2d,
+                    icon = Icons.Rounded.Hub,
+                    selected = state.selectedNoteSyncUuid == null && state.homeViewMode == DesktopViewMode.GRAPH,
+                    onClick = { openWorkspaceMode(DesktopViewMode.GRAPH) }
+                )
+                SidebarNavItem(
+                    label = strings.templateGallery,
+                    icon = Icons.Rounded.DashboardCustomize,
+                    selected = state.showTemplateGalleryDialog,
+                    onClick = { onEvent(DesktopUiEvent.SetTemplateGalleryVisible(true)) }
+                )
+                SidebarNavItem(
+                    label = strings.dailyAgenda,
+                    icon = Icons.Rounded.WbSunny,
+                    selected = false,
+                    onClick = { onEvent(DesktopUiEvent.CreateDailyAgenda) }
+                )
+                SidebarNavItem(
+                    label = strings.categoryManagement,
+                    icon = Icons.Rounded.Folder,
+                    selected = state.showCategoryManagementDialog,
+                    onClick = { onEvent(DesktopUiEvent.SetCategoryManagementVisible(true)) }
+                )
+                SidebarNavItem(
+                    label = strings.settings,
+                    icon = Icons.Rounded.Settings,
+                    selected = state.showSettingsDialog,
+                    onClick = { onEvent(DesktopUiEvent.SetSettingsDialogVisible(true)) }
                 )
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outline)
@@ -667,7 +902,7 @@ private fun DesktopSidebar(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "KATEGORİLER",
+                        text = strings.categoriesHeader,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -746,6 +981,8 @@ private fun DesktopSidebar(
                         node = node,
                         depth = 0,
                         selectedNoteSyncUuid = state.selectedNoteSyncUuid,
+                        lockedCategoryUuids = state.categories.filter { it.isPassword == true }.map { it.syncUuid }.toSet(),
+                        isNoteVaultUnlocked = state.isNoteVaultUnlocked,
                         onSelect = { onEvent(DesktopUiEvent.SelectNote(it)) }
                     )
                 }
@@ -773,7 +1010,7 @@ private fun DesktopSidebar(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = if (state.isDriveConnected) "Google Drive Bağlı" else "Bulut Eşitleme",
+                        text = if (state.isDriveConnected) strings.googleDriveConnected else strings.cloudSyncTitle,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -791,11 +1028,50 @@ private fun DesktopSidebar(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = if (state.lanServerRunning) "Wi-Fi Paylaşım Aktif" else "Aynı Ağ Wi-Fi",
+                        text = if (state.lanServerRunning) strings.wifiLanActive else strings.wifiSameNetwork,
                         fontSize = 11.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (state.isNotePinSet) {
+            Spacer(Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
+                    .clickable {
+                        if (state.isNoteVaultUnlocked) {
+                            onEvent(DesktopUiEvent.LockNoteVaultSession)
+                        } else {
+                            onEvent(DesktopUiEvent.RequestOpenNotePinUnlock)
+                        }
+                    }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                ) {
+                    Icon(
+                        imageVector = if (state.isNoteVaultUnlocked) Icons.Rounded.LockOpen else Icons.Rounded.Pin,
+                        contentDescription = null,
+                        tint = if (state.isNoteVaultUnlocked) DesktopColors.EmeraldGreen else DesktopColors.VibrantOrange,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = if (state.isNoteVaultUnlocked) strings.noteVaultUnlocked else strings.noteVaultLock,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -830,7 +1106,7 @@ private fun DesktopSidebar(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = if (state.isMasterLockEnabled) "Kasayı Kilitle (Ctrl+L)" else "Uygulama Kilidi",
+                    text = if (state.isMasterLockEnabled) strings.lockVaultShortcut else strings.appLock,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -863,19 +1139,19 @@ private fun SidebarNavItem(
         if (selected) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.onSurface
     )
 
-    Surface(
-        shape = RoundedCornerShape(10.dp),
+        Surface(
+        shape = RoundedCornerShape(9.dp),
         color = containerColor,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .padding(vertical = 1.dp)
+            .clip(RoundedCornerShape(9.dp))
             .hoverable(interactionSource)
             .clickable(onClick = onClick)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.5.dp)
         ) {
             Icon(
                 imageVector = icon,
@@ -906,9 +1182,12 @@ private fun SubPageTreeItem(
     node: SubPageTreeNode,
     depth: Int,
     selectedNoteSyncUuid: String?,
+    lockedCategoryUuids: Set<String> = emptySet(),
+    isNoteVaultUnlocked: Boolean = true,
     onSelect: (String) -> Unit
 ) {
     val selected = node.note.syncUuid == selectedNoteSyncUuid
+    val isProtected = isProtectedNoteUi(node.note, lockedCategoryUuids)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -922,7 +1201,7 @@ private fun SubPageTreeItem(
         Text(text = if (depth == 0) "•" else "↳", fontSize = 11.sp, color = DesktopColors.VibrantOrange)
         Spacer(Modifier.width(5.dp))
         Text(
-            text = node.note.title?.takeIf { it.isNotBlank() } ?: "Başlıksız",
+            text = if (isProtected && !isNoteVaultUnlocked) "🔒 ******" else (node.note.title?.takeIf { it.isNotBlank() } ?: "Başlıksız"),
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -930,7 +1209,39 @@ private fun SubPageTreeItem(
         )
     }
     node.children.forEach { child ->
-        SubPageTreeItem(child, depth + 1, selectedNoteSyncUuid, onSelect)
+        SubPageTreeItem(child, depth + 1, selectedNoteSyncUuid, lockedCategoryUuids, isNoteVaultUnlocked, onSelect)
+    }
+}
+
+private fun isProtectedNoteUi(note: Note, lockedCategoryUuids: Set<String>): Boolean =
+    note.isPassword == true ||
+        note.isEncrypted ||
+        (note.categorySyncUuid != null && note.categorySyncUuid in lockedCategoryUuids)
+
+private fun isTrashedNoteUi(note: Note): Boolean =
+    note.deletedAt != null || note.status.equals("TRASH", ignoreCase = true)
+
+private fun maskNotesForLockedViews(
+    notes: List<Note>,
+    lockedCategoryUuids: Set<String>,
+    isNoteVaultUnlocked: Boolean,
+    hideLockedNotes: Boolean
+): List<Note> {
+    if (isNoteVaultUnlocked && !hideLockedNotes) return notes
+    return notes.mapNotNull { note ->
+        val isProtected = isProtectedNoteUi(note, lockedCategoryUuids)
+        when {
+            !isProtected -> note
+            !isNoteVaultUnlocked && hideLockedNotes -> null
+            !isNoteVaultUnlocked -> note.copy(
+                title = "******",
+                description = "",
+                icon = "🔒",
+                totalTasks = 0,
+                completedTasks = 0
+            )
+            else -> note
+        }
     }
 }
 
@@ -1009,19 +1320,27 @@ private val DESKTOP_STARTER_TEMPLATES = listOf(
 private val SHORT_TR_DATE_FORMATTER: DateTimeFormatter =
     DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("tr-TR"))
 
-private fun formatShortDateTr(millis: Long): String {
+private val SHORT_EN_DATE_FORMATTER: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+
+private fun formatShortDateTr(millis: Long, strings: DesktopStrings = DesktopStrings.TR): String {
     if (millis <= 0L) return ""
+    val fmt = if (strings.languageCode == "en") SHORT_EN_DATE_FORMATTER else SHORT_TR_DATE_FORMATTER
     return runCatching {
         Instant.ofEpochMilli(millis)
             .atZone(ZoneId.systemDefault())
-            .format(SHORT_TR_DATE_FORMATTER)
+            .format(fmt)
     }.getOrDefault("")
 }
 
-private fun statusDisplayLabel(status: String): String = when (status.uppercase()) {
-    "IN_PROGRESS" -> "Devam Ediyor"
-    "DONE" -> "Tamamlandı"
-    else -> "Yapılacak"
+private fun statusDisplayLabel(status: String, strings: DesktopStrings = DesktopStrings.TR): String {
+    val isEn = strings.languageCode == "en"
+    return when (status.uppercase()) {
+        "IN_PROGRESS" -> if (isEn) "In Progress" else "Devam Ediyor"
+        "IN_REVIEW" -> if (isEn) "In Review" else "İnceleniyor"
+        "DONE" -> if (isEn) "Done" else "Tamamlandı"
+        else -> if (isEn) "To Do" else "Yapılacak"
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -1029,18 +1348,54 @@ private fun statusDisplayLabel(status: String): String = when (status.uppercase(
 private fun DesktopHomeDashboard(
     state: DesktopUiState,
     onEvent: (DesktopUiEvent) -> Unit,
+    onRequestEmptyTrash: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val sectionTitle = when (state.sidebarSection) {
-        SidebarSection.ALL -> "Ana Sayfa"
-        SidebarSection.PINNED -> "Sabitlenen Notlar"
-        SidebarSection.TASKS -> "Görevler"
-        SidebarSection.AGENDA -> "Ajanda"
-        SidebarSection.TRASH -> "Çöp Kutusu"
-        SidebarSection.CATEGORY -> state.categories
+    val strings = remember(state.language) { DesktopStrings.forLanguage(state.language) }
+    val lockedCategoryUuids = remember(state.categories) {
+        state.categories.filter { it.isPassword == true }.map { it.syncUuid }.toHashSet()
+    }
+    val collectionTitle = when (state.sidebarSection) {
+        SidebarSection.ALL -> strings.allNotes
+        SidebarSection.PINNED -> strings.pinnedNotesTitle
+        SidebarSection.TASKS -> strings.tasks
+        SidebarSection.AGENDA -> strings.agenda
+        SidebarSection.TRASH -> strings.trash
+        else -> state.categories
             .firstOrNull { it.syncUuid == state.selectedCategorySyncUuid }?.name
             ?: "Kategori"
     }
+    val sectionTitle = when (state.homeViewMode) {
+        DesktopViewMode.STREAM -> strings.streamTimeline
+        DesktopViewMode.WHITEBOARD -> strings.whiteboard
+        DesktopViewMode.CALENDAR -> strings.calendar
+        DesktopViewMode.GRAPH -> strings.graph2d
+        DesktopViewMode.BOARD -> strings.taskBoard
+        else -> if (state.sidebarSection == SidebarSection.ALL) strings.homeTitle else collectionTitle
+    }
+
+    val visualNotesRaw = remember(state.allActiveNotes, state.rootActiveNotes, state.showSubPagesInVisualModes) {
+        if (state.showSubPagesInVisualModes) state.allActiveNotes else state.rootActiveNotes
+    }
+    val visualNotes = remember(visualNotesRaw, lockedCategoryUuids, state.isNoteVaultUnlocked, state.hideLockedNotes) {
+        maskNotesForLockedViews(visualNotesRaw, lockedCategoryUuids, state.isNoteVaultUnlocked, state.hideLockedNotes)
+    }
+    val visualLinks = remember(state.noteLinks, visualNotes) {
+        val visibleUuids = visualNotes.asSequence().map { it.syncUuid }.toHashSet()
+        state.noteLinks.filter { it.sourceSyncUuid in visibleUuids && it.targetSyncUuid in visibleUuids }
+    }
+
+    val countBadge = when (state.homeViewMode) {
+        DesktopViewMode.STREAM -> "${state.streamItems.size} fikir"
+        DesktopViewMode.CALENDAR -> "${state.rootActiveNotes.size} not"
+        DesktopViewMode.GRAPH, DesktopViewMode.WHITEBOARD -> "${visualNotes.size} not"
+        else -> "${state.filteredNotes.size} not"
+    }
+    val showCollectionFilters = state.homeViewMode in setOf(
+        DesktopViewMode.CARDS,
+        DesktopViewMode.LIST,
+        DesktopViewMode.BOARD
+    )
 
     Column(modifier = modifier.padding(horizontal = 24.dp, vertical = 18.dp)) {
         FlowRow(
@@ -1066,7 +1421,7 @@ private fun DesktopHomeDashboard(
                     color = DesktopColors.VibrantOrange.copy(alpha = 0.14f)
                 ) {
                     Text(
-                        text = "${state.filteredNotes.size} not",
+                        text = countBadge,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = DesktopColors.VibrantOrange,
@@ -1084,11 +1439,61 @@ private fun DesktopHomeDashboard(
                 if (state.sidebarSection != SidebarSection.TRASH) {
                     ViewModeSwitcherPill(
                         selectedMode = state.homeViewMode,
+                        strings = strings,
                         onSelectMode = { onEvent(DesktopUiEvent.SetHomeViewMode(it)) }
                     )
+                } else if (state.trashedNotes.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = onRequestEmptyTrash,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(11.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.DeleteOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(strings.emptyTrashBtn, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                    }
                 }
 
-                if (state.allActiveNotes.isNotEmpty()) {
+                if (state.homeViewMode == DesktopViewMode.GRAPH ||
+                    state.homeViewMode == DesktopViewMode.WHITEBOARD ||
+                    state.splitViewMode == SplitViewMode.GRAPH_2D
+                ) {
+                    val showingSub = state.showSubPagesInVisualModes
+                    OutlinedButton(
+                        onClick = { onEvent(DesktopUiEvent.ToggleShowSubPagesInVisualModes) },
+                        border = BorderStroke(
+                            1.dp,
+                            if (showingSub) DesktopColors.VibrantOrange.copy(alpha = 0.65f) else MaterialTheme.colorScheme.outline
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(11.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (showingSub) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                            contentDescription = null,
+                            tint = if (showingSub) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            text = if (showingSub) "Alt Sayfalar: Açık" else "Alt Sayfalar: Gizli",
+                            fontSize = 12.sp,
+                            color = if (showingSub) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+
+                if (state.allActiveNotes.isNotEmpty() && state.homeViewMode != DesktopViewMode.GRAPH) {
                     val graphActive = state.splitViewMode == SplitViewMode.GRAPH_2D
                     OutlinedButton(
                         onClick = {
@@ -1111,7 +1516,7 @@ private fun DesktopHomeDashboard(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            "Bilgi Haritası",
+                            "Yan Harita",
                             fontSize = 12.sp,
                             color = if (graphActive) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
@@ -1132,92 +1537,141 @@ private fun DesktopHomeDashboard(
                 ) {
                     Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Yeni Not", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-
-        // Search & Category Filter Pills Row
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 580.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-            ) {
-                Icon(
-                    Icons.Rounded.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(10.dp))
-                Box(modifier = Modifier.weight(1f)) {
-                    if (state.searchQuery.isEmpty()) {
-                        Text(
-                            "Notlarda ara... (Ctrl+K)",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    BasicTextField(
-                        value = state.searchQuery,
-                        onValueChange = { onEvent(DesktopUiEvent.UpdateSearchQuery(it)) },
-                        singleLine = true,
-                        textStyle = TextStyle(fontSize = 13.5.sp, color = MaterialTheme.colorScheme.onSurface),
-                        cursorBrush = SolidColor(DesktopColors.VibrantOrange),
-                        modifier = Modifier.fillMaxWidth()
+                    Text(
+                        text = if (state.language == "en") "New Note" else "Yeni Not",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
-                if (state.searchQuery.isNotEmpty()) {
-                    IconButton(
-                        onClick = { onEvent(DesktopUiEvent.UpdateSearchQuery("")) },
-                        modifier = Modifier.size(22.dp)
+            }
+        }
+
+        if (showCollectionFilters) {
+            Spacer(Modifier.height(14.dp))
+
+            // Search & Category Filter Pills Row
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 580.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (state.searchQuery.isEmpty()) {
+                            Text(
+                                strings.searchPlaceholder,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        BasicTextField(
+                            value = state.searchQuery,
+                            onValueChange = { onEvent(DesktopUiEvent.UpdateSearchQuery(it)) },
+                            singleLine = true,
+                            textStyle = TextStyle(fontSize = 13.5.sp, color = MaterialTheme.colorScheme.onSurface),
+                            cursorBrush = SolidColor(DesktopColors.VibrantOrange),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    if (state.searchQuery.isNotEmpty()) {
+                        IconButton(
+                            onClick = { onEvent(DesktopUiEvent.UpdateSearchQuery("")) },
+                            modifier = Modifier.size(22.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = "Aramayı Temizle",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            CategoryFilterStrip(
+                categories = state.categories,
+                strings = strings,
+                activeSection = state.sidebarSection,
+                selectedCategoryUuid = state.selectedCategorySyncUuid,
+                onSelectAll = { onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.ALL)) },
+                onSelectCategory = { uuid -> onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.CATEGORY, uuid)) },
+                onAddCategory = { onEvent(DesktopUiEvent.SetCreateCategoryDialogVisible(true)) }
+            )
+
+            val visibleRecentNotes = remember(state.rootActiveNotes, lockedCategoryUuids, state.isNoteVaultUnlocked, state.hideLockedNotes) {
+                maskNotesForLockedViews(
+                    state.rootActiveNotes.sortedByDescending { it.updatedAt }.take(12),
+                    lockedCategoryUuids,
+                    state.isNoteVaultUnlocked,
+                    state.hideLockedNotes
+                ).take(6)
+            }
+            val showRecentStrip = state.homeViewMode in setOf(DesktopViewMode.CARDS, DesktopViewMode.LIST) &&
+                state.sidebarSection != SidebarSection.TRASH &&
+                state.searchQuery.isBlank() &&
+                visibleRecentNotes.isNotEmpty()
+            if (showRecentStrip) {
+                Spacer(Modifier.height(14.dp))
+                RecentNotesStrip(
+                    notes = visibleRecentNotes,
+                    categories = state.categories,
+                    strings = strings,
+                    lockedCategoryUuids = lockedCategoryUuids,
+                    onSelectNote = { onEvent(DesktopUiEvent.SelectNote(it)) }
+                )
+            }
+
+            if (state.homeViewMode in setOf(DesktopViewMode.CARDS, DesktopViewMode.LIST)) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                    modifier = Modifier.padding(top = 14.dp, bottom = 10.dp)
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = collectionTitle,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = "Aramayı Temizle",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp)
+                        Text(
+                            text = "${state.filteredNotes.size}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        CategoryFilterStrip(
-            categories = state.categories,
-            activeSection = state.sidebarSection,
-            selectedCategoryUuid = state.selectedCategorySyncUuid,
-            onSelectAll = { onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.ALL)) },
-            onSelectCategory = { uuid -> onEvent(DesktopUiEvent.SelectSidebar(SidebarSection.CATEGORY, uuid)) },
-            onAddCategory = { onEvent(DesktopUiEvent.SetCreateCategoryDialogVisible(true)) }
-        )
-
-        val showRecentStrip = state.sidebarSection != SidebarSection.TRASH &&
-            state.searchQuery.isBlank() &&
-            state.allActiveNotes.isNotEmpty()
-        if (showRecentStrip) {
-            Spacer(Modifier.height(14.dp))
-            RecentNotesStrip(
-                notes = remember(state.allActiveNotes) {
-                    state.allActiveNotes.sortedByDescending { it.updatedAt }.take(6)
-                },
-                categories = state.categories,
-                onSelectNote = { onEvent(DesktopUiEvent.SelectNote(it)) }
-            )
-        }
-
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(10.dp))
 
         AnimatedContent(
             targetState = Triple(state.filteredNotes.isEmpty(), state.homeViewMode, state.sidebarSection),
@@ -1226,113 +1680,183 @@ private fun DesktopHomeDashboard(
             },
             modifier = Modifier.weight(1f).fillMaxWidth()
         ) { (isEmpty, viewMode, section) ->
-            if (isEmpty) {
-                if (section == SidebarSection.TRASH || state.searchQuery.isNotBlank()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            modifier = Modifier.widthIn(max = 420.dp)
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(28.dp)
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(DesktopColors.VibrantOrange.copy(alpha = 0.14f))
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Description,
-                                        contentDescription = null,
-                                        tint = DesktopColors.VibrantOrange,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                                Spacer(Modifier.height(12.dp))
-                                Text(
-                                    text = if (state.searchQuery.isNotBlank()) {
-                                        "Aramayla eşleşen not bulunamadı"
-                                    } else {
-                                        "Çöp kutusu boş"
-                                    },
-                                    fontSize = 15.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    text = if (state.searchQuery.isNotBlank()) {
-                                        "Farklı bir anahtar kelime deneyin veya aramayı temizleyin."
-                                    } else {
-                                        "Silinen notlarınız buradan tek tıkla geri yüklenebilir."
-                                    },
-                                    fontSize = 12.5.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    StarterTemplatesEmptyState(
-                        onCreateBlank = { onEvent(DesktopUiEvent.CreateNewNote) },
-                        onSelectTemplate = { tpl ->
-                            onEvent(
-                                DesktopUiEvent.CreateNoteFromTemplate(
-                                    title = tpl.title,
-                                    icon = tpl.icon,
-                                    blocks = tpl.buildBlocks()
-                                )
+            when (viewMode) {
+                DesktopViewMode.CALENDAR -> DesktopCalendarView(
+                    notes = maskNotesForLockedViews(
+                        state.rootActiveNotes,
+                        lockedCategoryUuids,
+                        state.isNoteVaultUnlocked,
+                        state.hideLockedNotes
+                    ),
+                    categories = state.categories,
+                    onSelectNote = { onEvent(DesktopUiEvent.SelectNote(it)) },
+                    onCreateNoteForDay = { noonMillis ->
+                        onEvent(
+                            DesktopUiEvent.CreateNoteFromTemplate(
+                                title = "Planlanan Not",
+                                icon = "📅",
+                                blocks = listOf(NoteBlock(type = BlockType.TODO, content = "Yapılacak görev")),
+                                reminderTime = noonMillis
                             )
-                        },
+                        )
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+                DesktopViewMode.GRAPH -> Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    DesktopGraphView(
+                        notes = visualNotes,
+                        links = visualLinks,
+                        categories = state.categories,
+                        selectedNoteSyncUuid = state.selectedNoteSyncUuid,
+                        onNodeClick = { onEvent(DesktopUiEvent.SelectNote(it)) },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-            } else {
-                when (viewMode) {
-                    DesktopViewMode.CARDS -> {
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 248.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(state.filteredNotes, key = { it.syncUuid }) { note ->
-                                val categoryName = state.categories.firstOrNull { it.syncUuid == note.categorySyncUuid }?.name
-                                DesktopNoteCard(
-                                    note = note,
-                                    categoryName = categoryName,
-                                    onEvent = onEvent
+                DesktopViewMode.WHITEBOARD -> DesktopWhiteboardView(
+                    notes = visualNotes,
+                    links = visualLinks,
+                    categories = state.categories,
+                    onSelectNote = { onEvent(DesktopUiEvent.SelectNote(it)) },
+                    onCreateNote = { onEvent(DesktopUiEvent.CreateNewNote) },
+                    modifier = Modifier.fillMaxSize()
+                )
+                DesktopViewMode.STREAM -> DesktopStreamView(
+                    streamItems = state.streamItems,
+                    onAddItem = { onEvent(DesktopUiEvent.AddStreamItem(it)) },
+                    onDeleteItem = { onEvent(DesktopUiEvent.DeleteStreamItem(it)) },
+                    onConvertToNote = { ids, title -> onEvent(DesktopUiEvent.ConvertStreamItemsToNote(ids, title)) },
+                    onOpenNote = { onEvent(DesktopUiEvent.SelectNote(it)) },
+                    onPlayAudio = { onEvent(DesktopUiEvent.OpenMediaExternally(it)) },
+                    modifier = Modifier.fillMaxSize()
+                )
+                DesktopViewMode.CARDS, DesktopViewMode.LIST, DesktopViewMode.BOARD -> {
+                    if (isEmpty) {
+                        if (section == SidebarSection.TRASH || state.searchQuery.isNotBlank()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                    modifier = Modifier.widthIn(max = 420.dp)
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.padding(28.dp)
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(DesktopColors.VibrantOrange.copy(alpha = 0.14f))
+                                        ) {
+                                            Icon(
+                                                Icons.Rounded.Description,
+                                                contentDescription = null,
+                                                tint = DesktopColors.VibrantOrange,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                        Spacer(Modifier.height(12.dp))
+                                        Text(
+                                            text = if (state.searchQuery.isNotBlank()) {
+                                                strings.searchNoResultTitle
+                                            } else {
+                                                strings.trashEmptyTitle
+                                            },
+                                            fontSize = 15.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(
+                                            text = if (state.searchQuery.isNotBlank()) {
+                                                strings.searchNoResultDesc
+                                            } else {
+                                                strings.trashEmptyDesc
+                                            },
+                                            fontSize = 12.5.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            StarterTemplatesEmptyState(
+                                strings = strings,
+                                onCreateBlank = { onEvent(DesktopUiEvent.CreateNewNote) },
+                                onOpenAllTemplates = { onEvent(DesktopUiEvent.SetTemplateGalleryVisible(true)) },
+                                onSelectTemplate = { tpl ->
+                                    onEvent(
+                                        DesktopUiEvent.CreateNoteFromTemplate(
+                                            title = tpl.title,
+                                            icon = tpl.icon,
+                                            blocks = tpl.buildBlocks()
+                                        )
+                                    )
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    } else {
+                        when (viewMode) {
+                            DesktopViewMode.CARDS -> {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Adaptive(minSize = 256.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                                    contentPadding = PaddingValues(bottom = 18.dp),
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(state.filteredNotes, key = { it.syncUuid }) { note ->
+                                        val categoryName = state.categories.firstOrNull { it.syncUuid == note.categorySyncUuid }?.name
+                                        DesktopNoteCard(
+                                            note = note,
+                                            categoryName = categoryName,
+                                            strings = strings,
+                                            lockedCategoryUuids = lockedCategoryUuids,
+                                            isNoteVaultUnlocked = state.isNoteVaultUnlocked,
+                                            fixedHeight = 168.dp,
+                                            onEvent = onEvent
+                                        )
+                                    }
+                                }
+                            }
+                            DesktopViewMode.LIST -> {
+                                LazyColumn(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(state.filteredNotes, key = { it.syncUuid }) { note ->
+                                        val categoryName = state.categories.firstOrNull { it.syncUuid == note.categorySyncUuid }?.name
+                                        DesktopNoteListRow(
+                                            note = note,
+                                            categoryName = categoryName,
+                                            strings = strings,
+                                            lockedCategoryUuids = lockedCategoryUuids,
+                                            isNoteVaultUnlocked = state.isNoteVaultUnlocked,
+                                            onEvent = onEvent
+                                        )
+                                    }
+                                }
+                            }
+                            DesktopViewMode.BOARD -> {
+                                DesktopKanbanBoard(
+                                    notes = state.filteredNotes,
+                                    categories = state.categories,
+                                    strings = strings,
+                                    lockedCategoryUuids = lockedCategoryUuids,
+                                    isNoteVaultUnlocked = state.isNoteVaultUnlocked,
+                                    onEvent = onEvent,
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
-                    }
-                    DesktopViewMode.LIST -> {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(state.filteredNotes, key = { it.syncUuid }) { note ->
-                                val categoryName = state.categories.firstOrNull { it.syncUuid == note.categorySyncUuid }?.name
-                                DesktopNoteListRow(
-                                    note = note,
-                                    categoryName = categoryName,
-                                    onEvent = onEvent
-                                )
-                            }
-                        }
-                    }
-                    DesktopViewMode.BOARD -> {
-                        DesktopKanbanBoard(
-                            notes = state.filteredNotes,
-                            categories = state.categories,
-                            onEvent = onEvent,
-                            modifier = Modifier.fillMaxSize()
-                        )
                     }
                 }
             }
@@ -1343,12 +1867,17 @@ private fun DesktopHomeDashboard(
 @Composable
 private fun ViewModeSwitcherPill(
     selectedMode: DesktopViewMode,
+    strings: DesktopStrings,
     onSelectMode: (DesktopViewMode) -> Unit
 ) {
     val options = listOf(
-        Triple(DesktopViewMode.CARDS, "Kartlar", Icons.Rounded.GridView),
-        Triple(DesktopViewMode.LIST, "Liste", Icons.AutoMirrored.Rounded.FormatListBulleted),
-        Triple(DesktopViewMode.BOARD, "Pano", Icons.Rounded.ViewWeek)
+        Triple(DesktopViewMode.CARDS, strings.viewCards, Icons.Rounded.GridView),
+        Triple(DesktopViewMode.LIST, strings.viewList, Icons.AutoMirrored.Rounded.FormatListBulleted),
+        Triple(DesktopViewMode.BOARD, strings.viewBoard, Icons.Rounded.ViewWeek),
+        Triple(DesktopViewMode.CALENDAR, strings.viewCalendar, Icons.Rounded.CalendarMonth),
+        Triple(DesktopViewMode.GRAPH, strings.viewGraph, Icons.Rounded.Hub),
+        Triple(DesktopViewMode.WHITEBOARD, strings.viewCanvas, Icons.Rounded.Brush),
+        Triple(DesktopViewMode.STREAM, strings.viewStream, Icons.Rounded.Bolt)
     )
     Surface(
         shape = RoundedCornerShape(11.dp),
@@ -1358,7 +1887,9 @@ private fun ViewModeSwitcherPill(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(3.dp),
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             options.forEach { (mode, label, icon) ->
@@ -1396,6 +1927,7 @@ private fun ViewModeSwitcherPill(
 @Composable
 private fun CategoryFilterStrip(
     categories: List<Category>,
+    strings: DesktopStrings,
     activeSection: SidebarSection,
     selectedCategoryUuid: String?,
     onSelectAll: () -> Unit,
@@ -1409,7 +1941,7 @@ private fun CategoryFilterStrip(
     ) {
         item(key = "cat_all") {
             FilterPillChip(
-                label = "Tümü",
+                label = strings.allCategoriesFilter,
                 selected = activeSection == SidebarSection.ALL,
                 onClick = onSelectAll
             )
@@ -1442,7 +1974,7 @@ private fun CategoryFilterStrip(
                     )
                     Spacer(Modifier.width(5.dp))
                     Text(
-                        text = "Yeni Kategori",
+                        text = strings.newCategoryChip,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = DesktopColors.VibrantOrange,
@@ -1494,68 +2026,95 @@ private fun FilterPillChip(
 private fun RecentNotesStrip(
     notes: List<Note>,
     categories: List<Category>,
+    strings: DesktopStrings,
+    lockedCategoryUuids: Set<String>,
     onSelectNote: (String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Son Kullanılanlar ›",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(notes, key = { "recent_${it.syncUuid}" }) { note ->
-                val interactionSource = remember { MutableInteractionSource() }
-                val hovered by interactionSource.collectIsHoveredAsState()
-                val border by animateColorAsState(
-                    if (hovered) DesktopColors.VibrantOrange.copy(alpha = 0.65f) else MaterialTheme.colorScheme.outline
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.History,
+                    contentDescription = null,
+                    tint = DesktopColors.VibrantOrange,
+                    modifier = Modifier.size(15.dp)
                 )
-                val catName = categories.firstOrNull { it.syncUuid == note.categorySyncUuid }?.name
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, border),
-                    modifier = Modifier
-                        .width(210.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .hoverable(interactionSource)
-                        .clickable { onSelectNote(note.syncUuid) }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                Text(
+                    text = strings.recentNotesTitle,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(notes, key = { "recent_${it.syncUuid}" }) { note ->
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val hovered by interactionSource.collectIsHoveredAsState()
+                    val border by animateColorAsState(
+                        if (hovered) DesktopColors.VibrantOrange.copy(alpha = 0.65f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+                    )
+                    val catName = categories.firstOrNull { it.syncUuid == note.categorySyncUuid }?.name
+                    val isProtected = isProtectedNoteUi(note, lockedCategoryUuids)
+                    val isMaskedLocked = isProtected && (
+                        (note.description.orEmpty().isEmpty() && note.title == strings.protectedNoteTitleMasked) ||
+                            note.description.orEmpty().startsWith("ENC_")
+                        )
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, border),
+                        modifier = Modifier
+                            .width(204.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .hoverable(interactionSource)
+                            .clickable { onSelectNote(note.syncUuid) }
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(DesktopColors.VibrantOrange.copy(alpha = 0.12f))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
                         ) {
-                            Text(note.icon ?: "📝", fontSize = 17.sp)
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = note.title?.takeIf { it.isNotBlank() } ?: "Başlıksız Not",
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                            DesktopNoteIconBadge(
+                                iconKey = note.icon,
+                                isLocked = isMaskedLocked,
+                                size = 30.dp,
+                                iconSize = 16.dp,
+                                cornerRadius = 8.dp
                             )
-                            val sub = catName ?: formatShortDateTr(note.updatedAt)
-                            if (sub.isNotBlank()) {
+                            Spacer(Modifier.width(9.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = sub,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    text = note.title?.takeIf { it.isNotBlank() } ?: strings.untitledNote,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                                val sub = if (isMaskedLocked) {
+                                    strings.protectedNoteSubtitle
+                                } else {
+                                    catName ?: formatShortDateTr(note.updatedAt, strings)
+                                }
+                                if (sub.isNotBlank()) {
+                                    Text(
+                                        text = sub,
+                                        fontSize = 10.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
@@ -1568,10 +2127,13 @@ private fun RecentNotesStrip(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StarterTemplatesEmptyState(
+    strings: DesktopStrings,
     onCreateBlank: () -> Unit,
+    onOpenAllTemplates: () -> Unit,
     onSelectTemplate: (DesktopStarterTemplate) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isEn = strings.languageCode == "en"
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -1605,30 +2167,55 @@ private fun StarterTemplatesEmptyState(
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Çalışma alanınız hazır",
+                    text = if (isEn) "Your workspace is ready" else "Çalışma alanınız hazır",
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Hemen boş bir sayfa oluşturun ya da aşağıdaki şablonlardan biriyle hızlı başlayın.",
+                    text = if (isEn) {
+                        "Create a blank page right away or start quickly with one of the templates below."
+                    } else {
+                        "Hemen boş bir sayfa oluşturun ya da aşağıdaki şablonlardan biriyle hızlı başlayın."
+                    },
                     fontSize = 12.5.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = onCreateBlank,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DesktopColors.VibrantOrange,
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(38.dp)
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Boş Not Oluştur", fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(
+                        onClick = onCreateBlank,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = DesktopColors.VibrantOrange,
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(38.dp)
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            if (isEn) "Create Blank Note" else "Boş Not Oluştur",
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onOpenAllTemplates,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(38.dp)
+                    ) {
+                        Icon(Icons.Rounded.DashboardCustomize, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            if (isEn) "All 14 Templates" else "Tüm 14 Şablon",
+                            fontSize = 12.5.sp,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(22.dp))
@@ -1636,7 +2223,7 @@ private fun StarterTemplatesEmptyState(
                 Spacer(Modifier.height(16.dp))
 
                 Text(
-                    text = "Hızlı Başlangıç Şablonları",
+                    text = if (isEn) "Quick Start Templates" else "Hızlı Başlangıç Şablonları",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1708,11 +2295,25 @@ private fun StarterTemplatesEmptyState(
 private fun DesktopNoteCard(
     note: Note,
     categoryName: String?,
+    strings: DesktopStrings,
+    lockedCategoryUuids: Set<String>,
+    isNoteVaultUnlocked: Boolean,
     onEvent: (DesktopUiEvent) -> Unit,
-    showStatusPill: Boolean = true
+    showStatusPill: Boolean = true,
+    fixedHeight: Dp? = null,
+    onMovePrevStatus: (() -> Unit)? = null,
+    onMoveNextStatus: (() -> Unit)? = null
 ) {
-    val preview = remember(note.description) {
-        BlockParser.toPlainTextSummary(BlockParser.parse(note.description), maxLines = 3)
+    val isProtected = isProtectedNoteUi(note, lockedCategoryUuids)
+    val isMaskedLocked = isProtected && !isNoteVaultUnlocked
+    val isTrashed = isTrashedNoteUi(note)
+    val preview = remember(note.description, isMaskedLocked, isProtected, strings.protectedNoteSubtitle) {
+        val raw = note.description.orEmpty()
+        when {
+            isMaskedLocked -> strings.protectedNoteSubtitle
+            raw.startsWith("ENC_") -> strings.protectedNoteSubtitle
+            else -> BlockParser.toPlainTextSummary(BlockParser.parse(raw), maxLines = 3, includeDecorations = false)
+        }
     }
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -1724,54 +2325,94 @@ private fun DesktopNoteCard(
         }
     )
 
+    val cardModifier = Modifier
+        .fillMaxWidth()
+        .let { if (fixedHeight != null) it.height(fixedHeight) else it }
+        .clip(RoundedCornerShape(16.dp))
+        .hoverable(interactionSource)
+        .clickable { onEvent(DesktopUiEvent.SelectNote(note.syncUuid)) }
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, borderColor),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .hoverable(interactionSource)
-            .clickable { onEvent(DesktopUiEvent.SelectNote(note.syncUuid)) }
+        modifier = cardModifier
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = if (fixedHeight != null) {
+                Modifier.fillMaxSize().padding(16.dp)
+            } else {
+                Modifier.padding(16.dp)
+            }
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(DesktopColors.VibrantOrange.copy(alpha = 0.12f))
-                ) {
-                    Text(note.icon ?: "📝", fontSize = 17.sp)
-                }
+                DesktopNoteIconBadge(
+                    iconKey = note.icon,
+                    isLocked = isMaskedLocked,
+                    size = 34.dp,
+                    iconSize = 18.dp,
+                    cornerRadius = 10.dp
+                )
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    text = note.title?.takeIf { it.isNotBlank() } ?: "Başlıksız Not",
+                    text = if (isMaskedLocked) {
+                        strings.protectedNoteTitleMasked
+                    } else {
+                        note.title?.takeIf { it.isNotBlank() } ?: strings.untitledNote
+                    },
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                if (note.deletedAt != null) {
+                if (isTrashed) {
                     IconButton(
                         onClick = { onEvent(DesktopUiEvent.RestoreNote(note.syncUuid)) },
                         modifier = Modifier.size(28.dp)
                     ) {
-                        Icon(Icons.Rounded.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.Rounded.RestoreFromTrash,
+                            contentDescription = strings.restoreBtn,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { onEvent(DesktopUiEvent.PermanentDeleteNote(note.syncUuid)) },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.DeleteForever,
+                            contentDescription = strings.permanentDeleteBtn,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 } else {
-                    if (note.isPinned) {
+                    if (isProtected) {
                         Icon(
-                            Icons.Rounded.PushPin,
-                            contentDescription = "Sabitlenmiş",
+                            imageVector = if (isNoteVaultUnlocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
+                            contentDescription = strings.lockNoteBtn,
                             tint = DesktopColors.VibrantOrange,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
                     }
-                    NoteActionMenu(note = note, onEvent = onEvent)
+                    if (note.isPinned) {
+                        Icon(
+                            Icons.Rounded.PushPin,
+                            contentDescription = strings.pinned,
+                            tint = DesktopColors.VibrantOrange,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    NoteActionMenu(
+                        note = note,
+                        isProtected = isProtected,
+                        strings = strings,
+                        onEvent = onEvent
+                    )
                 }
             }
 
@@ -1787,7 +2428,11 @@ private fun DesktopNoteCard(
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
+            if (fixedHeight != null) {
+                Spacer(Modifier.weight(1f, fill = true))
+            } else {
+                Spacer(Modifier.height(12.dp))
+            }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1809,14 +2454,18 @@ private fun DesktopNoteCard(
                         )
                     }
                 }
-                if (showStatusPill && (note.status == "IN_PROGRESS" || note.status == "DONE")) {
-                    val statusTint = if (note.status == "DONE") DesktopColors.EmeraldGreen else DesktopColors.AccentBlue
+                if (!isMaskedLocked && showStatusPill && note.status in setOf("IN_PROGRESS", "IN_REVIEW", "DONE")) {
+                    val statusTint = when (note.status.uppercase()) {
+                        "DONE" -> DesktopColors.EmeraldGreen
+                        "IN_REVIEW" -> Color(0xFF0EA5E9)
+                        else -> Color(0xFFF59E0B)
+                    }
                     Surface(
                         shape = RoundedCornerShape(7.dp),
                         color = statusTint.copy(alpha = 0.14f)
                     ) {
                         Text(
-                            text = statusDisplayLabel(note.status),
+                            text = statusDisplayLabel(note.status, strings),
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.Medium,
                             color = statusTint,
@@ -1826,26 +2475,47 @@ private fun DesktopNoteCard(
                         )
                     }
                 }
-                if (note.totalTasks > 0) {
-                    Text(
-                        text = "✓ ${note.completedTasks}/${note.totalTasks}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = DesktopColors.EmeraldGreen,
-                        maxLines = 1,
-                        softWrap = false
+                if (!isMaskedLocked && note.totalTasks > 0) {
+                    DesktopTaskProgressBadge(
+                        completed = note.completedTasks,
+                        total = note.totalTasks
                     )
                 }
                 Spacer(Modifier.weight(1f))
-                val dateLabel = formatShortDateTr(note.updatedAt)
-                if (dateLabel.isNotBlank()) {
-                    Text(
-                        text = dateLabel,
-                        fontSize = 10.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        maxLines = 1,
-                        softWrap = false
-                    )
+                if (onMovePrevStatus != null || onMoveNextStatus != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (onMovePrevStatus != null) {
+                            IconButton(onClick = onMovePrevStatus, modifier = Modifier.size(24.dp)) {
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                        if (onMoveNextStatus != null) {
+                            IconButton(onClick = onMoveNextStatus, modifier = Modifier.size(24.dp)) {
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.ArrowForward,
+                                    contentDescription = null,
+                                    tint = DesktopColors.VibrantOrange,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    val dateLabel = formatShortDateTr(note.updatedAt, strings)
+                    if (dateLabel.isNotBlank()) {
+                        Text(
+                            text = dateLabel,
+                            fontSize = 10.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
                 }
             }
         }
@@ -1856,10 +2526,21 @@ private fun DesktopNoteCard(
 private fun DesktopNoteListRow(
     note: Note,
     categoryName: String?,
+    strings: DesktopStrings,
+    lockedCategoryUuids: Set<String>,
+    isNoteVaultUnlocked: Boolean,
     onEvent: (DesktopUiEvent) -> Unit
 ) {
-    val preview = remember(note.description) {
-        BlockParser.toPlainTextSummary(BlockParser.parse(note.description), maxLines = 1)
+    val isProtected = isProtectedNoteUi(note, lockedCategoryUuids)
+    val isMaskedLocked = isProtected && !isNoteVaultUnlocked
+    val isTrashed = isTrashedNoteUi(note)
+    val preview = remember(note.description, isMaskedLocked, strings.protectedNoteSubtitle) {
+        val raw = note.description.orEmpty()
+        when {
+            isMaskedLocked -> strings.protectedNoteSubtitle
+            raw.startsWith("ENC_") -> strings.protectedNoteSubtitle
+            else -> BlockParser.toPlainTextSummary(BlockParser.parse(raw), maxLines = 1, includeDecorations = false)
+        }
     }
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -1881,19 +2562,21 @@ private fun DesktopNoteListRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp)
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(DesktopColors.VibrantOrange.copy(alpha = 0.12f))
-            ) {
-                Text(note.icon ?: "📝", fontSize = 17.sp)
-            }
+            DesktopNoteIconBadge(
+                iconKey = note.icon,
+                isLocked = isMaskedLocked,
+                size = 34.dp,
+                iconSize = 18.dp,
+                cornerRadius = 10.dp
+            )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = note.title?.takeIf { it.isNotBlank() } ?: "Başlıksız Not",
+                    text = if (isMaskedLocked) {
+                        strings.protectedNoteTitleMasked
+                    } else {
+                        note.title?.takeIf { it.isNotBlank() } ?: strings.untitledNote
+                    },
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.5.sp,
                     maxLines = 1,
@@ -1924,15 +2607,14 @@ private fun DesktopNoteListRow(
                     )
                 }
             }
-            if (note.totalTasks > 0) {
+            if (!isMaskedLocked && note.totalTasks > 0) {
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "✓ ${note.completedTasks}/${note.totalTasks}",
-                    fontSize = 11.sp,
-                    color = DesktopColors.EmeraldGreen
+                DesktopTaskProgressBadge(
+                    completed = note.completedTasks,
+                    total = note.totalTasks
                 )
             }
-            val dateLabel = formatShortDateTr(note.updatedAt)
+            val dateLabel = formatShortDateTr(note.updatedAt, strings)
             if (dateLabel.isNotBlank()) {
                 Spacer(Modifier.width(10.dp))
                 Text(
@@ -1942,15 +2624,35 @@ private fun DesktopNoteListRow(
                 )
             }
             Spacer(Modifier.width(6.dp))
-            if (note.deletedAt != null) {
+            if (isTrashed) {
                 IconButton(
                     onClick = { onEvent(DesktopUiEvent.RestoreNote(note.syncUuid)) },
                     modifier = Modifier.size(28.dp)
                 ) {
-                    Icon(Icons.Rounded.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(16.dp))
+                    Icon(
+                        Icons.Rounded.RestoreFromTrash,
+                        contentDescription = strings.restoreBtn,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { onEvent(DesktopUiEvent.PermanentDeleteNote(note.syncUuid)) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.DeleteForever,
+                        contentDescription = strings.permanentDeleteBtn,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             } else {
-                NoteActionMenu(note = note, onEvent = onEvent)
+                NoteActionMenu(
+                    note = note,
+                    isProtected = isProtected,
+                    strings = strings,
+                    onEvent = onEvent
+                )
             }
         }
     }
@@ -1960,17 +2662,23 @@ private fun DesktopNoteListRow(
 private fun DesktopKanbanBoard(
     notes: List<Note>,
     categories: List<Category>,
+    strings: DesktopStrings,
+    lockedCategoryUuids: Set<String>,
+    isNoteVaultUnlocked: Boolean,
     onEvent: (DesktopUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isEn = strings.languageCode == "en"
     val columns = listOf(
-        Triple("TODO", "Yapılacak", MaterialTheme.colorScheme.onSurfaceVariant),
-        Triple("IN_PROGRESS", "Devam Ediyor", DesktopColors.VibrantOrange),
-        Triple("DONE", "Tamamlandı", DesktopColors.EmeraldGreen)
+        Triple("TODO", if (isEn) "To Do" else "Yapılacaklar", Color(0xFFA855F7)),
+        Triple("IN_PROGRESS", if (isEn) "In Progress" else "Devam Ediyor", Color(0xFFF59E0B)),
+        Triple("IN_REVIEW", if (isEn) "In Review" else "İnceleniyor", Color(0xFF0EA5E9)),
+        Triple("DONE", if (isEn) "Completed" else "Tamamlandı", DesktopColors.EmeraldGreen)
     )
+    val columnOrder = listOf("TODO", "IN_PROGRESS", "IN_REVIEW", "DONE")
 
     BoxWithConstraints(modifier = modifier) {
-        val wideColumns = maxWidth >= 740.dp
+        val wideColumns = maxWidth >= 920.dp
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier
@@ -1978,12 +2686,17 @@ private fun DesktopKanbanBoard(
                 .let { if (wideColumns) it else it.horizontalScroll(rememberScrollState()) }
         ) {
             columns.forEach { (statusKey, colTitle, accent) ->
+                val colIdx = columnOrder.indexOf(statusKey)
+                val prevKey = if (colIdx > 0) columnOrder[colIdx - 1] else null
+                val nextKey = if (colIdx in 0 until columnOrder.lastIndex) columnOrder[colIdx + 1] else null
                 val colNotes = remember(notes, statusKey) {
                     notes.filter {
                         when (statusKey) {
                             "IN_PROGRESS" -> it.status.equals("IN_PROGRESS", ignoreCase = true)
+                            "IN_REVIEW" -> it.status.equals("IN_REVIEW", ignoreCase = true)
                             "DONE" -> it.status.equals("DONE", ignoreCase = true)
                             else -> !it.status.equals("IN_PROGRESS", ignoreCase = true) &&
+                                !it.status.equals("IN_REVIEW", ignoreCase = true) &&
                                 !it.status.equals("DONE", ignoreCase = true)
                         }
                     }
@@ -1991,7 +2704,7 @@ private fun DesktopKanbanBoard(
                 val colModifier = if (wideColumns) {
                     Modifier.weight(1f).fillMaxHeight()
                 } else {
-                    Modifier.width(264.dp).fillMaxHeight()
+                    Modifier.width(268.dp).fillMaxHeight()
                 }
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -2016,6 +2729,8 @@ private fun DesktopKanbanBoard(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
                             Surface(
@@ -2030,19 +2745,52 @@ private fun DesktopKanbanBoard(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
-                        }
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.weight(1f).fillMaxWidth()
-                        ) {
-                            items(colNotes, key = { "board_${statusKey}_${it.syncUuid}" }) { note ->
-                                val catName = categories.firstOrNull { it.syncUuid == note.categorySyncUuid }?.name
-                                DesktopNoteCard(
-                                    note = note,
-                                    categoryName = catName,
-                                    onEvent = onEvent,
-                                    showStatusPill = false
+                            IconButton(
+                                onClick = { onEvent(DesktopUiEvent.CreateNewNoteWithStatus(statusKey)) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Add,
+                                    contentDescription = if (isEn) "Add to $colTitle" else "$colTitle sütununa ekle",
+                                    tint = accent,
+                                    modifier = Modifier.size(16.dp)
                                 )
+                            }
+                        }
+                        if (colNotes.isEmpty()) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.weight(1f).fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (isEn) "No notes in this column" else "Bu sütunda henüz not yok",
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f).fillMaxWidth()
+                            ) {
+                                items(colNotes, key = { "board_${statusKey}_${it.syncUuid}" }) { note ->
+                                    val catName = categories.firstOrNull { it.syncUuid == note.categorySyncUuid }?.name
+                                    DesktopNoteCard(
+                                        note = note,
+                                        categoryName = catName,
+                                        strings = strings,
+                                        lockedCategoryUuids = lockedCategoryUuids,
+                                        isNoteVaultUnlocked = isNoteVaultUnlocked,
+                                        onEvent = onEvent,
+                                        showStatusPill = false,
+                                        onMovePrevStatus = prevKey?.let { target ->
+                                            { onEvent(DesktopUiEvent.UpdateNoteStatus(note.syncUuid, target)) }
+                                        },
+                                        onMoveNextStatus = nextKey?.let { target ->
+                                            { onEvent(DesktopUiEvent.UpdateNoteStatus(note.syncUuid, target)) }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -2055,8 +2803,11 @@ private fun DesktopKanbanBoard(
 @Composable
 private fun NoteActionMenu(
     note: Note,
+    isProtected: Boolean,
+    strings: DesktopStrings,
     onEvent: (DesktopUiEvent) -> Unit
 ) {
+    val isEn = strings.languageCode == "en"
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(
@@ -2065,7 +2816,7 @@ private fun NoteActionMenu(
         ) {
             Icon(
                 Icons.Rounded.MoreVert,
-                contentDescription = "Not Seçenekleri",
+                contentDescription = if (isEn) "Note Options" else "Not Seçenekleri",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(16.dp)
             )
@@ -2075,29 +2826,51 @@ private fun NoteActionMenu(
             onDismissRequest = { expanded = false }
         ) {
             DropdownMenuItem(
-                text = { Text(if (note.isPinned) "Sabitlemeyi Kaldır" else "Üste Sabitle") },
+                text = {
+                    Text(
+                        if (note.isPinned) {
+                            if (isEn) "Unpin" else "Sabitlemeyi Kaldır"
+                        } else {
+                            if (isEn) "Pin to Top" else "Üste Sabitle"
+                        }
+                    )
+                },
                 onClick = {
                     expanded = false
                     onEvent(DesktopUiEvent.TogglePinNote(note.syncUuid))
                 }
             )
+            DropdownMenuItem(
+                text = { Text(if (isProtected) strings.unlockNoteBtn else strings.lockNoteBtn) },
+                onClick = {
+                    expanded = false
+                    onEvent(DesktopUiEvent.ToggleNoteLock(note.syncUuid))
+                }
+            )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             DropdownMenuItem(
-                text = { Text("Durum: Yapılacak") },
+                text = { Text(if (isEn) "Status: To Do" else "Durum: Yapılacak") },
                 onClick = {
                     expanded = false
                     onEvent(DesktopUiEvent.UpdateNoteStatus(note.syncUuid, "TODO"))
                 }
             )
             DropdownMenuItem(
-                text = { Text("Durum: Devam Ediyor") },
+                text = { Text(if (isEn) "Status: In Progress" else "Durum: Devam Ediyor") },
                 onClick = {
                     expanded = false
                     onEvent(DesktopUiEvent.UpdateNoteStatus(note.syncUuid, "IN_PROGRESS"))
                 }
             )
             DropdownMenuItem(
-                text = { Text("Durum: Tamamlandı") },
+                text = { Text(if (isEn) "Status: In Review" else "Durum: İnceleniyor") },
+                onClick = {
+                    expanded = false
+                    onEvent(DesktopUiEvent.UpdateNoteStatus(note.syncUuid, "IN_REVIEW"))
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(if (isEn) "Status: Done" else "Durum: Tamamlandı") },
                 onClick = {
                     expanded = false
                     onEvent(DesktopUiEvent.UpdateNoteStatus(note.syncUuid, "DONE"))
@@ -2105,7 +2878,7 @@ private fun NoteActionMenu(
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
             DropdownMenuItem(
-                text = { Text("Çöpe Taşı", color = MaterialTheme.colorScheme.error) },
+                text = { Text(strings.moveToTrashBtn, color = MaterialTheme.colorScheme.error) },
                 onClick = {
                     expanded = false
                     onEvent(DesktopUiEvent.SoftDeleteNote(note.syncUuid))
@@ -2121,6 +2894,11 @@ private fun DesktopNotesListPane(
     onEvent: (DesktopUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = remember(state.language) { DesktopStrings.forLanguage(state.language) }
+    val isEn = strings.languageCode == "en"
+    val lockedCategoryUuids = remember(state.categories) {
+        state.categories.filter { it.isPassword == true }.map { it.syncUuid }.toHashSet()
+    }
     Column(modifier = modifier.padding(12.dp)) {
         // Search Bar with Ctrl+K Hint
         Surface(
@@ -2144,7 +2922,7 @@ private fun DesktopNotesListPane(
                 Box(modifier = Modifier.weight(1f)) {
                     if (state.searchQuery.isEmpty()) {
                         Text(
-                            "Notlarda ara... (Ctrl+K)",
+                            strings.searchPlaceholder,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2164,7 +2942,7 @@ private fun DesktopNotesListPane(
         Spacer(Modifier.height(10.dp))
 
         Text(
-            text = "${state.filteredNotes.size} not listeleniyor",
+            text = if (isEn) "${state.filteredNotes.size} notes listed" else "${state.filteredNotes.size} not listeleniyor",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 6.dp)
@@ -2173,7 +2951,11 @@ private fun DesktopNotesListPane(
         if (state.filteredNotes.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "Bu görünümde henüz not yok.\nCtrl+N ile hemen oluşturabilirsiniz.",
+                    text = if (isEn) {
+                        "No notes in this view yet.\nPress Ctrl+N to create one."
+                    } else {
+                        "Bu görünümde henüz not yok.\nCtrl+N ile hemen oluşturabilirsiniz."
+                    },
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -2182,8 +2964,16 @@ private fun DesktopNotesListPane(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(state.filteredNotes, key = { it.syncUuid }) { note ->
                     val isSelected = note.syncUuid == state.selectedNoteSyncUuid
-                    val preview = remember(note.description) {
-                        BlockParser.toPlainTextSummary(BlockParser.parse(note.description), maxLines = 2)
+                    val isProtected = isProtectedNoteUi(note, lockedCategoryUuids)
+                    val isMaskedLocked = isProtected && !state.isNoteVaultUnlocked
+                    val isTrashed = isTrashedNoteUi(note)
+                    val preview = remember(note.description, isMaskedLocked, strings.protectedNoteSubtitle) {
+                        val raw = note.description.orEmpty()
+                        when {
+                            isMaskedLocked -> strings.protectedNoteSubtitle
+                            raw.startsWith("ENC_") -> strings.protectedNoteSubtitle
+                            else -> BlockParser.toPlainTextSummary(BlockParser.parse(raw), maxLines = 2, includeDecorations = false)
+                        }
                     }
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -2199,31 +2989,65 @@ private fun DesktopNotesListPane(
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(note.icon ?: "📝", fontSize = 14.sp)
-                                Spacer(Modifier.width(6.dp))
+                                DesktopNoteIconBadge(
+                                    iconKey = note.icon,
+                                    isLocked = isMaskedLocked,
+                                    size = 24.dp,
+                                    iconSize = 14.dp,
+                                    cornerRadius = 7.dp
+                                )
+                                Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = note.title?.takeIf { it.isNotBlank() } ?: "Başlıksız Not",
+                                    text = if (isMaskedLocked) {
+                                        strings.protectedNoteTitleMasked
+                                    } else {
+                                        note.title?.takeIf { it.isNotBlank() } ?: strings.untitledNote
+                                    },
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f)
                                 )
-                                if (note.deletedAt != null) {
+                                if (isTrashed) {
                                     IconButton(
                                         onClick = { onEvent(DesktopUiEvent.RestoreNote(note.syncUuid)) },
                                         modifier = Modifier.size(22.dp)
                                     ) {
-                                        Icon(Icons.Rounded.RestoreFromTrash, contentDescription = "Geri Yükle", modifier = Modifier.size(15.dp))
+                                        Icon(
+                                            Icons.Rounded.RestoreFromTrash,
+                                            contentDescription = strings.restoreBtn,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { onEvent(DesktopUiEvent.PermanentDeleteNote(note.syncUuid)) },
+                                        modifier = Modifier.size(22.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.DeleteForever,
+                                            contentDescription = strings.permanentDeleteBtn,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(15.dp)
+                                        )
                                     }
                                 } else {
+                                    if (isProtected) {
+                                        Icon(
+                                            imageVector = if (state.isNoteVaultUnlocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
+                                            contentDescription = strings.lockNoteBtn,
+                                            tint = DesktopColors.VibrantOrange,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Spacer(Modifier.width(2.dp))
+                                    }
                                     IconButton(
                                         onClick = { onEvent(DesktopUiEvent.TogglePinNote(note.syncUuid)) },
                                         modifier = Modifier.size(22.dp)
                                     ) {
                                         Icon(
                                             Icons.Rounded.PushPin,
-                                            contentDescription = "Sabitle",
+                                            contentDescription = strings.pinned,
                                             tint = if (note.isPinned) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(14.dp)
                                         )
@@ -2240,12 +3064,12 @@ private fun DesktopNotesListPane(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            if (note.totalTasks > 0) {
+                            if (!isMaskedLocked && note.totalTasks > 0) {
                                 Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = "✓ ${note.completedTasks}/${note.totalTasks} görev",
-                                    fontSize = 10.sp,
-                                    color = DesktopColors.EmeraldGreen
+                                DesktopTaskProgressBadge(
+                                    completed = note.completedTasks,
+                                    total = note.totalTasks,
+                                    suffix = if (isEn) "tasks" else "görev"
                                 )
                             }
                         }
@@ -2267,6 +3091,25 @@ private fun DesktopEditorPane(
     modifier: Modifier = Modifier
 ) {
     val selectedNote = state.selectedNote ?: return
+    val strings = remember(state.language) { DesktopStrings.forLanguage(state.language) }
+    val isEn = strings.languageCode == "en"
+    val lockedCategoryUuids = remember(state.categories) {
+        state.categories.filter { it.isPassword == true }.map { it.syncUuid }.toHashSet()
+    }
+    val isNoteProtected = isProtectedNoteUi(selectedNote, lockedCategoryUuids)
+
+    if (state.showZenReadingMode) {
+        DesktopZenReadingView(
+            title = state.editorTitle,
+            icon = state.editorIcon,
+            blocks = state.editorBlocks,
+            readMediaBytes = readMediaBytes,
+            onPlayAudio = { path -> onEvent(DesktopUiEvent.OpenMediaExternally(path)) },
+            onExit = { onEvent(DesktopUiEvent.SetZenReadingMode(false)) },
+            modifier = modifier
+        )
+        return
+    }
 
     var categoryDropdownOpen by remember { mutableStateOf(false) }
 
@@ -2291,7 +3134,7 @@ private fun DesktopEditorPane(
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = "Ana Sayfa",
+                    text = strings.backHome,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = DesktopColors.VibrantOrange,
@@ -2307,7 +3150,12 @@ private fun DesktopEditorPane(
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                     modifier = Modifier.height(34.dp).wrapContentWidth()
                 ) {
-                    Text(activeCat?.name ?: "Kategori", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                    Text(
+                        activeCat?.name ?: if (isEn) "Category" else "Kategori",
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
                 DropdownMenu(
                     expanded = categoryDropdownOpen,
@@ -2330,7 +3178,7 @@ private fun DesktopEditorPane(
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                 modifier = Modifier.height(34.dp).wrapContentWidth()
             ) {
-                Text("+ Alt Sayfa", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                Text(strings.subPageAddBtn, fontSize = 12.sp, maxLines = 1, softWrap = false)
             }
 
             OutlinedButton(
@@ -2343,7 +3191,7 @@ private fun DesktopEditorPane(
             ) {
                 Icon(Icons.Rounded.Hub, contentDescription = null, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("Harita", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                Text(strings.mapBtn, fontSize = 12.sp, maxLines = 1, softWrap = false)
             }
 
             if (isWideSplitCapable) {
@@ -2357,17 +3205,80 @@ private fun DesktopEditorPane(
                 ) {
                     Icon(Icons.Rounded.VerticalSplit, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Yan Görünüm", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                    Text(strings.splitViewBtn, fontSize = 12.sp, maxLines = 1, softWrap = false)
                 }
             }
 
+            OutlinedButton(
+                onClick = { onEvent(DesktopUiEvent.SetReminderDialogVisible(true)) },
+                border = BorderStroke(
+                    1.dp,
+                    if (selectedNote.reminderTime != null) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.outline
+                ),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                modifier = Modifier.height(34.dp).wrapContentWidth()
+            ) {
+                Icon(
+                    Icons.Rounded.Alarm,
+                    contentDescription = null,
+                    tint = if (selectedNote.reminderTime != null) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = if (selectedNote.reminderTime != null) strings.plannedBtn else strings.reminderBtn,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+
+            OutlinedButton(
+                onClick = { onEvent(DesktopUiEvent.SetZenReadingMode(true)) },
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                modifier = Modifier.height(34.dp).wrapContentWidth()
+            ) {
+                Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(strings.readModeBtn, fontSize = 12.sp, maxLines = 1, softWrap = false)
+            }
+
+            OutlinedButton(
+                onClick = { onEvent(DesktopUiEvent.SetExportDialogVisible(true)) },
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                modifier = Modifier.height(34.dp).wrapContentWidth()
+            ) {
+                Icon(Icons.Rounded.PictureAsPdf, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(strings.exportBtn, fontSize = 12.sp, maxLines = 1, softWrap = false)
+            }
+
+            OutlinedButton(
+                onClick = { onEvent(DesktopUiEvent.ToggleNoteLock(selectedNote.syncUuid)) },
+                border = BorderStroke(
+                    1.dp,
+                    if (isNoteProtected) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.outline
+                ),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                modifier = Modifier.height(34.dp).wrapContentWidth()
+            ) {
+                Icon(
+                    imageVector = if (isNoteProtected) Icons.Rounded.Lock else Icons.Rounded.LockOpen,
+                    contentDescription = null,
+                    tint = if (isNoteProtected) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = if (isNoteProtected) strings.unlockNoteBtn else strings.lockNoteBtn,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+
             Button(
-                onClick = {
-                    onEvent(DesktopUiEvent.SaveCurrentNote)
-                    if (state.isDriveConnected) {
-                        onEvent(DesktopUiEvent.TriggerSyncNow)
-                    }
-                },
+                onClick = { onEvent(DesktopUiEvent.SaveCurrentNote) },
                 colors = ButtonDefaults.buttonColors(containerColor = DesktopColors.VibrantOrange),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
                 modifier = Modifier.height(34.dp).wrapContentWidth()
@@ -2375,7 +3286,7 @@ private fun DesktopEditorPane(
                 Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = if (state.isEditorDirty) "Kaydet*" else "Kaydet",
+                    text = if (state.isEditorDirty) "${strings.saveBtn}*" else strings.saveBtn,
                     fontSize = 12.sp,
                     maxLines = 1,
                     softWrap = false
@@ -2388,7 +3299,7 @@ private fun DesktopEditorPane(
             ) {
                 Icon(
                     Icons.Rounded.DeleteOutline,
-                    contentDescription = "Çöp Kutusuna Taşı",
+                    contentDescription = strings.moveToTrashBtn,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -2396,11 +3307,11 @@ private fun DesktopEditorPane(
 
         Spacer(Modifier.height(12.dp))
 
-        // Note Title Input with Clickable Emoji Badge
+        // Note Title Input with Clickable Modern Material Icon Badge
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = DesktopColors.VibrantOrange.copy(alpha = 0.12f),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                 border = BorderStroke(1.dp, DesktopColors.VibrantOrange.copy(alpha = 0.35f)),
                 modifier = Modifier
                     .padding(end = 12.dp)
@@ -2409,13 +3320,19 @@ private fun DesktopEditorPane(
                     .clickable { onEvent(DesktopUiEvent.SetEmojiPickerDialogVisible(true)) }
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(state.editorIcon, fontSize = 24.sp)
+                    DesktopNoteIconBadge(
+                        iconKey = state.editorIcon,
+                        isLocked = isNoteProtected,
+                        size = 44.dp,
+                        iconSize = 22.dp,
+                        cornerRadius = 12.dp
+                    )
                 }
             }
             Box(modifier = Modifier.weight(1f)) {
                 if (state.editorTitle.isEmpty()) {
                     Text(
-                        "Başlıksız Not",
+                        strings.untitledNote,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
@@ -2457,30 +3374,104 @@ private fun DesktopEditorPane(
                     onOpenDrawing = { id -> onEvent(DesktopUiEvent.OpenDrawingEditor(id)) },
                     onRunCode = { id, lang, code -> onEvent(DesktopUiEvent.RunCodeBlock(id, lang, code)) },
                     onApproveBash = { id -> onEvent(DesktopUiEvent.ConfirmBashExecution(id)) },
-                    onDismissRunOutput = { id -> onEvent(DesktopUiEvent.DismissCodeOutput(id)) }
+                    onDismissRunOutput = { id -> onEvent(DesktopUiEvent.DismissCodeOutput(id)) },
+                    isRecordingAudio = state.isRecordingAudio,
+                    playingAudioMediaPath = state.playingAudioMediaPath,
+                    onStartAudioRecord = { blockId -> onEvent(DesktopUiEvent.StartAudioRecording(blockId)) },
+                    onOpenAudio = { path -> onEvent(DesktopUiEvent.PlayOrToggleAudio(path)) },
+                    onOpenAudioExternally = { path -> onEvent(DesktopUiEvent.OpenMediaExternally(path)) }
                 )
             }
 
             item {
                 Spacer(Modifier.height(14.dp))
+                if (state.isRecordingAudio) {
+                    val totalSecs = (state.recordingDurationMs / 1000L).toInt()
+                    val timeLabel = "%02d:%02d".format(totalSecs / 60, totalSecs % 60)
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = DesktopColors.VibrantOrange.copy(alpha = 0.14f),
+                        border = BorderStroke(1.dp, DesktopColors.VibrantOrange),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Mic,
+                                contentDescription = null,
+                                tint = Color(0xFFD32F2F),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "${strings.recordingInProgress} ($timeLabel)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(state.recordingAmplitude.coerceIn(0.08f, 1f))
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(DesktopColors.VibrantOrange)
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { onEvent(DesktopUiEvent.CancelAudioRecording) },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text(strings.cancelBtn, fontSize = 11.5.sp)
+                            }
+                            Button(
+                                onClick = { onEvent(DesktopUiEvent.StopAudioRecordingAndSave) },
+                                colors = ButtonDefaults.buttonColors(containerColor = DesktopColors.VibrantOrange),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Icon(Icons.Rounded.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(strings.saveRecordingBtn, fontSize = 11.5.sp, color = Color.White)
+                            }
+                        }
+                    }
+                }
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     OutlinedButton(onClick = { onEvent(DesktopUiEvent.AddBlock(BlockType.PARAGRAPH)) }) {
-                        Text("+ Paragraf", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                        Text(if (isEn) "+ Paragraph" else "+ Paragraf", fontSize = 12.sp, maxLines = 1, softWrap = false)
                     }
                     OutlinedButton(onClick = { onEvent(DesktopUiEvent.AddBlock(BlockType.TODO)) }) {
-                        Text("+ Görev", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                        Text(if (isEn) "+ To-Do" else "+ Görev", fontSize = 12.sp, maxLines = 1, softWrap = false)
                     }
                     OutlinedButton(onClick = { onEvent(DesktopUiEvent.AddBlock(BlockType.CODE)) }) {
-                        Text("+ Kod Bloğu", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                        Text(if (isEn) "+ Code Block" else "+ Kod Bloğu", fontSize = 12.sp, maxLines = 1, softWrap = false)
                     }
                     OutlinedButton(onClick = { onEvent(DesktopUiEvent.AddBlock(BlockType.DRAWING)) }) {
-                        Text("+ Çizim", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                        Text(if (isEn) "+ Drawing" else "+ Çizim", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                    }
+                    OutlinedButton(
+                        enabled = !state.isRecordingAudio,
+                        onClick = { onEvent(DesktopUiEvent.StartAudioRecording(targetBlockId = null)) }
+                    ) {
+                        Text(strings.recordAudioBtn, fontSize = 12.sp, maxLines = 1, softWrap = false)
                     }
                     OutlinedButton(onClick = { onEvent(DesktopUiEvent.SetSlashPaletteVisible(true)) }) {
-                        Text("/ Tüm Bloklar", fontSize = 12.sp, maxLines = 1, softWrap = false)
+                        Text(if (isEn) "/ All Blocks" else "/ Tüm Bloklar", fontSize = 12.sp, maxLines = 1, softWrap = false)
                     }
                 }
             }
@@ -2494,11 +3485,24 @@ private fun DesktopRightSplitPane(
     onEvent: (DesktopUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val lockedCategoryUuids = remember(state.categories) {
+        state.categories.filter { it.isPassword == true }.map { it.syncUuid }.toHashSet()
+    }
     when (state.splitViewMode) {
         SplitViewMode.GRAPH_2D -> {
+            val visualNotesRaw = remember(state.allActiveNotes, state.rootActiveNotes, state.showSubPagesInVisualModes) {
+                if (state.showSubPagesInVisualModes) state.allActiveNotes else state.rootActiveNotes
+            }
+            val visualNotes = remember(visualNotesRaw, lockedCategoryUuids, state.isNoteVaultUnlocked, state.hideLockedNotes) {
+                maskNotesForLockedViews(visualNotesRaw, lockedCategoryUuids, state.isNoteVaultUnlocked, state.hideLockedNotes)
+            }
+            val visualLinks = remember(state.noteLinks, visualNotes) {
+                val visibleUuids = visualNotes.asSequence().map { it.syncUuid }.toHashSet()
+                state.noteLinks.filter { it.sourceSyncUuid in visibleUuids && it.targetSyncUuid in visibleUuids }
+            }
             DesktopGraphView(
-                notes = state.allActiveNotes,
-                links = state.noteLinks,
+                notes = visualNotes,
+                links = visualLinks,
                 categories = state.categories,
                 selectedNoteSyncUuid = state.selectedNoteSyncUuid,
                 onNodeClick = { clickedUuid -> onEvent(DesktopUiEvent.SelectNote(clickedUuid)) },
@@ -2506,28 +3510,45 @@ private fun DesktopRightSplitPane(
             )
         }
         SplitViewMode.SUB_PAGE -> {
+            val strings = remember(state.language) { DesktopStrings.forLanguage(state.language) }
+            val isEn = strings.languageCode == "en"
             Column(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)) {
                 val target = state.splitPreviewNote
+                val isTargetMasked = target != null && isProtectedNoteUi(target, lockedCategoryUuids) && !state.isNoteVaultUnlocked
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = target?.title ?: "Alt Sayfa Önizleme",
+                        text = when {
+                            isTargetMasked -> strings.protectedNoteTitleMasked
+                            target != null -> target.title ?: strings.untitledNote
+                            else -> if (isEn) "Sub-page Preview" else "Alt Sayfa Önizleme"
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
-                    if (target != null) {
+                    if (target != null && !isTargetMasked) {
                         OutlinedButton(onClick = { onEvent(DesktopUiEvent.SelectNote(target.syncUuid)) }) {
-                            Text("Ana Editöre Al", fontSize = 11.sp)
+                            Text(if (isEn) "Open in Editor" else "Ana Editöre Al", fontSize = 11.sp)
                         }
                     }
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline)
                 if (target == null) {
                     Text(
-                        text = "Bir Alt Sayfa kartına tıklayarak ana notla yan yana görüntüleyin.",
+                        text = if (isEn) {
+                            "Click a Sub-page card to inspect it side-by-side."
+                        } else {
+                            "Bir Alt Sayfa kartına tıklayarak ana notla yan yana görüntüleyin."
+                        },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (isTargetMasked) {
+                    Text(
+                        text = strings.protectedNoteSubtitle,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -2560,26 +3581,45 @@ private fun QuickSwitcherDialog(
     onSelectNote: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = remember(state.language) { DesktopStrings.forLanguage(state.language) }
+    val isEn = strings.languageCode == "en"
+    val lockedCategoryUuids = remember(state.categories) {
+        state.categories.filter { it.isPassword == true }.map { it.syncUuid }.toHashSet()
+    }
     var q by remember { mutableStateOf("") }
-    val matches = remember(q, state.allActiveNotes) {
+    val matches = remember(q, state.allActiveNotes, lockedCategoryUuids, state.isNoteVaultUnlocked, state.hideLockedNotes) {
+        val visible = maskNotesForLockedViews(
+            state.allActiveNotes,
+            lockedCategoryUuids,
+            state.isNoteVaultUnlocked,
+            state.hideLockedNotes
+        )
         val clean = q.trim().lowercase()
-        if (clean.isEmpty()) state.allActiveNotes.take(10)
-        else state.allActiveNotes.filter {
-            it.title.orEmpty().lowercase().contains(clean) ||
-                BlockParser.findSearchSnippet(it.description, clean) != null
-        }.take(12)
+        if (clean.isEmpty()) {
+            visible.take(10)
+        } else {
+            visible.filter { note ->
+                val isProtected = isProtectedNoteUi(note, lockedCategoryUuids)
+                if (isProtected && !state.isNoteVaultUnlocked) {
+                    false
+                } else {
+                    note.title.orEmpty().lowercase().contains(clean) ||
+                        BlockParser.findSearchSnippet(note.description, clean) != null
+                }
+            }.take(12)
+        }
     }
 
     DesktopAnimatedDialog(
         onDismiss = onDismiss,
         width = 500.dp,
-        title = "Hızlı Not Geçişi",
-        subtitle = "Ctrl+K ile istediğiniz nota anında atlayın."
+        title = if (isEn) "Quick Switcher" else "Hızlı Not Geçişi",
+        subtitle = if (isEn) "Jump to any note instantly with Ctrl+K." else "Ctrl+K ile istediğiniz nota anında atlayın."
     ) {
         OutlinedTextField(
             value = q,
             onValueChange = { q = it },
-            placeholder = { Text("Başlık veya blok içeriği yazın...") },
+            placeholder = { Text(if (isEn) "Type title or block content..." else "Başlık veya blok içeriği yazın...") },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
@@ -2587,6 +3627,8 @@ private fun QuickSwitcherDialog(
         Spacer(Modifier.height(10.dp))
         LazyColumn(modifier = Modifier.height(260.dp)) {
             items(matches, key = { it.syncUuid }) { note ->
+                val isProtected = isProtectedNoteUi(note, lockedCategoryUuids)
+                val isMaskedLocked = isProtected && !state.isNoteVaultUnlocked
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -2595,10 +3637,20 @@ private fun QuickSwitcherDialog(
                         .clickable { onSelectNote(note.syncUuid) }
                         .padding(10.dp)
                 ) {
-                    Text(note.icon ?: "📝", fontSize = 15.sp)
-                    Spacer(Modifier.width(8.dp))
+                    DesktopNoteIconBadge(
+                        iconKey = note.icon,
+                        isLocked = isMaskedLocked,
+                        size = 26.dp,
+                        iconSize = 15.dp,
+                        cornerRadius = 7.dp
+                    )
+                    Spacer(Modifier.width(10.dp))
                     Text(
-                        text = note.title?.takeIf { it.isNotBlank() } ?: "Başlıksız Not",
+                        text = if (isMaskedLocked) {
+                            strings.protectedNoteTitleMasked
+                        } else {
+                            note.title?.takeIf { it.isNotBlank() } ?: strings.untitledNote
+                        },
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -2626,6 +3678,7 @@ private fun SlashBlockPaletteDialog(
         BlockType.MATH to "Matematik / Formül",
         BlockType.IMAGE to "Görsel Ekle",
         BlockType.DRAWING to "Çizim Tuvali",
+        BlockType.AUDIO to "Ses Kaydı (Mikrofon)",
         BlockType.WEB_BOOKMARK to "Web Bağlantı Kartı",
         BlockType.DIVIDER to "Ayırıcı Çizgi"
     )

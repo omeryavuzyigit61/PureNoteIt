@@ -33,7 +33,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,8 +75,20 @@ fun TrashBinSheet(
 ) {
     val context = LocalContext.current
     val prefs = remember { SharedPrefencesUtil(context) }
-    val retentionDays = remember {
-        prefs.get(Constants.KEY_TRASH_RETENTION_DAYS, Constants.DEFAULT_TRASH_RETENTION_DAYS)
+    var retentionDays by remember {
+        mutableIntStateOf(prefs.get(Constants.KEY_TRASH_RETENTION_DAYS, Constants.DEFAULT_TRASH_RETENTION_DAYS))
+    }
+    DisposableEffect(context) {
+        val sp = context.getSharedPreferences(Constants.SHARED_PREFENCES_KEY, android.content.Context.MODE_PRIVATE)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == Constants.KEY_TRASH_RETENTION_DAYS) {
+                retentionDays = prefs.get(Constants.KEY_TRASH_RETENTION_DAYS, Constants.DEFAULT_TRASH_RETENTION_DAYS)
+            }
+        }
+        sp.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            sp.unregisterOnSharedPreferenceChangeListener(listener)
+        }
     }
     var showEmptyConfirmDialog by remember { mutableStateOf(false) }
 

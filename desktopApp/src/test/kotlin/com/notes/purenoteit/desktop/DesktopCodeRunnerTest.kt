@@ -163,6 +163,87 @@ class DesktopCodeRunnerTest {
         )
     }
 
+    @Test
+    fun `Kotlin gomulu motoru harici kotlinc olmadan gercek cikti uretmelidir`() = runBlocking {
+        val runner = DesktopCodeRunnerImpl(
+            ioDispatcher = Dispatchers.IO,
+            clock = clock,
+            processTimeoutMs = 15_000L,
+            executableResolver = { null }
+        )
+
+        val scriptRes = runner.executeOffline(
+            "kotlin",
+            """
+            val a = 15
+            val b = 27
+            println("KT_SCRIPT:" + (a + b))
+            """.trimIndent()
+        )
+        assertTrue("Kotlin script calismasi basarili olmali: $scriptRes", scriptRes is AppResult.Success)
+        val scriptConsole = (scriptRes as AppResult.Success).data as CodeExecutionOutput.Console
+        assertTrue("KT_SCRIPT:42 bekleniyordu: ${scriptConsole.lines}", scriptConsole.lines.any { it.text.contains("KT_SCRIPT:42") })
+        assertFalse(scriptConsole.hasRuntimeError)
+
+        val mainRes = runner.executeOffline(
+            "kotlin",
+            """
+            fun main() {
+                println("KT_MAIN:OK")
+            }
+            """.trimIndent()
+        )
+        assertTrue("Kotlin main() calismasi basarili olmali: $mainRes", mainRes is AppResult.Success)
+        val mainConsole = (mainRes as AppResult.Success).data as CodeExecutionOutput.Console
+        assertTrue("KT_MAIN:OK bekleniyordu: ${mainConsole.lines}", mainConsole.lines.any { it.text.contains("KT_MAIN:OK") })
+    }
+
+    @Test
+    fun `Java gomulu JDK derleyicisi harici arac olmadan gercek cikti uretmelidir`() = runBlocking {
+        val runner = DesktopCodeRunnerImpl(
+            ioDispatcher = Dispatchers.IO,
+            clock = clock,
+            processTimeoutMs = 10_000L,
+            executableResolver = { null }
+        )
+        val result = runner.executeOffline(
+            "java",
+            """
+            System.out.println("JAVA_EMBEDDED:" + (6 * 7));
+            """.trimIndent()
+        )
+        assertTrue("Java calismasi basarili olmali: $result", result is AppResult.Success)
+        val console = (result as AppResult.Success).data as CodeExecutionOutput.Console
+        assertTrue("JAVA_EMBEDDED:42 bekleniyordu: ${console.lines}", console.lines.any { it.text.contains("JAVA_EMBEDDED:42") })
+        assertFalse(console.hasRuntimeError)
+    }
+
+    @Test
+    fun `Bash acik onayla WSL hatasina dusmeden gercek cikti uretmelidir`() = runBlocking {
+        val bashExe = DesktopCodeRunnerImpl.findExecutableOnSystem(listOf("bash", "sh"))
+        assumeNotNull("Bu test ortami calisan bash gerektirir", bashExe)
+
+        val runner = createRunner(timeoutMs = 8_000L)
+        val result = runner.executeWithApproval(
+            language = "bash",
+            code = "echo BASH_OK_123",
+            bashExplicitlyApproved = true
+        )
+        assertTrue("Bash calismasi basarili olmali: $result", result is AppResult.Success)
+        val console = (result as AppResult.Success).data as CodeExecutionOutput.Console
+        assertTrue("BASH_OK_123 bekleniyordu: ${console.lines}", console.lines.any { it.text.contains("BASH_OK_123") })
+        assertFalse(console.hasRuntimeError)
+    }
+
+    @Test
+    fun `HTML icerigi HtmlPreview dondurmelidir`() = runBlocking {
+        val runner = createRunner()
+        val result = runner.executeOffline("html", "<h1>Merhaba</h1><p>Test</p>")
+        assertTrue(result is AppResult.Success)
+        val preview = (result as AppResult.Success).data as CodeExecutionOutput.HtmlPreview
+        assertTrue(preview.htmlContent.contains("<h1>Merhaba</h1>"))
+    }
+
     private fun countTempSandboxes(): Int {
         val tmpDir = File(System.getProperty("java.io.tmpdir"))
         return tmpDir.listFiles { _, name -> name.startsWith("purenote_exec_") }?.size ?: 0

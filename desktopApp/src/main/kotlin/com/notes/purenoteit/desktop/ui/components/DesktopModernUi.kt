@@ -26,12 +26,37 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.NoteAdd
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.FolderCopy
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Mood
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.rounded.RocketLaunch
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Spa
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.WarningAmber
+import androidx.compose.material.icons.rounded.WorkOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -376,8 +401,96 @@ fun CreateSubPageDialog(
 private val DESKTOP_NOTE_EMOJIS = listOf(
     "📝", "📌", "💡", "🚀", "📅", "✅",
     "💻", "🔐", "🎯", "📚", "🎨", "⚡",
-    "🧠", "🗂️", "✨", "🔥", "🌱", "🔍"
+    "💰", "🗂️", "✨", "🔥", "🌿", "🔍"
 )
+
+private fun resolveDesktopNoteIconSpec(
+    iconKey: String?,
+    isLocked: Boolean
+): Pair<ImageVector, Color> = when {
+    isLocked -> Icons.Rounded.Lock to DesktopColors.VibrantOrange
+    iconKey.isNullOrBlank() || iconKey == "📝" || iconKey == "📄" ->
+        Icons.Rounded.Description to DesktopColors.VibrantOrange
+    iconKey == "📅" -> Icons.Rounded.CalendarToday to DesktopColors.VibrantOrange
+    iconKey == "💰" || iconKey == "💎" -> Icons.Rounded.AccountBalanceWallet to Color(0xFF00897B)
+    iconKey == "✅" || iconKey == "📋" -> Icons.Rounded.TaskAlt to DesktopColors.EmeraldGreen
+    iconKey == "💼" -> Icons.Rounded.WorkOutline to Color(0xFF795548)
+    iconKey == "⚡" || iconKey == "💻" -> Icons.Rounded.Code to DesktopColors.AccentBlue
+    iconKey == "🚀" -> Icons.Rounded.RocketLaunch to DesktopColors.VibrantOrange
+    iconKey == "🔐" || iconKey == "🛡️" || iconKey == "🔒" ->
+        Icons.Rounded.Shield to Color(0xFF8E24AA)
+    iconKey == "📌" -> Icons.Rounded.PushPin to DesktopColors.VibrantOrange
+    iconKey == "💡" || iconKey == "🧠" -> Icons.Rounded.Lightbulb to Color(0xFFF9A825)
+    iconKey == "🎨" -> Icons.Rounded.Palette to Color(0xFF8E24AA)
+    iconKey == "📚" || iconKey == "📖" -> Icons.AutoMirrored.Rounded.MenuBook to Color(0xFF3949AB)
+    iconKey == "🎯" -> Icons.Rounded.TrackChanges to Color(0xFFE65100)
+    iconKey == "🔥" -> Icons.Rounded.LocalFireDepartment to Color(0xFFD32F2F)
+    iconKey == "🌱" || iconKey == "🌿" -> Icons.Rounded.Spa to DesktopColors.EmeraldGreen
+    iconKey == "🗂️" -> Icons.Rounded.FolderCopy to Color(0xFF546E7A)
+    iconKey == "📊" -> Icons.Rounded.BarChart to DesktopColors.AccentBlue
+    iconKey == "🎙️" || iconKey == "🗣️" -> Icons.Rounded.Mic to Color(0xFF00796B)
+    iconKey == "🥗" -> Icons.Rounded.Restaurant to Color(0xFF43A047)
+    iconKey == "💪" -> Icons.Rounded.FitnessCenter to Color(0xFFC2185B)
+    iconKey == "🧭" -> Icons.Rounded.Explore to Color(0xFF0277BD)
+    iconKey == "🔍" -> Icons.Rounded.Search to Color(0xFF607D8B)
+    iconKey == "✨" -> Icons.Rounded.AutoAwesome to Color(0xFFFF8F00)
+    else -> Icons.Rounded.Description to DesktopColors.VibrantOrange
+}
+
+@Composable
+fun DesktopNoteIconBadge(
+    iconKey: String?,
+    isLocked: Boolean = false,
+    size: Dp = 34.dp,
+    iconSize: Dp = 18.dp,
+    cornerRadius: Dp = 10.dp,
+    modifier: Modifier = Modifier
+) {
+    val (vector, tint) = resolveDesktopNoteIconSpec(iconKey, isLocked)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(tint.copy(alpha = 0.14f))
+    ) {
+        Icon(
+            imageVector = vector,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
+@Composable
+fun DesktopTaskProgressBadge(
+    completed: Int,
+    total: Int,
+    suffix: String = "",
+    modifier: Modifier = Modifier
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.CheckCircleOutline,
+            contentDescription = null,
+            tint = DesktopColors.EmeraldGreen,
+            modifier = Modifier.size(13.dp)
+        )
+        Text(
+            text = if (suffix.isBlank()) "$completed/$total" else "$completed/$total $suffix",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = DesktopColors.EmeraldGreen,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+}
 
 @Composable
 fun NoteEmojiPickerDialog(
@@ -389,7 +502,7 @@ fun NoteEmojiPickerDialog(
         onDismiss = onDismiss,
         width = 390.dp,
         title = "Sayfa Simgesi",
-        subtitle = "Notunuza hızlı tanınan bir simge atayın.",
+        subtitle = "Notunuza modern bir Material ikon atayın.",
         badgeIcon = Icons.Rounded.Mood,
         badgeTint = DesktopColors.VibrantOrange
     ) {
@@ -420,7 +533,12 @@ fun NoteEmojiPickerDialog(
                                 .clickable { onSelectEmoji(emoji) }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(text = emoji, fontSize = 22.sp)
+                                DesktopNoteIconBadge(
+                                    iconKey = emoji,
+                                    size = 32.dp,
+                                    iconSize = 18.dp,
+                                    cornerRadius = 9.dp
+                                )
                             }
                         }
                     }

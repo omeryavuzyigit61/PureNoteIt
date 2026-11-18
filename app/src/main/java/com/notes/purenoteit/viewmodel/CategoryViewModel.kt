@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.notes.purenoteit.data.db.CategoryData
 import com.notes.purenoteit.data.mapper.toDomain
 import com.notes.purenoteit.data.mapper.toEntity
+import com.notes.purenoteit.data.sync.CloudSyncTriggerBus
 import com.notes.purenoteit.di.IoDispatcher
 import com.notes.purenoteit.domain.model.Category
 import com.notes.purenoteit.domain.repository.CategoryRepository
@@ -24,7 +25,8 @@ import javax.inject.Inject
 class CategoryViewModel @Inject constructor(
     private val repository: CategoryRepository,
     private val getCategoriesUseCase: GetCategoriesUseCase,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val cloudSyncTriggerBus: CloudSyncTriggerBus = CloudSyncTriggerBus()
 ) : ViewModel() {
 
     private val _categoriesDomainFlow = MutableStateFlow<List<Category>>(emptyList())
@@ -44,6 +46,11 @@ class CategoryViewModel @Inject constructor(
     }
 
     init {
+        viewModelScope.launch {
+            cloudSyncTriggerBus.remoteAppliedEvents.collect {
+                getAllCategories()
+            }
+        }
         viewModelScope.launch(ioDispatcher) {
             try {
                 getCategoriesUseCase().collect { domainCategories ->
@@ -104,6 +111,7 @@ class CategoryViewModel @Inject constructor(
             try {
                 repository.upsertCategory(item.toDomain())
                 getAllCategories()
+                cloudSyncTriggerBus.requestImmediateSync()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -116,6 +124,7 @@ class CategoryViewModel @Inject constructor(
             try {
                 repository.updateCategory(item.toDomain())
                 getAllCategories()
+                cloudSyncTriggerBus.requestImmediateSync()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -128,6 +137,7 @@ class CategoryViewModel @Inject constructor(
             try {
                 repository.deleteCategory(item.toDomain())
                 getAllCategories()
+                cloudSyncTriggerBus.requestImmediateSync()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -140,6 +150,7 @@ class CategoryViewModel @Inject constructor(
             try {
                 repository.deleteCategoryById(id)
                 getAllCategories()
+                cloudSyncTriggerBus.requestImmediateSync()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

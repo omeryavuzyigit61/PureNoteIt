@@ -1,12 +1,16 @@
 package com.notes.purenoteit.desktop.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,9 +19,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Brush
@@ -25,9 +32,15 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -54,14 +67,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.notes.purenoteit.desktop.data.storage.DesktopImageOptimizer
 import com.notes.purenoteit.desktop.ui.DesktopColors
 import com.notes.purenoteit.desktop.ui.contract.CodeBlockRunState
 import com.notes.purenoteit.domain.model.CodeExecutionOutput
@@ -71,11 +86,11 @@ import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.awt.Desktop
 import java.awt.FileDialog
 import java.awt.Frame
-import java.io.ByteArrayInputStream
 import java.io.File
-import javax.imageio.ImageIO
+import java.nio.file.Files
 
 private val SUPPORTED_LANGUAGES = listOf(
     "python", "kotlin", "java", "javascript", "sql", "cpp", "json", "html", "bash"
@@ -99,7 +114,12 @@ fun DesktopBlockRow(
     onOpenDrawing: (blockId: String) -> Unit,
     onRunCode: (blockId: String, language: String, code: String) -> Unit,
     onApproveBash: (blockId: String) -> Unit,
-    onDismissRunOutput: (blockId: String) -> Unit
+    onDismissRunOutput: (blockId: String) -> Unit,
+    isRecordingAudio: Boolean = false,
+    playingAudioMediaPath: String? = null,
+    onStartAudioRecord: (blockId: String) -> Unit = {},
+    onOpenAudio: (String) -> Unit = {},
+    onOpenAudioExternally: (String) -> Unit = onOpenAudio
 ) {
     Row(
         modifier = Modifier
@@ -272,30 +292,10 @@ fun DesktopBlockRow(
                     color = MaterialTheme.colorScheme.outline
                 )
 
-                BlockType.MATH -> Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(10.dp)
-                    ) {
-                        Text("∑", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DesktopColors.VibrantOrange)
-                        Spacer(Modifier.width(10.dp))
-                        EditorTextField(
-                            value = block.content,
-                            placeholder = "LaTeX / Formül (ör. E = mc^2)...",
-                            textStyle = TextStyle(
-                                fontSize = 14.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            onValueChange = { onUpdate(block.copy(content = it)) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
+                BlockType.MATH -> DesktopMathEditorBlock(
+                    block = block,
+                    onUpdate = onUpdate
+                )
 
                 BlockType.WEB_BOOKMARK -> Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -379,6 +379,79 @@ fun DesktopBlockRow(
                     onApproveBash = { onApproveBash(block.id) },
                     onDismissOutput = { onDismissRunOutput(block.id) }
                 )
+
+                BlockType.AUDIO -> Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                ) {
+                    val audioPath = block.mediaPath
+                    val isThisPlaying = !audioPath.isNullOrBlank() && playingAudioMediaPath == audioPath
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = DesktopColors.VibrantOrange)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = block.content.ifBlank { "Sesli Not Kaydı" },
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.5.sp
+                            )
+                            Text(
+                                text = if (audioPath.isNullOrBlank()) {
+                                    "Mikrofondan doğrudan kaydetmek için sağdaki butona tıklayın"
+                                } else if (isThisPlaying) {
+                                    "Oynatılıyor..."
+                                } else {
+                                    "Dinlemek için oynat veya harici aç"
+                                },
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (audioPath.isNullOrBlank()) {
+                            Button(
+                                enabled = !isRecordingAudio,
+                                onClick = { onStartAudioRecord(block.id) },
+                                colors = ButtonDefaults.buttonColors(containerColor = DesktopColors.VibrantOrange),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Rounded.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Kayda Başla", fontSize = 12.sp)
+                            }
+                        } else {
+                            Button(
+                                onClick = { onOpenAudio(audioPath) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isThisPlaying) Color(0xFFE53935) else DesktopColors.VibrantOrange
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isThisPlaying) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(if (isThisPlaying) "Durdur" else "Dinle", fontSize = 12.sp)
+                            }
+                            OutlinedButton(
+                                onClick = { onOpenAudioExternally(audioPath) },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                }
 
                 else -> EditorTextField(
                     value = block.content,
@@ -514,8 +587,19 @@ private fun DesktopImageOrDrawingBlock(
         value = withContext(Dispatchers.IO) {
             val path = block.mediaPath ?: return@withContext null
             val bytes = readMediaBytes(path) ?: return@withContext null
-            runCatching { ImageIO.read(ByteArrayInputStream(bytes))?.toComposeImageBitmap() }.getOrNull()
+            DesktopImageOptimizer.decodeComposeBitmap(bytes)
         }
+    }
+
+    val rawPath = block.mediaPath.orEmpty()
+    val isLegacyPhonePath = rawPath.startsWith("/data/") || rawPath.startsWith("/storage/")
+    val friendlyStatus = when {
+        bitmap != null -> if (isDrawing) "Çizim hazır" else "Görsel hazır"
+        rawPath.isBlank() -> if (isDrawing) "Henüz çizim yok" else "Görsel seçilmedi"
+        isLegacyPhonePath ->
+            "Bu ${if (isDrawing) "çizim" else "görsel"} telefonda eski yerel biçimde kayıtlı. Telefondan notu açıp kaydederek eşitleyebilir veya buradan yeniden oluşturabilirsiniz."
+        else ->
+            "${if (isDrawing) "Çizim" else "Görsel"} henüz bu cihaza eşitlenmedi (Bulut Eşitleme'yi kontrol edin)."
     }
 
     Surface(
@@ -535,6 +619,7 @@ private fun DesktopImageOrDrawingBlock(
                         .fillMaxWidth()
                         .height(240.dp)
                         .clip(RoundedCornerShape(8.dp))
+                        .then(if (isDrawing) Modifier.clickable(onClick = onOpenDrawing) else Modifier)
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -548,13 +633,236 @@ private fun DesktopImageOrDrawingBlock(
                     tint = DesktopColors.VibrantOrange
                 )
                 Text(
-                    text = block.mediaPath ?: if (isDrawing) "Henüz çizim yok" else "Görsel seçilmedi",
+                    text = friendlyStatus,
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
-                OutlinedButton(onClick = if (isDrawing) onOpenDrawing else onPickImage) {
-                    Text(if (isDrawing) "Tuvalde Çiz / Düzenle" else "Dosyadan Resim Seç")
+                OutlinedButton(
+                    onClick = if (isDrawing) onOpenDrawing else onPickImage,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)
+                ) {
+                    Text(if (isDrawing) "Tuvalde Çiz / Düzenle" else "Dosyadan Resim Seç", maxLines = 1, softWrap = false)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DesktopMathEditorBlock(
+    block: NoteBlock,
+    onUpdate: (NoteBlock) -> Unit
+) {
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    var isEditing by remember(block.id) { mutableStateOf(block.content.isBlank()) }
+    var selectedCategory by remember { mutableStateOf(DesktopMathCategory.TEMEL) }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, DesktopColors.VibrantOrange.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("∑", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DesktopColors.VibrantOrange)
+                    Text(
+                        text = "Matematik & LaTeX Formül",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = DesktopColors.VibrantOrange.copy(alpha = 0.14f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { isEditing = !isEditing }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isEditing) Icons.Rounded.Visibility else Icons.Rounded.Edit,
+                            contentDescription = null,
+                            tint = DesktopColors.VibrantOrange,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = if (isEditing) "Önizleme" else "Düzenle & Şablonlar",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DesktopColors.VibrantOrange,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+            }
+
+            if (!isEditing && block.content.isNotBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isEditing = true }
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 10.dp)) {
+                        DesktopMathFormulaView(latex = block.content, isDark = isDark, fontSize = 19.sp)
+                    }
+                }
+            } else {
+                // Category Tabs
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    DesktopMathCategory.values().forEach { category ->
+                        val active = category == selectedCategory
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = if (active) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(
+                                1.dp,
+                                if (active) DesktopColors.VibrantOrange else MaterialTheme.colorScheme.outline
+                            ),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .clickable { selectedCategory = category }
+                        ) {
+                            Text(
+                                text = category.title,
+                                fontSize = 11.sp,
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                                color = if (active) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Ready-Made Formula Templates or Clickable Symbol Palette
+                val symbols = DesktopMathFormulaRenderer.CATEGORIZED_SYMBOLS[selectedCategory].orEmpty()
+                if (selectedCategory == DesktopMathCategory.SABLONLAR) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        symbols.forEach { tmpl ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, DesktopColors.VibrantOrange.copy(alpha = 0.3f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { onUpdate(block.copy(content = tmpl.insertText)) }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = tmpl.label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = DesktopColors.VibrantOrange
+                                    )
+                                    Text(
+                                        text = tmpl.insertText,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(start = 10.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        symbols.forEach { sym ->
+                            Surface(
+                                shape = RoundedCornerShape(7.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, DesktopColors.VibrantOrange.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .clickable { onUpdate(block.copy(content = block.content + sym.insertText)) }
+                            ) {
+                                Text(
+                                    text = sym.label,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DesktopColors.VibrantOrange,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // LaTeX Text Editor
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    EditorTextField(
+                        value = block.content,
+                        placeholder = "LaTeX / Formül yazın (ör. x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a})...",
+                        textStyle = TextStyle(
+                            fontSize = 13.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        onValueChange = { onUpdate(block.copy(content = it)) },
+                        modifier = Modifier.fillMaxWidth().padding(10.dp)
+                    )
+                }
+
+                // Live Formatted Visual Preview
+                if (block.content.isNotBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, DesktopColors.VibrantOrange.copy(alpha = 0.28f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            Text(
+                                text = "CANLI ÖNİZLEME",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DesktopColors.VibrantOrange
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            DesktopMathFormulaView(latex = block.content, isDark = isDark, fontSize = 17.sp)
+                        }
+                    }
                 }
             }
         }
@@ -589,15 +897,34 @@ private fun DesktopCodeEditorBlock(
                 )
                 Spacer(Modifier.width(8.dp))
                 Box {
-                    OutlinedButton(
-                        onClick = { langMenuOpen = true },
-                        modifier = Modifier.height(30.dp)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF252730),
+                        border = BorderStroke(1.dp, Color(0xFF424554)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { langMenuOpen = true }
                     ) {
-                        Text(
-                            block.codeLanguage.uppercase(),
-                            fontSize = 11.sp,
-                            color = Color.White
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 5.dp, bottom = 5.dp)
+                        ) {
+                            Text(
+                                text = block.codeLanguage.uppercase(),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowDropDown,
+                                contentDescription = "Dil Seç",
+                                tint = Color(0xFFB4B8C5),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                     DropdownMenu(
                         expanded = langMenuOpen,
@@ -618,8 +945,13 @@ private fun DesktopCodeEditorBlock(
                 Button(
                     onClick = onRunCode,
                     enabled = runState?.isRunning != true,
-                    colors = ButtonDefaults.buttonColors(containerColor = DesktopColors.VibrantOrange),
-                    modifier = Modifier.height(32.dp)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DesktopColors.VibrantOrange,
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(9.dp),
+                    modifier = Modifier.height(34.dp)
                 ) {
                     if (runState?.isRunning == true) {
                         CircularProgressIndicator(
@@ -631,7 +963,7 @@ private fun DesktopCodeEditorBlock(
                         Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                     Spacer(Modifier.width(4.dp))
-                    Text("Çalıştır", fontSize = 12.sp)
+                    Text("Çalıştır", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
                 }
             }
 
@@ -667,13 +999,17 @@ private fun DesktopCodeEditorBlock(
                         Icon(Icons.Rounded.Warning, contentDescription = null, tint = DesktopColors.VibrantOrange)
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Bash betiği sisteminizde izole dizinde yürütülecek. Onaylıyor musunuz?",
+                            text = "Bu kod bilgisayarınızda, sizin kullanıcı yetkilerinizle çalışacak. Yalnızca güvendiğiniz kodu çalıştırın. Onaylıyor musunuz?",
                             fontSize = 12.sp,
                             color = Color.White,
                             modifier = Modifier.weight(1f)
                         )
-                        Button(onClick = onApproveBash, modifier = Modifier.height(30.dp)) {
-                            Text("Onayla ve Çalıştır", fontSize = 11.sp)
+                        Button(
+                            onClick = onApproveBash,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Text("Onayla ve Çalıştır", fontSize = 11.sp, maxLines = 1, softWrap = false)
                         }
                     }
                 }
@@ -766,12 +1102,38 @@ private fun DesktopCodeEditorBlock(
                                     )
                                 }
                                 is CodeExecutionOutput.HtmlPreview -> {
-                                    Text(
-                                        text = "HTML Önizleme Hazır (${out.htmlContent.length} karakter):\n${out.htmlContent.take(300)}",
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.sp,
-                                        color = Color(0xFFFDE68A)
-                                    )
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        val readableText = out.htmlContent
+                                            .replace(Regex("<script[^>]*>[\\s\\S]*?</script>", RegexOption.IGNORE_CASE), "")
+                                            .replace(Regex("<style[^>]*>[\\s\\S]*?</style>", RegexOption.IGNORE_CASE), "")
+                                            .replace(Regex("<[^>]+>"), " ")
+                                            .replace(Regex("\\s+"), " ")
+                                            .trim()
+                                        Text(
+                                            text = if (readableText.isNotBlank()) readableText.take(400) else "(HTML yapısında görünür metin yok)",
+                                            fontFamily = FontFamily.SansSerif,
+                                            fontSize = 12.5.sp,
+                                            color = Color(0xFFFDE68A)
+                                        )
+                                        OutlinedButton(
+                                            onClick = {
+                                                runCatching {
+                                                    val tmp = Files.createTempFile("purenoteit_preview_", ".html").toFile()
+                                                    tmp.deleteOnExit()
+                                                    tmp.writeText(out.htmlContent, Charsets.UTF_8)
+                                                    if (Desktop.isDesktopSupported()) {
+                                                        Desktop.getDesktop().browse(tmp.toURI())
+                                                    }
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                                            modifier = Modifier.height(30.dp)
+                                        ) {
+                                            Icon(Icons.Rounded.OpenInBrowser, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFFFDE68A))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Tarayıcıda Önizle", fontSize = 11.sp, color = Color(0xFFFDE68A), maxLines = 1, softWrap = false)
+                                        }
+                                    }
                                 }
                                 is CodeExecutionOutput.SyntaxCheckPassed -> {
                                     Text(

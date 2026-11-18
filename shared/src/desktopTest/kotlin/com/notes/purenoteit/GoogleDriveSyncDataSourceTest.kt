@@ -10,6 +10,7 @@ import com.notes.purenoteit.sync.model.EncryptedDeltaEnvelope
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.async
@@ -199,7 +200,7 @@ class GoogleDriveSyncDataSourceTest {
         )
         assertTrue(pushRes is AppResult.Success)
         assertEquals("drv-id-99", (pushRes as AppResult.Success).data.remoteId)
-        assertEquals("cursor-99", pushRes.data.newCursor)
+        assertEquals("cursor-1", pushRes.data.newCursor)
     }
 
     @Test
@@ -309,6 +310,60 @@ class GoogleDriveSyncDataSourceTest {
         )
         val res = dataSource.readAppDataConfigFile("../secret.json")
         assertEquals(AppResult.Failure(DataError.Network.UNKNOWN), res)
+    }
+
+    @Test
+    fun `getAppDataUsageSummary ve pruneOrphanMediaBlobs kullanilmayan medyalari Drive dan temizlemelidir`() = runTest {
+        val activeSha = "a".repeat(64)
+        val orphanSha = "b".repeat(64)
+        val activeKey = "media/images/$activeSha.jpg"
+        val activeBlobName = "media_blob_media_images_${activeSha}.jpg.pvm3"
+        val orphanBlobName = "media_blob_media_drawings_${orphanSha}.png.pvm3"
+        val deletedIds = mutableListOf<String>()
+
+        val mockEngine = MockEngine { req ->
+            val url = req.url.toString()
+            when {
+                req.method == HttpMethod.Delete && url.contains("/files/orphan-blob-1") -> {
+                    deletedIds += "orphan-blob-1"
+                    respond("", HttpStatusCode.NoContent)
+                }
+                req.method == HttpMethod.Get && url.contains("/files?") -> {
+                    respond(
+                        content = """{"files":[
+                            {"id":"delta-1","name":"sync_delta_1.enc","size":"400"},
+                            {"id":"active-blob-1","name":"$activeBlobName","size":"120000"},
+                            {"id":"orphan-blob-1","name":"$orphanBlobName","size":"85000"}
+                        ]}""".trimIndent(),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+                else -> respond("", HttpStatusCode.NotFound)
+            }
+        }
+
+        val dataSource = SharedSyncFactory.createGoogleDriveDataSource(
+            tokenProvider = object : SyncTokenProvider {
+                override suspend fun getAccessToken() = AppResult.Success("ok")
+                override suspend fun refreshAccessToken(expiredToken: String?) = AppResult.Success("ok")
+            },
+            clock = fixedClock,
+            httpEngine = mockEngine,
+            delayFn = {}
+        )
+
+        val usageRes = dataSource.getAppDataUsageSummary()
+        assertTrue(usageRes is AppResult.Success)
+        val usage = (usageRes as AppResult.Success).data
+        assertEquals(2, usage.mediaFileCount)
+        assertEquals(205_000L, usage.totalMediaBytes)
+        assertEquals(1, usage.deltaFileCount)
+        assertEquals(400L, usage.totalDeltaBytes)
+
+        val pruneRes = dataSource.pruneOrphanMediaBlobs(setOf(activeKey))
+        assertEquals(AppResult.Success(1), pruneRes)
+        assertEquals(listOf("orphan-blob-1"), deletedIds)
     }
 
     private class InMemoryTokenStorage : SecureTokenStorage {

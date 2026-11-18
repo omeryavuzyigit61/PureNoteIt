@@ -6,6 +6,8 @@ import com.notes.purenoteit.domain.model.Note
 import com.notes.purenoteit.domain.model.NoteLink
 import com.notes.purenoteit.domain.model.StreamItem
 import com.notes.purenoteit.domain.time.AppClock
+import com.notes.purenoteit.model.BlockParser
+import com.notes.purenoteit.model.BlockType
 
 data class NoteMergeResolution(
     val primary: Note,
@@ -70,13 +72,25 @@ class ConflictResolver(
 
         val maxVersion = maxOf(local.syncVersion, remote.syncVersion)
 
-        // Case 1: Remote tombstone vs local active edit
+        // Case 1: Remote tombstone/trash vs local active edit
         if (remote.deletedAt != null && local.deletedAt == null) {
             return if (local.updatedAt > remote.deletedAt) {
                 NoteMergeResolution(
                     primary = local.copy(
                         deletedAt = null,
                         syncVersion = maxVersion + 1L
+                    )
+                )
+            } else if (remote.status.equals("TRASH", ignoreCase = true)) {
+                val winner = if (remote.updatedAt >= local.updatedAt) remote else local
+                NoteMergeResolution(
+                    primary = winner.copy(
+                        id = local.id,
+                        syncUuid = local.syncUuid,
+                        deletedAt = remote.deletedAt,
+                        updatedAt = maxOf(local.updatedAt, remote.updatedAt),
+                        status = "TRASH",
+                        syncVersion = maxVersion
                     )
                 )
             } else {
@@ -91,21 +105,42 @@ class ConflictResolver(
             }
         }
 
-        // Case 2: Both tombstoned
+        // Case 2: Both tombstoned or trashed
         if (remote.deletedAt != null && local.deletedAt != null) {
+            val remotePerm = !remote.status.equals("TRASH", ignoreCase = true)
+            val localPerm = !local.status.equals("TRASH", ignoreCase = true)
+            val resolvedStatus = when {
+                remotePerm && (!localPerm || remote.updatedAt >= local.updatedAt) -> "DELETED"
+                localPerm && (!remotePerm || local.updatedAt >= remote.updatedAt) -> "DELETED"
+                remote.status.equals("TRASH", ignoreCase = true) || local.status.equals("TRASH", ignoreCase = true) -> "TRASH"
+                else -> "DELETED"
+            }
+            val winner = if (remote.updatedAt >= local.updatedAt) remote else local
+            val resolvedDeletedAt = if (resolvedStatus == "TRASH") {
+                winner.deletedAt ?: maxOf(local.deletedAt, remote.deletedAt)
+            } else {
+                minOf(local.deletedAt, remote.deletedAt)
+            }
             return NoteMergeResolution(
-                primary = local.copy(
-                    deletedAt = minOf(local.deletedAt, remote.deletedAt),
+                primary = winner.copy(
+                    id = local.id,
+                    syncUuid = local.syncUuid,
+                    deletedAt = resolvedDeletedAt,
                     updatedAt = maxOf(local.updatedAt, remote.updatedAt),
-                    status = "DELETED",
+                    status = resolvedStatus,
                     syncVersion = maxVersion
                 )
             )
         }
 
-        // Case 3: Local tombstoned vs remote active edit
+        // Case 3: Local tombstoned/trashed vs remote active edit
         if (local.deletedAt != null && remote.deletedAt == null) {
-            return if (remote.updatedAt > local.deletedAt) {
+            val cutoff = if (local.status.equals("DELETED", ignoreCase = true)) {
+                maxOf(local.deletedAt, local.updatedAt)
+            } else {
+                local.deletedAt
+            }
+            return if (remote.updatedAt > cutoff) {
                 NoteMergeResolution(
                     primary = remote.copy(
                         id = local.id,
@@ -132,18 +167,25 @@ class ConflictResolver(
         val localModifiedSinceSync = lastSyncedAt == 0L || local.updatedAt > lastSyncedAt
         val remoteModifiedSinceSync = lastSyncedAt == 0L || remote.updatedAt > lastSyncedAt
 
-        // Fast-forward remote update when local wasn't concurrently edited
-        if (!localModifiedSinceSync && remoteModifiedSinceSync) {
+        // If local was NOT edited after lastSyncedAt, never branch a false conflict copy
+        if (!localModifiedSinceSync) {
+            val acceptRemote = remoteModifiedSinceSync ||
+                remote.syncVersion >= local.syncVersion ||
+                remote.updatedAt >= local.updatedAt
             return NoteMergeResolution(
-                primary = remote.copy(
-                    id = local.id,
-                    syncVersion = maxVersion
-                )
+                primary = if (acceptRemote) {
+                    remote.copy(
+                        id = local.id,
+                        syncVersion = maxVersion
+                    )
+                } else {
+                    local.copy(syncVersion = maxVersion)
+                }
             )
         }
 
         // Local-only change vs stale remote revision
-        if (localModifiedSinceSync && !remoteModifiedSinceSync) {
+        if (!remoteModifiedSinceSync) {
             return NoteMergeResolution(
                 primary = local.copy(syncVersion = maxVersion + 1L)
             )
@@ -225,6 +267,7 @@ class ConflictResolver(
         val remoteDirty = lastSyncedAt == 0L || remoteUpdated > lastSyncedAt
         return when {
             !localDirty && remoteDirty -> true
+            !localDirty && !remoteDirty -> remoteVersion >= localVersion || remoteUpdated >= localUpdated
             localDirty && !remoteDirty -> false
             remoteUpdated != localUpdated -> remoteUpdated > localUpdated
             else -> remoteVersion >= localVersion
@@ -232,21 +275,80 @@ class ConflictResolver(
     }
 
     private fun hasSameNotePayload(a: Note, b: Note): Boolean =
-        (a.title ?: "") == (b.title ?: "") &&
-            (a.description ?: "") == (b.description ?: "") &&
-            a.status == b.status &&
+        (a.title?.trim().orEmpty()) == (b.title?.trim().orEmpty()) &&
+            hasSameDescription(a.description, b.description) &&
+            a.status.ifBlank { "TODO" } == b.status.ifBlank { "TODO" } &&
             a.isPinned == b.isPinned &&
-            (a.icon ?: "") == (b.icon ?: "") &&
-            a.isPassword == b.isPassword &&
+            (a.icon?.takeIf { it.isNotBlank() } ?: "📝") == (b.icon?.takeIf { it.isNotBlank() } ?: "📝") &&
+            (a.isPassword == true) == (b.isPassword == true) &&
             a.isEncrypted == b.isEncrypted &&
-            a.categorySyncUuid == b.categorySyncUuid &&
-            (a.images.orEmpty() == b.images.orEmpty()) &&
+            (a.categorySyncUuid ?: "") == (b.categorySyncUuid ?: "") &&
+            normalizedImageList(a) == normalizedImageList(b) &&
             (a.sounds.orEmpty() == b.sounds.orEmpty()) &&
-            (a.richBlocksJson ?: "") == (b.richBlocksJson ?: "") &&
+            normalizeRichMetadataForComparison(a.richBlocksJson) == normalizeRichMetadataForComparison(b.richBlocksJson) &&
             a.reminderTime == b.reminderTime &&
-            a.reminderType == b.reminderType &&
-            a.reminderSound == b.reminderSound &&
+            (a.reminderType ?: "") == (b.reminderType ?: "") &&
+            (a.reminderSound ?: "") == (b.reminderSound ?: "") &&
             a.isReminderDone == b.isReminderDone
+
+    private fun hasSameDescription(descA: String?, descB: String?): Boolean {
+        val rawA = descA.orEmpty()
+        val rawB = descB.orEmpty()
+        if (!rawA.startsWith("NOTION_BLOCKS_V1:") || !rawB.startsWith("NOTION_BLOCKS_V1:")) {
+            return normalizeDescriptionForComparison(rawA) == normalizeDescriptionForComparison(rawB)
+        }
+        val blocksA = normalizeBlocksForComparison(rawA)
+        val blocksB = normalizeBlocksForComparison(rawB)
+        if (blocksA.size != blocksB.size) return false
+        return blocksA.indices.all { idx ->
+            val blkA = blocksA[idx]
+            val blkB = blocksB[idx]
+            if (blkA.type == BlockType.SUB_PAGE &&
+                blkB.type == BlockType.SUB_PAGE &&
+                (blkA.subPageSyncUuid.isNullOrBlank() || blkB.subPageSyncUuid.isNullOrBlank())
+            ) {
+                blkA.copy(subPageSyncUuid = null) == blkB.copy(subPageSyncUuid = null)
+            } else {
+                blkA == blkB
+            }
+        }
+    }
+
+    private fun normalizeBlocksForComparison(raw: String): List<com.notes.purenoteit.model.NoteBlock> =
+        BlockParser.parse(raw)
+            .filterNot { it.type == BlockType.PAGE_RELATIONS }
+            .map { blk ->
+                blk.copy(
+                    id = "",
+                    subPageNoteId = if (blk.type == BlockType.SUB_PAGE) null else blk.subPageNoteId
+                )
+            }
+
+    private fun normalizeDescriptionForComparison(description: String?): String {
+        val raw = description.orEmpty()
+        if (!raw.startsWith("NOTION_BLOCKS_V1:")) return raw
+        return BlockParser.serialize(normalizeBlocksForComparison(raw))
+    }
+
+    private fun normalizedImageList(note: Note): List<String> {
+        val desc = note.description.orEmpty()
+        val drawingPaths = if (desc.startsWith("NOTION_BLOCKS_V1:")) {
+            BlockParser.parse(desc)
+                .mapNotNull { blk -> blk.mediaPath?.takeIf { blk.type == BlockType.DRAWING } }
+                .toSet()
+        } else {
+            emptySet()
+        }
+        return note.images.orEmpty().filterNot { it in drawingPaths }.distinct()
+    }
+
+    private fun normalizeRichMetadataForComparison(richBlocksJson: String?): String {
+        val meta = BlockParser.parseRichMetadata(richBlocksJson)
+        if (meta != null && (meta.isSubPage || !meta.parentSyncUuid.isNullOrBlank())) {
+            return "subpage:${meta.parentSyncUuid.orEmpty()}"
+        }
+        return richBlocksJson.orEmpty()
+    }
 
     private fun formatConflictTitle(originalTitle: String?): String {
         val clean = originalTitle?.trim().orEmpty().ifBlank { "Adsız Not" }

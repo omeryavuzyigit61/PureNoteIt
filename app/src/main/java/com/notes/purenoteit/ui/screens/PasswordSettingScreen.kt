@@ -71,6 +71,7 @@ import com.notes.purenoteit.util.showToastShort
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PasswordSettingScreen(
+    onPasswordSaved: () -> Unit = {},
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -137,6 +138,7 @@ fun PasswordSettingScreen(
             newPassword = ""
             repeatPassword = ""
             context.showToastShort(context.getString(R.string.toast_password_changed_success))
+            onPasswordSaved()
             onNavigateBack()
         } finally {
             currChars.fill('\u0000')

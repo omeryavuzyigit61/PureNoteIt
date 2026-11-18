@@ -42,17 +42,17 @@ object AppUpdateHelper {
     private const val MIN_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L // 12 saatte bir otomatik kontrol
 
     private val DEFAULT_RELEASE_NOTES_TR = listOf(
-        "☁️ Google Drive Eşitleme: Ayarlar'dan tek dokunuşla bağlanın, notlarınızı cihazlar arasında otomatik eşitleyin.",
-        "🛡️ Güçlü Gizlilik: Tüm notlar, çizimler ve medya dosyaları cihazınızda ve bulutta güvenle şifrelenir.",
-        "🔄 Çapraz Cihaz Uyumu: Mobil ve bilgisayar arasında kategori, alt sayfa ve not bağlantıları eksiksiz aktarılır.",
-        "⚡ Akıcılık & Kararlılık: Yenilenen Ayarlar deneyimi ve daha hızlı senkronizasyon."
+        "🖥️ PC'de Çizim & Ses: Şekil araçları, geri/ileri al ve mikrofon kaydı artık masaüstünde de var.",
+        "📋 Görev Panosu: Yapılacaklar, Devam Ediyor, İnceleniyor ve Tamamlandı sütunları PC'de de kullanılabilir.",
+        "⚡ Akıllı Eşitleme: Notlar yalnızca Kaydet veya Geri'de eşitlenir; kopya ve gereksiz bildirim kalmaz.",
+        "🔒 Güvenlik: Şifreli medya, PIN ve çöp saklama süresi cihazlar arasında birebir eşitlenir."
     )
 
     private val DEFAULT_RELEASE_NOTES_EN = listOf(
-        "☁️ Google Drive Sync: Connect with one tap in Settings and keep your notes synced across devices.",
-        "🛡️ Strong Privacy: All notes, drawings, and media stay securely encrypted on device and in the cloud.",
-        "🔄 Cross-Device Continuity: Seamless categories, sub-pages, and note links between mobile and desktop.",
-        "⚡ Performance & Stability: Refined Settings experience and faster sync reliability."
+        "🖥️ Drawing & Audio on PC: Shape tools, undo/redo and microphone recording now on desktop too.",
+        "📋 Task Board: To Do, In Progress, In Review and Completed columns are now on PC as well.",
+        "⚡ Smart Sync: Notes sync only on Save or Back; no duplicates and no noisy notifications.",
+        "🔒 Security: Encrypted media, PIN and trash retention stay in perfect sync across devices."
     )
 
     fun getAppUpdateManager(context: Context): AppUpdateManager {

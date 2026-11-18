@@ -10,11 +10,10 @@ import com.notes.purenoteit.domain.model.Note
 import com.notes.purenoteit.domain.model.NoteLink
 import com.notes.purenoteit.domain.model.StreamItem
 import com.notes.purenoteit.domain.storage.MediaPathResolver
-import com.notes.purenoteit.model.BlockParser
-import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.sync.LocalSyncSnapshot
 import com.notes.purenoteit.sync.LocalSyncStore
 import com.notes.purenoteit.sync.ResolvedRemoteBatch
+import com.notes.purenoteit.sync.SubPageSyncRemapper
 import com.notes.purenoteit.sync.model.SyncCursorState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -121,8 +120,9 @@ internal class DesktopLocalSyncStoreImpl(
                 queryNotesModifiedSince(conn, Long.MIN_VALUE).forEach { n ->
                     noteIdByUuid[n.syncUuid] = n.id
                 }
-                val touchedNotes = mutableListOf<Note>()
+                val remoteBatchNoteUuids = HashSet<String>(batch.notes.size)
                 for (note in batch.notes) {
+                    remoteBatchNoteUuids += note.syncUuid
                     val existingId = noteIdByUuid[note.syncUuid]
                     val resolvedCategoryId = note.categorySyncUuid?.let { categoryIdByUuid[it] } ?: fallbackCategoryId
                     val ready = note.copy(
@@ -132,26 +132,15 @@ internal class DesktopLocalSyncStoreImpl(
                     if (existingId != null) {
                         updateNoteFull(conn, ready)
                         noteIdByUuid[ready.syncUuid] = existingId
-                        touchedNotes += ready
                     } else {
                         val insertedId = insertNoteFull(conn, ready)
                         if (insertedId > 0) {
                             noteIdByUuid[ready.syncUuid] = insertedId
-                            touchedNotes += ready.copy(id = insertedId)
                         }
                     }
                 }
 
-                // 2b. Remap local Int subpage/parent pointers inside blocks via cross-device UUIDs
-                for (n in touchedNotes) {
-                    if (n.deletedAt != null) continue
-                    val remapped = remapSubPageLocalIds(n, noteIdByUuid)
-                    if (remapped != n) {
-                        updateNoteFull(conn, remapped)
-                    }
-                }
-
-                // 3. NoteLinks
+                // 3. NoteLinks (commit before subpage remapping so links assist legacy UUID lookup)
                 val existingLinkIds = queryLinksModifiedSince(conn, Long.MIN_VALUE).associate { it.syncUuid to it.id }
                 for (link in batch.noteLinks) {
                     val sourceId = noteIdByUuid[link.sourceSyncUuid] ?: continue
@@ -195,6 +184,20 @@ internal class DesktopLocalSyncStoreImpl(
                             ps.setLong(10, link.syncVersion)
                             ps.executeUpdate()
                         }
+                    }
+                }
+
+                // 3b. Remap local Int subpage/parent pointers across all active notes & strip colliding foreign IDs
+                if (batch.notes.isNotEmpty() || batch.noteLinks.isNotEmpty()) {
+                    val allNotes = queryNotesModifiedSince(conn, Long.MIN_VALUE)
+                    val allLinks = queryLinksModifiedSince(conn, Long.MIN_VALUE)
+                    val remappedUpdates = SubPageSyncRemapper.remapActiveNotes(
+                        allNotes = allNotes,
+                        allLinks = allLinks,
+                        remoteBatchNoteUuids = remoteBatchNoteUuids
+                    )
+                    for (remapped in remappedUpdates) {
+                        updateNoteFull(conn, remapped)
                     }
                 }
 
@@ -423,38 +426,6 @@ internal class DesktopLocalSyncStoreImpl(
         }
     }
 
-    private fun remapSubPageLocalIds(note: Note, noteIdByUuid: Map<String, Int>): Note {
-        var changed = false
-        var updatedDesc = note.description
-        val blocks = BlockParser.parse(note.description)
-        if (blocks.any { it.type == BlockType.SUB_PAGE && !it.subPageSyncUuid.isNullOrBlank() }) {
-            val remapped = blocks.map { b ->
-                val uuid = b.subPageSyncUuid
-                val localId = if (uuid != null) noteIdByUuid[uuid] else null
-                if (b.type == BlockType.SUB_PAGE && localId != null && b.subPageNoteId != localId) {
-                    changed = true
-                    b.copy(subPageNoteId = localId)
-                } else {
-                    b
-                }
-            }
-            if (changed) {
-                updatedDesc = BlockParser.serialize(remapped)
-            }
-        }
-
-        var updatedRich = note.richBlocksJson
-        val richMeta = BlockParser.parseRichMetadata(note.richBlocksJson)
-        if (richMeta != null && richMeta.isSubPage && !richMeta.parentSyncUuid.isNullOrBlank()) {
-            val resolvedParentId = noteIdByUuid[richMeta.parentSyncUuid]
-            if (resolvedParentId != null && richMeta.parentNoteId != resolvedParentId) {
-                updatedRich = BlockParser.buildSubPageMetadataJson(resolvedParentId, richMeta.parentSyncUuid)
-                changed = true
-            }
-        }
-        return if (changed) note.copy(description = updatedDesc, richBlocksJson = updatedRich) else note
-    }
-
     private fun insertNoteFull(conn: Connection, note: Note): Int {
         val sql = """
             INSERT INTO notes (
@@ -514,7 +485,7 @@ internal class DesktopLocalSyncStoreImpl(
 
     private fun queryCategoriesModifiedSince(conn: Connection, sinceMillis: Long): List<Category> {
         val list = mutableListOf<Category>()
-        conn.prepareStatement("SELECT * FROM categories WHERE updatedAt >= ?").use { ps ->
+        conn.prepareStatement("SELECT * FROM categories WHERE updatedAt > ?").use { ps ->
             ps.setLong(1, sinceMillis)
             ps.executeQuery().use { rs ->
                 while (rs.next()) {
@@ -535,7 +506,7 @@ internal class DesktopLocalSyncStoreImpl(
 
     private fun queryNotesModifiedSince(conn: Connection, sinceMillis: Long): List<Note> {
         val list = mutableListOf<Note>()
-        conn.prepareStatement("SELECT * FROM notes WHERE updatedAt >= ?").use { ps ->
+        conn.prepareStatement("SELECT * FROM notes WHERE updatedAt > ?").use { ps ->
             ps.setLong(1, sinceMillis)
             ps.executeQuery().use { rs ->
                 while (rs.next()) {
@@ -573,7 +544,7 @@ internal class DesktopLocalSyncStoreImpl(
 
     private fun queryLinksModifiedSince(conn: Connection, sinceMillis: Long): List<NoteLink> {
         val list = mutableListOf<NoteLink>()
-        conn.prepareStatement("SELECT * FROM note_links WHERE updatedAt >= ?").use { ps ->
+        conn.prepareStatement("SELECT * FROM note_links WHERE updatedAt > ?").use { ps ->
             ps.setLong(1, sinceMillis)
             ps.executeQuery().use { rs ->
                 while (rs.next()) {
@@ -598,7 +569,7 @@ internal class DesktopLocalSyncStoreImpl(
 
     private fun queryStreamItemsModifiedSince(conn: Connection, sinceMillis: Long): List<StreamItem> {
         val list = mutableListOf<StreamItem>()
-        conn.prepareStatement("SELECT * FROM stream_items WHERE updatedAt >= ?").use { ps ->
+        conn.prepareStatement("SELECT * FROM stream_items WHERE updatedAt > ?").use { ps ->
             ps.setLong(1, sinceMillis)
             ps.executeQuery().use { rs ->
                 while (rs.next()) {
@@ -625,7 +596,7 @@ internal class DesktopLocalSyncStoreImpl(
 
     private fun queryRulesModifiedSince(conn: Connection, sinceMillis: Long): List<AutomationRule> {
         val list = mutableListOf<AutomationRule>()
-        conn.prepareStatement("SELECT * FROM automation_rules WHERE updatedAt >= ?").use { ps ->
+        conn.prepareStatement("SELECT * FROM automation_rules WHERE updatedAt > ?").use { ps ->
             ps.setLong(1, sinceMillis)
             ps.executeQuery().use { rs ->
                 while (rs.next()) {

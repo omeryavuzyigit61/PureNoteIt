@@ -102,13 +102,17 @@ dependencies {
     implementation(compose.material3)
     implementation(compose.materialIconsExtended)
 
+    implementation("org.jetbrains.kotlin:kotlin-scripting-jsr223:${libs.versions.kotlin.get()}")
+
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.swing)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.sqlite.jdbc)
 
     implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.websockets)
+    implementation(libs.ktor.network.tls.certificates)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.websockets)
 
@@ -129,7 +133,20 @@ compose.desktop {
             vendor = "PureNoteIt"
             copyright = "Copyright (c) 2026 PureNoteIt"
             description = "PureNoteIt Smart Notes & Workspace"
-            modules("java.sql", "java.desktop", "java.naming", "jdk.crypto.ec")
+            modules(
+                "java.sql",
+                "java.desktop",
+                "java.naming",
+                "java.scripting",
+                "java.compiler",
+                "java.logging",
+                "java.management",
+                "java.xml",
+                "jdk.crypto.ec",
+                "jdk.compiler",
+                "jdk.unsupported",
+                "jdk.zipfs"
+            )
             windows {
                 iconFile.set(project.file("src/main/resources/purenoteit.ico"))
                 perUserInstall = true

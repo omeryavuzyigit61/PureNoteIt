@@ -26,7 +26,7 @@ interface NoteDao {
             updatedAt = :updatedAt,
             syncVersion = syncVersion + 1,
             status = 'DELETED'
-        WHERE id = :id AND deletedAt IS NULL
+        WHERE id = :id AND (deletedAt IS NULL OR UPPER(COALESCE(status, 'TODO')) != 'DELETED')
         """
     )
     suspend fun softDeleteWithTombstoneSuspend(id: Int, deletedAt: Long, updatedAt: Long)
@@ -38,24 +38,53 @@ interface NoteDao {
             updatedAt = :updatedAt,
             syncVersion = syncVersion + 1,
             status = 'DELETED'
-        WHERE categoryId = :categoryId AND deletedAt IS NULL
+        WHERE categoryId = :categoryId AND (deletedAt IS NULL OR UPPER(COALESCE(status, 'TODO')) != 'DELETED')
         """
     )
     suspend fun softDeleteNotesByCategorySuspend(categoryId: Int, deletedAt: Long, updatedAt: Long)
 
-    @Query("SELECT * FROM notes WHERE deletedAt IS NULL ORDER BY isPinned DESC, date DESC")
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE (deletedAt IS NULL OR UPPER(COALESCE(status, 'TODO')) = 'TRASH')
+          AND UPPER(COALESCE(status, 'TODO')) != 'DELETED'
+        ORDER BY isPinned DESC, date DESC
+        """
+    )
     fun getAllNotesFlow(): Flow<List<NoteData>>
 
-    @Query("SELECT * FROM notes WHERE deletedAt IS NULL ORDER BY isPinned DESC, date DESC")
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE (deletedAt IS NULL OR UPPER(COALESCE(status, 'TODO')) = 'TRASH')
+          AND UPPER(COALESCE(status, 'TODO')) != 'DELETED'
+        ORDER BY isPinned DESC, date DESC
+        """
+    )
     suspend fun getAllNotesSuspend(): List<NoteData>
 
-    @Query("SELECT * FROM notes WHERE id = :id AND deletedAt IS NULL")
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE id = :id
+          AND (deletedAt IS NULL OR UPPER(COALESCE(status, 'TODO')) = 'TRASH')
+          AND UPPER(COALESCE(status, 'TODO')) != 'DELETED'
+        """
+    )
     suspend fun getNoteByIdSuspend(id: Int): NoteData?
 
     @Query("SELECT * FROM notes WHERE id = :id")
     suspend fun getNoteByIdIncludingDeletedSuspend(id: Int): NoteData?
 
-    @Query("SELECT * FROM notes WHERE syncUuid = :syncUuid AND deletedAt IS NULL LIMIT 1")
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE syncUuid = :syncUuid
+          AND (deletedAt IS NULL OR UPPER(COALESCE(status, 'TODO')) = 'TRASH')
+          AND UPPER(COALESCE(status, 'TODO')) != 'DELETED'
+        LIMIT 1
+        """
+    )
     suspend fun getNoteBySyncUuidSuspend(syncUuid: String): NoteData?
 
     @Query("SELECT * FROM notes WHERE syncUuid = :syncUuid LIMIT 1")
@@ -70,6 +99,7 @@ interface NoteDao {
     FROM notes
     LEFT JOIN categories ON notes.categoryId = categories.id AND categories.deletedAt IS NULL
     WHERE notes.deletedAt IS NULL
+      AND UPPER(COALESCE(notes.status, 'TODO')) NOT IN ('TRASH', 'DELETED')
       AND (categories.isPassword IS NULL OR categories.isPassword = 0)
       AND (notes.isPassword IS NULL OR notes.isPassword = 0)
       AND (notes.title LIKE '%' || :query || '%' OR notes.description LIKE '%' || :query || '%')
@@ -84,6 +114,7 @@ interface NoteDao {
     FROM notes
     INNER JOIN categories ON notes.categoryId = categories.id
     WHERE notes.deletedAt IS NULL
+      AND UPPER(COALESCE(notes.status, 'TODO')) NOT IN ('TRASH', 'DELETED')
       AND categories.deletedAt IS NULL
       AND categories.name = :categoryName
     ORDER BY notes.isPinned DESC, notes.date DESC
@@ -97,6 +128,7 @@ interface NoteDao {
     FROM notes
     LEFT JOIN categories ON notes.categoryId = categories.id AND categories.deletedAt IS NULL
     WHERE notes.deletedAt IS NULL
+      AND UPPER(COALESCE(notes.status, 'TODO')) NOT IN ('TRASH', 'DELETED')
       AND (categories.isPassword IS NULL OR categories.isPassword = 0)
       AND (notes.date BETWEEN :startDate AND :endDate)
     ORDER BY notes.isPinned DESC, notes.date DESC
@@ -104,7 +136,16 @@ interface NoteDao {
     )
     suspend fun getNotesBetweenDatesSuspend(startDate: Long, endDate: Long): List<NoteData>
 
-    @Query("SELECT * FROM notes WHERE deletedAt IS NULL AND reminderTime IS NOT NULL AND reminderTime > :now AND isReminderDone = 0")
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE deletedAt IS NULL
+          AND UPPER(COALESCE(status, 'TODO')) NOT IN ('TRASH', 'DELETED')
+          AND reminderTime IS NOT NULL
+          AND reminderTime > :now
+          AND isReminderDone = 0
+        """
+    )
     suspend fun getActiveRemindersSuspend(now: Long): List<NoteData>
 
     @Query("UPDATE notes SET isPinned = :isPinned, updatedAt = :updatedAt, syncVersion = syncVersion + 1 WHERE id = :id AND deletedAt IS NULL")

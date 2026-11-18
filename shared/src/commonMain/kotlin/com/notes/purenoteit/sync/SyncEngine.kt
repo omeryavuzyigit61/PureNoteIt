@@ -179,6 +179,8 @@ class SyncEngine(
 
         // 4. Conflict resolution & ordered batch commit (Categories -> Notes -> Links/Stream/Rules)
         var conflictCopiesCreated = 0
+        val step4Now = clock.nowMillis()
+        var maxFastForwardAppliedAt = 0L
         val skippedEchoCatStamps = mutableMapOf<String, Pair<Long, Long>>()
         val skippedEchoNoteStamps = mutableMapOf<String, Pair<Long, Long>>()
         val skippedEchoLinkStamps = mutableMapOf<String, Pair<Long, Long>>()
@@ -192,21 +194,31 @@ class SyncEngine(
             val resolvedCats = mergedCategoriesByUuid.values.map { remote ->
                 val resolved = conflictResolver.mergeCategory(existingCats[remote.syncUuid], remote, initialCursorState.lastSyncedAt)
                 if (resolved.syncVersion == remote.syncVersion && resolved.updatedAt == remote.updatedAt) {
-                    skippedEchoCatStamps[resolved.syncUuid] = resolved.updatedAt to resolved.syncVersion
+                    val clampedAt = minOf(resolved.updatedAt, step4Now)
+                    val applied = if (clampedAt != resolved.updatedAt) resolved.copy(updatedAt = clampedAt) else resolved
+                    skippedEchoCatStamps[applied.syncUuid] = applied.updatedAt to applied.syncVersion
+                    maxFastForwardAppliedAt = maxOf(maxFastForwardAppliedAt, applied.updatedAt)
+                    applied
+                } else {
+                    resolved
                 }
-                resolved
             }
 
             val existingNotes = localStore.findNotesBySyncUuids(mergedNotesByUuid.keys)
             val resolvedNotes = mutableListOf<Note>()
             for (remoteNote in mergedNotesByUuid.values) {
                 val res = conflictResolver.mergeNote(existingNotes[remoteNote.syncUuid], remoteNote, initialCursorState.lastSyncedAt)
-                resolvedNotes += res.primary
                 if (res.conflictCopy == null &&
                     res.primary.syncVersion == remoteNote.syncVersion &&
                     res.primary.updatedAt == remoteNote.updatedAt
                 ) {
-                    skippedEchoNoteStamps[res.primary.syncUuid] = res.primary.updatedAt to res.primary.syncVersion
+                    val clampedAt = minOf(res.primary.updatedAt, step4Now)
+                    val applied = if (clampedAt != res.primary.updatedAt) res.primary.copy(updatedAt = clampedAt) else res.primary
+                    resolvedNotes += applied
+                    skippedEchoNoteStamps[applied.syncUuid] = applied.updatedAt to applied.syncVersion
+                    maxFastForwardAppliedAt = maxOf(maxFastForwardAppliedAt, applied.updatedAt)
+                } else {
+                    resolvedNotes += res.primary
                 }
                 res.conflictCopy?.let {
                     resolvedNotes += it
@@ -218,27 +230,42 @@ class SyncEngine(
             val resolvedLinks = mergedLinksByUuid.values.map { remote ->
                 val resolved = conflictResolver.mergeNoteLink(existingLinks[remote.syncUuid], remote)
                 if (resolved.syncVersion == remote.syncVersion && resolved.updatedAt == remote.updatedAt) {
-                    skippedEchoLinkStamps[resolved.syncUuid] = resolved.updatedAt to resolved.syncVersion
+                    val clampedAt = minOf(resolved.updatedAt, step4Now)
+                    val applied = if (clampedAt != resolved.updatedAt) resolved.copy(updatedAt = clampedAt) else resolved
+                    skippedEchoLinkStamps[applied.syncUuid] = applied.updatedAt to applied.syncVersion
+                    maxFastForwardAppliedAt = maxOf(maxFastForwardAppliedAt, applied.updatedAt)
+                    applied
+                } else {
+                    resolved
                 }
-                resolved
             }
 
             val existingStream = localStore.findStreamItemsBySyncUuids(mergedStreamByUuid.keys)
             val resolvedStream = mergedStreamByUuid.values.map { remote ->
                 val resolved = conflictResolver.mergeStreamItem(existingStream[remote.syncUuid], remote)
                 if (resolved.syncVersion == remote.syncVersion && resolved.updatedAt == remote.updatedAt) {
-                    skippedEchoStreamStamps[resolved.syncUuid] = resolved.updatedAt to resolved.syncVersion
+                    val clampedAt = minOf(resolved.updatedAt, step4Now)
+                    val applied = if (clampedAt != resolved.updatedAt) resolved.copy(updatedAt = clampedAt) else resolved
+                    skippedEchoStreamStamps[applied.syncUuid] = applied.updatedAt to applied.syncVersion
+                    maxFastForwardAppliedAt = maxOf(maxFastForwardAppliedAt, applied.updatedAt)
+                    applied
+                } else {
+                    resolved
                 }
-                resolved
             }
 
             val existingRules = localStore.findRulesBySyncUuids(mergedRulesByUuid.keys)
             val resolvedRules = mergedRulesByUuid.values.map { remote ->
                 val resolved = conflictResolver.mergeAutomationRule(existingRules[remote.syncUuid], remote)
                 if (resolved.syncVersion == remote.syncVersion && resolved.updatedAt == remote.updatedAt) {
-                    skippedEchoRuleStamps[resolved.syncUuid] = resolved.updatedAt to resolved.syncVersion
+                    val clampedAt = minOf(resolved.updatedAt, step4Now)
+                    val applied = if (clampedAt != resolved.updatedAt) resolved.copy(updatedAt = clampedAt) else resolved
+                    skippedEchoRuleStamps[applied.syncUuid] = applied.updatedAt to applied.syncVersion
+                    maxFastForwardAppliedAt = maxOf(maxFastForwardAppliedAt, applied.updatedAt)
+                    applied
+                } else {
+                    resolved
                 }
-                resolved
             }
 
             when (
@@ -306,7 +333,7 @@ class SyncEngine(
         )
 
         var pushedEntities = 0
-        var finalPushAt = initialCursorState.lastPushedAt
+        var finalPushAt = maxOf(initialCursorState.lastPushedAt, maxFastForwardAppliedAt)
         if (!outgoingPayload.isEmpty()) {
             val payloadJson = json.encodeToString(outgoingPayload)
             val encPayloadRes = vaultCrypto.encryptWithPassphrase(payloadJson, keyChars)
@@ -334,6 +361,7 @@ class SyncEngine(
                 snapshot.streamItems.size +
                 snapshot.automationRules.size
             finalPushAt = maxOf(
+                finalPushAt,
                 now,
                 snapshot.notes.maxOfOrNull { it.updatedAt } ?: 0L,
                 snapshot.categories.maxOfOrNull { it.updatedAt } ?: 0L,
@@ -343,11 +371,12 @@ class SyncEngine(
             )
         }
 
+        val syncEndAt = maxOf(now, clock.nowMillis(), maxFastForwardAppliedAt)
         localStore.saveSyncCursorState(
             SyncCursorState(
                 remoteCursor = workingCursor,
                 lastPushedAt = finalPushAt,
-                lastSyncedAt = now,
+                lastSyncedAt = syncEndAt,
                 deviceId = deviceId,
                 uploadedMediaKeys = alreadyUploaded + newlyUploadedKeys
             )
@@ -369,6 +398,30 @@ class SyncEngine(
         )
     }
 
+    suspend fun getRemoteUsageSummary(): AppResult<RemoteMediaUsageSummary, AppError> =
+        remoteDataSource.getAppDataUsageSummary()
+
+    suspend fun cleanupOrphanRemoteMedia(): AppResult<Int, AppError> = syncMutex.withLock {
+        val allSnapRes = localStore.readModifiedSince(Long.MIN_VALUE)
+        val allSnap = when (allSnapRes) {
+            is AppResult.Failure -> return allSnapRes
+            is AppResult.Success -> allSnapRes.data
+        }
+        val activeKeys = collectReferencedCanonicalMediaKeys(
+            notes = allSnap.notes,
+            streamItems = allSnap.streamItems,
+            includeTrashed = true
+        )
+        val pruneRes = remoteDataSource.pruneOrphanMediaBlobs(activeKeys)
+        if (pruneRes is AppResult.Success && pruneRes.data > 0) {
+            val state = localStore.getSyncCursorState()
+            localStore.saveSyncCursorState(
+                state.copy(uploadedMediaKeys = state.uploadedMediaKeys intersect activeKeys)
+            )
+        }
+        pruneRes
+    }
+
     private fun isIncomingNewer(
         inUpdated: Long,
         inVersion: Long,
@@ -378,11 +431,12 @@ class SyncEngine(
 
     private fun collectReferencedCanonicalMediaKeys(
         notes: Collection<Note>,
-        streamItems: Collection<StreamItem>
+        streamItems: Collection<StreamItem>,
+        includeTrashed: Boolean = false
     ): Set<String> {
         val keys = linkedSetOf<String>()
         for (note in notes) {
-            if (note.deletedAt != null) continue
+            if (!includeTrashed && note.deletedAt != null) continue
             note.images.orEmpty().forEach { path -> if (isCanonicalMediaKey(path)) keys += path }
             note.sounds.orEmpty().forEach { path -> if (isCanonicalMediaKey(path)) keys += path }
             val desc = note.description
@@ -396,7 +450,7 @@ class SyncEngine(
             }
         }
         for (item in streamItems) {
-            if (item.deletedAt != null) continue
+            if (!includeTrashed && item.deletedAt != null) continue
             item.audioPath?.takeIf { isCanonicalMediaKey(it) }?.let { keys += it }
             item.imagePath?.takeIf { isCanonicalMediaKey(it) }?.let { keys += it }
         }

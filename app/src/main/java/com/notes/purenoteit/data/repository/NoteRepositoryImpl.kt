@@ -63,7 +63,13 @@ internal class NoteRepositoryImpl private constructor(
     }
 
     override suspend fun insertNote(note: Note): Long = withContext(ioDispatcher) {
-        noteDao.insertNoteSuspend(prepareEntityForWrite(note))
+        val entity = prepareEntityForWrite(note)
+        if (entity.id > 0) {
+            noteDao.updateNote(entity)
+            entity.id.toLong()
+        } else {
+            noteDao.insertNoteSuspend(entity)
+        }
     }
 
     override suspend fun updateNote(note: Note) = withContext(ioDispatcher) {
@@ -140,9 +146,9 @@ internal class NoteRepositoryImpl private constructor(
             null
         }
 
-        val resolvedSyncUuid = note.syncUuid.ifBlank {
-            existing?.syncUuid?.ifBlank { null } ?: UUID.randomUUID().toString()
-        }
+        val resolvedSyncUuid = existing?.syncUuid?.takeIf { it.isNotBlank() }
+            ?: note.syncUuid.takeIf { it.isNotBlank() }
+            ?: UUID.randomUUID().toString()
         val resolvedCategorySyncUuid = note.categorySyncUuid?.takeIf { it.isNotBlank() }
             ?: note.categoryId?.let { catId ->
                 categoryDao?.getCategoryByIdIncludingDeletedSuspend(catId)?.takeIf { it.id > 0 }?.syncUuid

@@ -15,6 +15,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerializationException
@@ -25,10 +27,15 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
+import java.io.PrintStream
+import java.io.StringWriter
+import java.net.URLClassLoader
 import java.nio.file.Files
 import java.sql.DriverManager
 import java.sql.SQLException
 import java.util.concurrent.TimeUnit
+import javax.script.ScriptEngineManager
+import javax.tools.ToolProvider
 import kotlin.concurrent.thread
 
 interface DesktopCodeExecutor : CodeExecutionRepository {
@@ -60,6 +67,7 @@ internal class DesktopCodeRunnerImpl(
         prettyPrintIndent = "  "
     }
     private val compactJson = Json { prettyPrint = false }
+    private val embeddedJvmExecMutex = Mutex()
 
     override suspend fun executeOffline(
         language: String,
@@ -239,63 +247,213 @@ internal class DesktopCodeRunnerImpl(
     private suspend fun executeJava(code: String): AppResult<CodeExecutionOutput, CodeExecutionError> {
         val javacExe = executableResolver(listOf("javac"))
         val javaExe = executableResolver(listOf("java"))
-        if (javacExe == null || javaExe == null) {
-            return runStaticSyntaxFallback("java", code, "JDK (javac/java) bulunamadı; statik sözdizimi doğrulandı.")
+        val (className, normalizedSource) = normalizeJavaSource(code)
+
+        if (javacExe != null && javaExe != null) {
+            return runInTempSandbox { sandboxDir ->
+                val srcFile = sandboxDir.resolve("$className.java").toFile()
+                srcFile.writeText(normalizedSource, Charsets.UTF_8)
+                val compileRes = runProcess(
+                    command = listOf(javacExe, "-encoding", "UTF-8", srcFile.absolutePath),
+                    workingDir = sandboxDir.toFile()
+                )
+                if (compileRes !is AppResult.Success) return@runInTempSandbox compileRes
+                val compileOut = compileRes.data
+                if (compileOut is CodeExecutionOutput.Console && compileOut.hasRuntimeError) {
+                    return@runInTempSandbox compileRes
+                }
+                runProcess(
+                    command = listOf(javaExe, "-Dfile.encoding=UTF-8", "-cp", sandboxDir.toFile().absolutePath, className),
+                    workingDir = sandboxDir.toFile()
+                )
+            }
         }
 
-        val (className, normalizedSource) = normalizeJavaSource(code)
-        return runInTempSandbox { sandboxDir ->
-            val srcFile = sandboxDir.resolve("$className.java").toFile()
-            srcFile.writeText(normalizedSource, Charsets.UTF_8)
-            val compileRes = runProcess(
-                command = listOf(javacExe, "-encoding", "UTF-8", srcFile.absolutePath),
-                workingDir = sandboxDir.toFile()
+        // Embedded JDK compiler fallback so Java also runs inside standalone packaged distributions
+        return executeEmbeddedJava(className, normalizedSource)
+    }
+
+    private suspend fun executeEmbeddedJava(
+        className: String,
+        normalizedSource: String
+    ): AppResult<CodeExecutionOutput, CodeExecutionError> = runInTempSandbox { sandboxDir ->
+        val compiler = ToolProvider.getSystemJavaCompiler()
+            ?: return@runInTempSandbox runStaticSyntaxFallback(
+                "java",
+                normalizedSource,
+                "JDK derleyicisi bulunamadı; statik sözdizimi doğrulandı."
             )
-            if (compileRes !is AppResult.Success) return@runInTempSandbox compileRes
-            val compileOut = compileRes.data
-            if (compileOut is CodeExecutionOutput.Console && compileOut.hasRuntimeError) {
-                return@runInTempSandbox compileRes
+        val startedAt = clock.nowMillis()
+        val srcFile = sandboxDir.resolve("$className.java").toFile()
+        srcFile.writeText(normalizedSource, Charsets.UTF_8)
+        val compilerDiagnostics = StringWriter()
+        val fileManager = compiler.getStandardFileManager(null, null, Charsets.UTF_8)
+        val compiledOk = try {
+            val units = fileManager.getJavaFileObjectsFromFiles(listOf(srcFile))
+            val task = compiler.getTask(
+                compilerDiagnostics,
+                fileManager,
+                null,
+                listOf("-d", sandboxDir.toFile().absolutePath, "-encoding", "UTF-8"),
+                null,
+                units
+            )
+            task.call() == true
+        } finally {
+            fileManager.close()
+        }
+
+        if (!compiledOk) {
+            val diag = compilerDiagnostics.toString().trim().ifBlank { "Java derleme hatası" }
+            return@runInTempSandbox AppResult.Success(
+                CodeExecutionOutput.Console(
+                    lines = diag.lines().map { ConsoleLine(it, ConsoleLevel.ERROR) },
+                    hasRuntimeError = true,
+                    durationMs = (clock.nowMillis() - startedAt).coerceAtLeast(1L)
+                )
+            )
+        }
+
+        runEmbeddedCapturedJvm(startedAt) {
+            URLClassLoader(arrayOf(sandboxDir.toUri().toURL()), this::class.java.classLoader).use { loader ->
+                val cls = loader.loadClass(className)
+                val mainMethod = cls.getMethod("main", Array<String>::class.java)
+                mainMethod.invoke(null, emptyArray<String>())
             }
-            runProcess(
-                command = listOf(javaExe, "-Dfile.encoding=UTF-8", "-cp", sandboxDir.toFile().absolutePath, className),
-                workingDir = sandboxDir.toFile()
-            )
         }
     }
 
     private suspend fun executeKotlin(code: String): AppResult<CodeExecutionOutput, CodeExecutionError> {
         val kotlincExe = executableResolver(listOf("kotlinc"))
         val javaExe = executableResolver(listOf("java"))
-        if (kotlincExe == null || javaExe == null) {
-            return runStaticSyntaxFallback(
-                "kotlin",
-                code,
-                "kotlinc kurulu değil; statik sözdizimi kontrolü uygulandı."
-            )
-        }
-        val normalized = if (Regex("""\bfun\s+main\s*\(""").containsMatchIn(code)) {
-            code
-        } else {
-            "fun main() {\n$code\n}"
-        }
-        return runInTempSandbox { sandboxDir ->
-            val ktFile = sandboxDir.resolve("Main.kt").toFile()
-            val jarFile = sandboxDir.resolve("app.jar").toFile()
-            ktFile.writeText(normalized, Charsets.UTF_8)
-            val compileRes = runProcess(
-                command = listOf(kotlincExe, ktFile.absolutePath, "-include-runtime", "-d", jarFile.absolutePath),
-                workingDir = sandboxDir.toFile()
-            )
-            if (compileRes !is AppResult.Success) return@runInTempSandbox compileRes
-            val compileOut = compileRes.data
-            if (compileOut is CodeExecutionOutput.Console && compileOut.hasRuntimeError) {
-                return@runInTempSandbox compileRes
+        if (kotlincExe != null && javaExe != null) {
+            val normalized = if (Regex("""\bfun\s+main\s*\(""").containsMatchIn(code)) {
+                code
+            } else {
+                "fun main() {\n$code\n}"
             }
-            runProcess(
-                command = listOf(javaExe, "-Dfile.encoding=UTF-8", "-jar", jarFile.absolutePath),
-                workingDir = sandboxDir.toFile()
+            return runInTempSandbox { sandboxDir ->
+                val ktFile = sandboxDir.resolve("Main.kt").toFile()
+                val jarFile = sandboxDir.resolve("app.jar").toFile()
+                ktFile.writeText(normalized, Charsets.UTF_8)
+                val compileRes = runProcess(
+                    command = listOf(kotlincExe, ktFile.absolutePath, "-include-runtime", "-d", jarFile.absolutePath),
+                    workingDir = sandboxDir.toFile()
+                )
+                if (compileRes !is AppResult.Success) return@runInTempSandbox compileRes
+                val compileOut = compileRes.data
+                if (compileOut is CodeExecutionOutput.Console && compileOut.hasRuntimeError) {
+                    return@runInTempSandbox compileRes
+                }
+                runProcess(
+                    command = listOf(javaExe, "-Dfile.encoding=UTF-8", "-jar", jarFile.absolutePath),
+                    workingDir = sandboxDir.toFile()
+                )
+            }
+        }
+
+        return executeEmbeddedKotlin(code)
+    }
+
+    private suspend fun executeEmbeddedKotlin(code: String): AppResult<CodeExecutionOutput, CodeExecutionError> =
+        withContext(ioDispatcher) {
+            val startedAt = clock.nowMillis()
+            val engine = ScriptEngineManager(this::class.java.classLoader).getEngineByExtension("kts")
+                ?: return@withContext runStaticSyntaxFallback(
+                    "kotlin",
+                    code,
+                    "Kotlin çalıştırma motoru başlatılamadı; statik sözdizimi kontrolü uygulandı."
+                )
+
+            val scriptText = prepareKotlinScriptForEval(code)
+            runEmbeddedCapturedJvm(startedAt) {
+                val result = engine.eval(scriptText)
+                if (result != null && result !is Unit) {
+                    println(result)
+                }
+            }
+        }
+
+    private fun prepareKotlinScriptForEval(code: String): String {
+        val trimmed = code.trim()
+        val hasMainArgs = Regex("""\bfun\s+main\s*\(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:\s*Array\s*<\s*String\s*>""").containsMatchIn(trimmed)
+        val hasMainNoArgs = Regex("""\bfun\s+main\s*\(\s*\)""").containsMatchIn(trimmed)
+        return when {
+            hasMainArgs -> "$trimmed\nmain(emptyArray())"
+            hasMainNoArgs -> "$trimmed\nmain()"
+            else -> trimmed
+        }
+    }
+
+    private suspend fun runEmbeddedCapturedJvm(
+        startedAt: Long,
+        block: () -> Unit
+    ): AppResult<CodeExecutionOutput, CodeExecutionError> = embeddedJvmExecMutex.withLock {
+        val outBaos = CappedByteArrayOutputStream(maxOutputBytes)
+        val errBaos = CappedByteArrayOutputStream(maxOutputBytes)
+        val origOut = System.out
+        val origErr = System.err
+        var uncaught: Throwable? = null
+        val worker = Thread({
+            try {
+                block()
+            } catch (t: Throwable) {
+                uncaught = t
+            }
+        }, "purenote-embedded-exec").apply { isDaemon = true }
+
+        try {
+            System.setOut(PrintStream(outBaos, true, Charsets.UTF_8))
+            System.setErr(PrintStream(errBaos, true, Charsets.UTF_8))
+            worker.start()
+            val joined = runInterruptible(ioDispatcher) {
+                worker.join(processTimeoutMs)
+                !worker.isAlive
+            }
+            if (!joined) {
+                worker.interrupt()
+                return AppResult.Failure(CodeExecutionError.ExecutionTimeout)
+            }
+        } catch (e: CancellationException) {
+            worker.interrupt()
+            throw e
+        } finally {
+            runCatching { System.out.flush() }
+            runCatching { System.err.flush() }
+            System.setOut(origOut)
+            System.setErr(origErr)
+        }
+
+        val lines = mutableListOf<ConsoleLine>()
+        val outText = outBaos.toUtf8String().trimEnd()
+        val errText = errBaos.toUtf8String().trimEnd()
+        if (outText.isNotBlank()) {
+            outText.lines().forEach { lines += ConsoleLine(it, ConsoleLevel.OUTPUT) }
+        }
+        if (errText.isNotBlank()) {
+            errText.lines().forEach { lines += ConsoleLine(it, ConsoleLevel.ERROR) }
+        }
+        uncaught?.let { ex ->
+            val root = generateSequence(ex) { it.cause }.lastOrNull() ?: ex
+            val msg = root.message?.takeIf { it.isNotBlank() } ?: root::class.java.simpleName
+            lines += ConsoleLine("Çalıştırma hatası: $msg", ConsoleLevel.ERROR)
+        }
+        if (outBaos.truncated || errBaos.truncated) {
+            lines += ConsoleLine(
+                "[Çıktı bellek güvenliği için ${maxOutputBytes / 1024} KB sınırında kesildi]",
+                ConsoleLevel.WARN
             )
         }
+        if (lines.isEmpty()) {
+            lines += ConsoleLine("(Çıktı yok — çıkış kodu 0)", ConsoleLevel.INFO)
+        }
+        AppResult.Success(
+            CodeExecutionOutput.Console(
+                lines = lines,
+                hasRuntimeError = uncaught != null || errText.isNotBlank(),
+                durationMs = (clock.nowMillis() - startedAt).coerceAtLeast(1L)
+            )
+        )
     }
 
     private suspend fun executeCpp(code: String, isCpp: Boolean): AppResult<CodeExecutionOutput, CodeExecutionError> {
@@ -306,7 +464,7 @@ internal class DesktopCodeRunnerImpl(
         } ?: return runStaticSyntaxFallback(
             if (isCpp) "cpp" else "c",
             code,
-            "Derleyici (g++/clang++) bulunamadı; statik sözdizimi kontrolü uygulandı."
+            "Derleyici (g++/clang++) sistemde bulunamadı (MSYS2 / MinGW / LLVM kuruluysa otomatik çalışır); statik sözdizimi kontrolü uygulandı."
         )
 
         val ext = if (isCpp) "cpp" else "c"
@@ -577,7 +735,67 @@ internal class DesktopCodeRunnerImpl(
 
         fun findExecutableOnSystem(candidates: List<String>): String? {
             val isWindows = System.getProperty("os.name").orEmpty().lowercase().contains("win")
+            val wantsBash = candidates.any { it.equals("bash", ignoreCase = true) || it.equals("sh", ignoreCase = true) }
+            val wantsPython = candidates.any { it.startsWith("python", ignoreCase = true) }
+            val wantsNode = candidates.any { it.startsWith("node", ignoreCase = true) }
+            val wantsJvmTool = candidates.any { it.equals("javac", true) || it.equals("java", true) || it.equals("kotlinc", true) }
+            val wantsCppTool = candidates.any { it in setOf("g++", "clang++", "gcc", "clang") }
+
             val dirs = buildList {
+                if (isWindows) {
+                    val programFiles = System.getenv("ProgramFiles") ?: "C:\\Program Files"
+                    val programFilesX86 = System.getenv("ProgramFiles(x86)") ?: "C:\\Program Files (x86)"
+                    val localAppData = System.getenv("LOCALAPPDATA")
+                    val userHome = System.getProperty("user.home")
+
+                    if (wantsBash) {
+                        add(File(programFiles, "Git\\bin"))
+                        add(File(programFiles, "Git\\usr\\bin"))
+                        add(File(programFilesX86, "Git\\bin"))
+                        if (!localAppData.isNullOrBlank()) {
+                            add(File(localAppData, "Programs\\Git\\bin"))
+                        }
+                        add(File("C:\\msys64\\usr\\bin"))
+                    }
+                    if (wantsNode) {
+                        add(File(programFiles, "nodejs"))
+                        add(File(programFilesX86, "nodejs"))
+                    }
+                    if (wantsPython && !localAppData.isNullOrBlank()) {
+                        File(localAppData, "Programs\\Python")
+                            .takeIf { it.isDirectory }
+                            ?.listFiles()
+                            ?.filter { it.isDirectory }
+                            ?.sortedByDescending { it.name }
+                            ?.forEach { add(it) }
+                    }
+                    if (wantsJvmTool) {
+                        add(File(programFiles, "Android\\Android Studio\\plugins\\Kotlin\\kotlinc\\bin"))
+                        add(File(programFiles, "Android\\Android Studio\\jbr\\bin"))
+                        if (!userHome.isNullOrBlank()) {
+                            File(userHome, ".jdks").takeIf { it.isDirectory }?.listFiles()
+                                ?.filter { it.isDirectory }
+                                ?.sortedByDescending { it.name }
+                                ?.forEach { add(File(it, "bin")) }
+                        }
+                        listOf("Java", "Eclipse Adoptium", "Microsoft", "Zulu", "Amazon Corretto").forEach { vendor ->
+                            File(programFiles, vendor).takeIf { it.isDirectory }?.listFiles()
+                                ?.filter { it.isDirectory }
+                                ?.sortedByDescending { it.name }
+                                ?.forEach { add(File(it, "bin")) }
+                        }
+                    }
+                    if (wantsCppTool) {
+                        add(File("C:\\msys64\\ucrt64\\bin"))
+                        add(File("C:\\msys64\\mingw64\\bin"))
+                        add(File("C:\\msys64\\clang64\\bin"))
+                        add(File("C:\\mingw64\\bin"))
+                        add(File("C:\\TDM-GCC-64\\bin"))
+                        add(File(programFiles, "LLVM\\bin"))
+                        add(File(programFilesX86, "LLVM\\bin"))
+                    }
+                }
+
                 System.getProperty("java.home")?.takeIf { it.isNotBlank() }?.let { add(File(it, "bin")) }
                 System.getenv("JAVA_HOME")?.takeIf { it.isNotBlank() }?.let { add(File(it, "bin")) }
                 val rawPath = System.getenv("PATH") ?: System.getenv("Path") ?: ""
@@ -592,11 +810,16 @@ internal class DesktopCodeRunnerImpl(
                 for (name in candidates) {
                     for (ext in extensions) {
                         val file = File(dir, "$name$ext")
-                        if (file.isFile && (isWindows || file.canExecute())) {
-                            // Guard against WindowsApps zero-byte python store alias when real python exists elsewhere
-                            if (isWindows && file.absolutePath.contains("WindowsApps", ignoreCase = true) && file.length() == 0L) {
-                                continue
-                            }
+                        if (!file.isFile) continue
+                        val absLower = file.absolutePath.lowercase()
+                        if (isWindows && wantsBash && (absLower.contains("\\system32\\bash.exe") || absLower.contains("\\windowsapps\\bash.exe"))) {
+                            // Avoid broken Windows WSL stub when scanning bash interpreters
+                            continue
+                        }
+                        if (isWindows && absLower.contains("windowsapps") && file.length() == 0L) {
+                            continue
+                        }
+                        if (isWindows || file.canExecute()) {
                             return file.absolutePath
                         }
                     }
@@ -605,4 +828,30 @@ internal class DesktopCodeRunnerImpl(
             return null
         }
     }
+}
+
+private class CappedByteArrayOutputStream(private val maxBytes: Int) : ByteArrayOutputStream() {
+    var truncated: Boolean = false
+        private set
+
+    override fun write(b: Int) {
+        if (count < maxBytes) {
+            super.write(b)
+        } else {
+            truncated = true
+        }
+    }
+
+    override fun write(b: ByteArray, off: Int, len: Int) {
+        val remaining = maxBytes - count
+        if (remaining > 0) {
+            val toWrite = minOf(len, remaining)
+            super.write(b, off, toWrite)
+            if (len > remaining) truncated = true
+        } else {
+            truncated = true
+        }
+    }
+
+    fun toUtf8String(): String = String(toByteArray(), Charsets.UTF_8)
 }

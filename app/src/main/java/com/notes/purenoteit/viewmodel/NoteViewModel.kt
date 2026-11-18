@@ -10,6 +10,7 @@ import com.notes.purenoteit.data.db.NoteLinkData
 import com.notes.purenoteit.data.db.StreamItemData
 import com.notes.purenoteit.data.mapper.toDomain
 import com.notes.purenoteit.data.mapper.toEntity
+import com.notes.purenoteit.data.sync.CloudSyncTriggerBus
 import com.notes.purenoteit.di.IoDispatcher
 import com.notes.purenoteit.domain.model.AppResult
 import com.notes.purenoteit.domain.model.Note
@@ -61,8 +62,20 @@ class NoteViewModel @Inject constructor(
     private val clock: AppClock,
     val mediaPathResolver: MediaPathResolver,
     @ApplicationContext private val context: Context,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val cloudSyncTriggerBus: CloudSyncTriggerBus = CloudSyncTriggerBus()
 ) : ViewModel() {
+
+    init {
+        viewModelScope.launch {
+            cloudSyncTriggerBus.remoteAppliedEvents.collect {
+                getAllNotes()
+                getAllLinks()
+                loadStreamItems()
+                notifyWidgetSync()
+            }
+        }
+    }
 
     private val _noteListFlow = MutableStateFlow<List<NoteData>>(emptyList())
     val noteListFlow: StateFlow<List<NoteData>> = _noteListFlow.asStateFlow()
@@ -382,7 +395,7 @@ class NoteViewModel @Inject constructor(
 
                 if (noteModified) {
                     val serialized = BlockParser.serialize(parsedBlocks)
-                    val finalDesc = if (wasEncrypted) SecurityUtil.encrypt(serialized) else serialized
+                    val finalDesc = if (wasEncrypted) SecurityUtil.encryptForVault(context, serialized) else serialized
                     suspendSafeOrNull { repository.updateNote(candidate.copy(description = finalDesc)) }
                 }
             }
@@ -491,7 +504,7 @@ class NoteViewModel @Inject constructor(
 
                 if (noteModified) {
                     val serialized = BlockParser.serialize(parsedBlocks)
-                    val finalDesc = if (wasEncrypted) SecurityUtil.encrypt(serialized) else serialized
+                    val finalDesc = if (wasEncrypted) SecurityUtil.encryptForVault(context, serialized) else serialized
                     suspendSafeOrNull { repository.updateNote(candidate.copy(description = finalDesc)) }
                 }
             }
@@ -578,7 +591,7 @@ class NoteViewModel @Inject constructor(
 
                 if (parentModified) {
                     val serialized = BlockParser.serialize(parsedBlocks)
-                    val finalDesc = if (wasEncrypted) SecurityUtil.encrypt(serialized) else serialized
+                    val finalDesc = if (wasEncrypted) SecurityUtil.encryptForVault(context, serialized) else serialized
                     suspendSafeOrNull { repository.updateNote(parentNote.copy(description = finalDesc)) }
                 }
 
@@ -719,6 +732,7 @@ class NoteViewModel @Inject constructor(
                     val richJson = note.richBlocksJson ?: previousNote?.richBlocksJson
                     val trashedDomain = note.toDomain().copy(
                         status = "TRASH",
+                        deletedAt = clock.nowMillis(),
                         richBlocksJson = richJson
                     )
                     repository.updateNote(trashedDomain)
@@ -753,7 +767,7 @@ class NoteViewModel @Inject constructor(
                         if (note.isEncrypted || SecurityUtil.isEncryptedPayload(currentDesc)) {
                             currentDesc
                         } else {
-                            SecurityUtil.encrypt(currentDesc)
+                            SecurityUtil.encryptForVault(context, currentDesc)
                         }
                     } else {
                         if (note.isEncrypted || SecurityUtil.isEncryptedPayload(currentDesc)) {
@@ -796,6 +810,73 @@ class NoteViewModel @Inject constructor(
                 withContext(Dispatchers.Main) {
                     getAllNotes()
                     notifyWidgetSync()
+                    triggerAutoSync()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun emptyTrash(trashedNotes: List<NoteData>) {
+        if (trashedNotes.isEmpty()) return
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                for (note in trashedNotes) {
+                    purgeDeletedNoteReferences(note.id, note.title)
+                    if (note.id > 0) {
+                        deleteNoteUseCase(note.id)
+                    } else {
+                        repository.deleteNote(note.toDomain())
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    getAllNotes()
+                    getAllLinks()
+                    notifyWidgetSync()
+                    triggerAutoSync()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /**
+     * Re-encrypts unlocked legacy `ENC_V2:` (AndroidKeyStore-only) notes into portable
+     * `ENC_P3_PWD:` envelopes so synchronized desktop/other devices can decrypt them cleanly with PIN.
+     */
+    fun migrateUnlockedLegacyEncryptedNotes() {
+        if (!SecurityUtil.isVaultUnlocked) return
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                val all = repository.getAllNotes()
+                var changed = false
+                for (note in all) {
+                    val desc = note.description ?: continue
+                    if (!desc.startsWith("ENC_V2:")) continue
+                    val dec = SecurityUtil.decryptSafe(desc)
+                    if (dec is AppResult.Success) {
+                        val portable = SecurityUtil.encryptForVault(context, dec.data)
+                        if (portable != desc && portable.startsWith("ENC_P3_PWD:")) {
+                            repository.updateNote(
+                                note.copy(
+                                    description = portable,
+                                    isEncrypted = true,
+                                    isPassword = true
+                                )
+                            )
+                            changed = true
+                        }
+                    }
+                }
+                if (changed) {
+                    withContext(Dispatchers.Main) {
+                        getAllNotes()
+                        triggerAutoSync()
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -977,6 +1058,7 @@ class NoteViewModel @Inject constructor(
                 knowledgeRepository.insertStreamItem(item)
                 withContext(Dispatchers.Main) {
                     loadStreamItems()
+                    triggerAutoSync()
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -991,6 +1073,7 @@ class NoteViewModel @Inject constructor(
                 knowledgeRepository.deleteStreamItemById(id)
                 withContext(Dispatchers.Main) {
                     loadStreamItems()
+                    triggerAutoSync()
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -1033,6 +1116,7 @@ class NoteViewModel @Inject constructor(
                     getAllNotes()
                     notifyWidgetSync()
                     loadStreamItems()
+                    triggerAutoSync()
                     onSuccess(savedEntity)
                 }
             } catch (e: CancellationException) {
@@ -1075,6 +1159,7 @@ class NoteViewModel @Inject constructor(
     }
 
     fun triggerAutoSync() {
+        cloudSyncTriggerBus.requestImmediateSync()
         if (VaultBackupManager.isAutoSyncEnabled(context)) {
             VaultBackupManager.scheduleDebouncedAutoSync(
                 context = context,

@@ -28,5 +28,19 @@ interface SecureTokenStorage {
 
     suspend fun getSyncPassphrase(): AppResult<CharArray?, DataError.Security>
 
+    suspend fun saveVaultSecurityJson(json: String): AppResult<Unit, DataError.Security> =
+        AppResult.Success(Unit)
+
+    suspend fun getVaultSecurityJson(): AppResult<String?, DataError.Security> =
+        AppResult.Success(null)
+
+    suspend fun saveLocalVaultContentKey(keyChars: CharArray): AppResult<Unit, DataError.Security> {
+        keyChars.fill('\u0000')
+        return AppResult.Success(Unit)
+    }
+
+    suspend fun getLocalVaultContentKey(): AppResult<CharArray?, DataError.Security> =
+        AppResult.Success(null)
+
     suspend fun clearAll(): AppResult<Unit, DataError.Security>
 }

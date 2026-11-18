@@ -6,6 +6,13 @@ import com.notes.purenoteit.sync.model.EncryptedDeltaEnvelope
 import com.notes.purenoteit.sync.model.RemoteSyncPullPage
 import com.notes.purenoteit.sync.model.RemoteSyncPushAck
 
+data class RemoteMediaUsageSummary(
+    val mediaFileCount: Int = 0,
+    val totalMediaBytes: Long = 0L,
+    val deltaFileCount: Int = 0,
+    val totalDeltaBytes: Long = 0L
+)
+
 /**
  * Server-agnostic remote synchronization data source abstraction.
  * Allows swapping Google Drive (`appDataFolder`) with a custom backend or LAN WebSocket
@@ -25,4 +32,13 @@ interface RemoteSyncDataSource {
 
     suspend fun getOrCreateAppDataConfigFile(fileName: String, content: String): AppResult<String, DataError.Network> =
         AppResult.Success(content)
+
+    suspend fun upsertAppDataConfigFile(fileName: String, content: String): AppResult<Unit, DataError.Network> =
+        AppResult.Success(Unit)
+
+    suspend fun getAppDataUsageSummary(): AppResult<RemoteMediaUsageSummary, DataError.Network> =
+        AppResult.Success(RemoteMediaUsageSummary())
+
+    suspend fun pruneOrphanMediaBlobs(activeCanonicalMediaKeys: Set<String>): AppResult<Int, DataError.Network> =
+        AppResult.Success(0)
 }

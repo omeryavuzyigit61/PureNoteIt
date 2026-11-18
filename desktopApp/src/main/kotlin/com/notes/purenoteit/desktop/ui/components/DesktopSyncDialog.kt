@@ -2,6 +2,8 @@ package com.notes.purenoteit.desktop.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +37,7 @@ import com.notes.purenoteit.desktop.ui.DesktopColors
 import com.notes.purenoteit.desktop.ui.contract.DesktopUiState
 import com.notes.purenoteit.desktop.ui.contract.SyncTransportMode
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DesktopSyncDialog(
     state: DesktopUiState,
@@ -42,6 +45,8 @@ fun DesktopSyncDialog(
     onConnectDrive: () -> Unit,
     onDisconnectDrive: () -> Unit,
     onTriggerSync: () -> Unit,
+    onForcePushAll: () -> Unit = {},
+    onCleanOrphanMedia: () -> Unit = {},
     onStartLanServer: (CharArray) -> Unit,
     onStopLanServer: () -> Unit,
     onConnectAndSyncLan: (remoteUrl: String, pairPinChars: CharArray, e2eePassChars: CharArray) -> Unit,
@@ -115,6 +120,71 @@ fun DesktopSyncDialog(
                                 }
                             }
                         }
+
+                        if (state.isDriveConnected) {
+                            Spacer(Modifier.height(14.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.padding(12.dp)
+                                ) {
+                                    val usage = state.driveMediaUsage
+                                    val totalBytes = (usage?.totalMediaBytes ?: 0L) + (usage?.totalDeltaBytes ?: 0L)
+                                    val sizeLabel = when {
+                                        usage == null -> "Hesaplanıyor..."
+                                        totalBytes < 1024L * 1024L -> "${(totalBytes / 1024.0).let { "%.1f".format(it) }} KB (${usage.mediaFileCount} medya)"
+                                        else -> "${(totalBytes / (1024.0 * 1024.0)).let { "%.2f".format(it) }} MB (${usage.mediaFileCount} medya)"
+                                    }
+                                    Text(
+                                        text = "Drive Depolama: $sizeLabel",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Not fotoğrafları gönderilmeden önce otomatik küçültülüp optimize edilir. Drive alanınız kısıtlıysa çöp kutusundan silinmiş notların eski medyalarını temizleyebilir veya Aynı Ağ Wi-Fi sekmesini sıfır kota ile kullanabilirsiniz.",
+                                        fontSize = 11.5.sp,
+                                        lineHeight = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        enabled = !state.isSyncing && !state.isCleaningCloudMedia,
+                                        onClick = onForcePushAll
+                                    ) {
+                                        Text(
+                                            text = "Tüm Notları Buluta Yeniden Gönder",
+                                            fontSize = 11.5.sp,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+                                    OutlinedButton(
+                                        enabled = !state.isSyncing && !state.isCleaningCloudMedia,
+                                        onClick = onCleanOrphanMedia
+                                    ) {
+                                        if (state.isCleaningCloudMedia) {
+                                            CircularProgressIndicator(modifier = Modifier.height(14.dp).width(14.dp), strokeWidth = 2.dp)
+                                            Spacer(Modifier.width(6.dp))
+                                        }
+                                        Text(
+                                            text = if (state.isCleaningCloudMedia) "Temizleniyor..." else "Gereksiz Medyaları Temizle",
+                                            fontSize = 11.5.sp,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+                                }
+                                }
+                            }
+                        }
                     }
 
                     SyncTransportMode.LAN_WIFI -> {
@@ -128,7 +198,7 @@ fun DesktopSyncDialog(
                         OutlinedTextField(
                             value = lanPinInput,
                             onValueChange = { lanPinInput = it },
-                            label = { Text("Wi-Fi Eşleşme Kodu (en az 4 karakter)") },
+                            label = { Text("Wi-Fi Eşleşme Kodu (en az 8 karakter)") },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
@@ -162,7 +232,7 @@ fun DesktopSyncDialog(
                         OutlinedTextField(
                             value = lanRemoteUrlInput,
                             onValueChange = { lanRemoteUrlInput = it },
-                            label = { Text("Karşı Cihaz URL (ör. http://192.168.1.45:8765)") },
+                            label = { Text("Karşı cihaz adresi (sunucuda gösterilen https://…#… adresini aynen yapıştırın)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )

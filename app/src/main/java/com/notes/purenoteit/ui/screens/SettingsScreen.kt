@@ -32,6 +32,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -87,6 +88,21 @@ fun SettingsScreen(
 
     var selectedRetentionDays by remember {
         mutableIntStateOf(prefs.get(Constants.KEY_TRASH_RETENTION_DAYS, Constants.DEFAULT_TRASH_RETENTION_DAYS))
+    }
+    LaunchedEffect(Unit) {
+        selectedRetentionDays = prefs.get(Constants.KEY_TRASH_RETENTION_DAYS, Constants.DEFAULT_TRASH_RETENTION_DAYS)
+    }
+    DisposableEffect(context) {
+        val sp = context.getSharedPreferences(Constants.SHARED_PREFENCES_KEY, android.content.Context.MODE_PRIVATE)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == Constants.KEY_TRASH_RETENTION_DAYS) {
+                selectedRetentionDays = prefs.get(Constants.KEY_TRASH_RETENTION_DAYS, Constants.DEFAULT_TRASH_RETENTION_DAYS)
+            }
+        }
+        sp.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            sp.unregisterOnSharedPreferenceChangeListener(listener)
+        }
     }
     var showLanguageSheet by remember { mutableStateOf(false) }
 
@@ -552,6 +568,11 @@ fun SettingsScreen(
                                     .clickable {
                                         selectedRetentionDays = days
                                         prefs.addLocal(Constants.KEY_TRASH_RETENTION_DAYS, days)
+                                        context.getSharedPreferences(Constants.SHARED_PREFENCES_KEY, android.content.Context.MODE_PRIVATE)
+                                            .edit()
+                                            .putLong(Constants.KEY_VAULT_SETTINGS_UPDATED_AT, System.currentTimeMillis())
+                                            .apply()
+                                        cloudSyncViewModel?.triggerAutoSyncIfConnected(silent = true)
                                         context.showToastShort(
                                             context.getString(R.string.settings_trash_retention_applied, label)
                                         )

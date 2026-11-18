@@ -107,11 +107,10 @@ internal class CategoryRepositoryImpl @Inject constructor(
             categoryDao.getCategoryByIdIncludingDeletedSuspend(category.id)?.takeIf { it.id > 0 }
         } else null
 
-        val resolvedUuid = category.syncUuid.ifBlank {
-            existing?.syncUuid?.ifBlank { null }
-                ?: defaultCategorySyncUuid(category.id, category.name)
-                ?: UUID.randomUUID().toString()
-        }
+        val resolvedUuid = existing?.syncUuid?.takeIf { it.isNotBlank() }
+            ?: category.syncUuid.takeIf { it.isNotBlank() }
+            ?: defaultCategorySyncUuid(category.id, category.name)
+            ?: UUID.randomUUID().toString()
         val resolvedVersion = if (existing != null) {
             maxOf(category.syncVersion, existing.syncVersion) + 1L
         } else {

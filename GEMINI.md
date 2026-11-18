@@ -129,7 +129,7 @@ Kod istendiğinde:
 Kod dışı sorularda kısa ve doğrudan cevap ver; bu format zorunlu değil.
 
 ## PROJE BAĞLAMI (PURENOTEIT - ANDROID & DESKTOP HİBRİT MİMARİ)
-- **Sürümler & Mevcut Durum:** `gradle/libs.versions.toml` (AGP `9.5.1` · Kotlin `2.4.21` · KSP `2.3.13` · Compose BOM `2026.09.00` · Hilt `2.60.1` · Room `2.8.5` · SQLCipher `4.20.0` · Navigation Compose `2.10.2` · Lifecycle `2.11.0` · Coroutines `1.11.0` · `kotlinx.serialization` `1.12.0` · `minSdk 24` / `compileSdk 37` / `targetSdk 37` · JVM 17 · v1.1.2 `versionCode = 16`).
+- **Sürümler & Mevcut Durum:** `gradle/libs.versions.toml` (AGP `9.5.1` · Kotlin `2.4.21` · KSP `2.3.13` · Compose BOM `2026.09.00` · Hilt `2.60.1` · Room `2.8.5` · SQLCipher `4.20.0` · Navigation Compose `2.10.2` · Lifecycle `2.11.0` · Coroutines `1.11.0` · `kotlinx.serialization` `1.12.0` · `minSdk 24` / `compileSdk 37` / `targetSdk 37` · JVM 17 · v1.2.4 `versionCode = 21` (`gradle.properties` içindeki `purenote.versionName` / `purenote.versionCode` tek kaynaktır)).
 - **Mimari (Hedef Monorepo):** Çok Modüllü Monorepo (`:app` [Mevcut Android], `:shared` [Android + Desktop JVM Ortak Çekirdek], `:desktopApp` [Compose Multiplatform Desktop PC]). Geçiş tamamlanana dek `:app` içi paket bazlı Clean Architecture + `ArchitectureRulesTest` korunur.
 - **Ortak Hedef:** Yalnızca JVM (Android + Desktop). iOS/Native hedefi **YOKTUR**; `:shared` içinde saf `java.security.*`, `javax.crypto.*`, `java.util.UUID` kullanımı serbesttir.
 - **DI Stratejisi:** `:app` modülünde mevcut **Dagger-Hilt** (`@Binds` / `@Provides`) korunur; `:shared` sınıfları Hilt `@Provides` / `@Binds` ile Android'e, Koin veya Constructor Injection ile `:desktopApp`'e bağlanır.

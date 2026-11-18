@@ -6,8 +6,8 @@
   ### *Düşüncelerinizin En Saf Hali • The Purest Form of Your Thoughts*
 
   <p align="center">
-    <b>Modern, Blok Tabanlı, Çevrimdışı ve Güvenlik Odaklı Android Kişisel Bilgi İşletim Sistemi (Knowledge OS)</b><br />
-    <i>A modern, block-based, offline-first & Bitwarden-grade secure Android personal knowledge system.</i>
+    <b>Modern, Blok Tabanlı, Çevrimdışı ve Güvenlik Odaklı Android + Windows Kişisel Bilgi İşletim Sistemi (Knowledge OS)</b><br />
+    <i>A modern, block-based, offline-first and security-focused personal knowledge system for Android and Windows.</i>
   </p>
 
   <p align="center">
@@ -21,14 +21,14 @@
   </p>
 
   <p align="center">
-    <img src="https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026%2B)-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Platform" />
+    <img src="https://img.shields.io/badge/Platform-Android%207.0%2B%20(API%2024%2B)%20%7C%20Windows-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Platform" />
     <img src="https://img.shields.io/badge/Language-Kotlin%202.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin" />
     <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose" />
     <img src="https://img.shields.io/badge/Database-Room%20%2B%20SQLCipher%20AES--256-FF8F00?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room + SQLCipher AES-256" />
     <img src="https://img.shields.io/badge/DI-Dagger%20Hilt-00C853?style=for-the-badge&logo=dagger&logoColor=white" alt="Hilt" />
-    <img src="https://img.shields.io/badge/Security-AES--256%20Vault-175DDC?style=for-the-badge&logo=bitwarden&logoColor=white" alt="Security" />
+    <img src="https://img.shields.io/badge/Security-AES--256%20Vault-175DDC?style=for-the-badge" alt="Security" />
     <img src="https://img.shields.io/badge/Optimization-R8%20DEX%20Obfuscated-blueviolet?style=for-the-badge&logo=googleplay&logoColor=white" alt="R8 Obfuscation" />
-    <img src="https://img.shields.io/badge/Version-1.1.2-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-1.2.4-orange?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
   </p>
 
@@ -38,7 +38,7 @@
 
 ## 📖 Genel Bakış / Overview
 
-**PureNoteIt**, Notion'ın dinamik blok modülerliğini, Obsidian'ın çift yönlü bağlantı ve bilgi grafiğini (`[[Bağlantı]]`), Bitwarden'ın askeri standarttaki **AES-256-GCM** yerel şifrelemesini tek bir yerel (native) Android uygulamasında birleştiren yeni nesil bir not alma ve düşünce mimarisidir.
+**PureNoteIt**, Notion'ın dinamik blok modülerliğini, Obsidian'ın çift yönlü bağlantı ve bilgi grafiğini (`[[Bağlantı]]`), **AES-256-GCM** yerel şifrelemesini tek bir yerel (native) Android uygulamasında birleştiren yeni nesil bir not alma ve düşünce mimarisidir.
 
 Buluta bağımlı olmayan **%100 Çevrimdışı (Offline-First)** mimarisi sayesinde verileriniz yalnızca sizin cihazınızda yaşar. Hiçbir sunucuya veri aktarılmaz, hiçbir kullanıcı takip edilmez, reklam içermez.
 
@@ -101,7 +101,7 @@ Buluta bağımlı olmayan **%100 Çevrimdışı (Offline-First)** mimarisi sayes
 - **Kapsamlı İçerik Taraması:** Başlığı hatırlanmayan notlar dahi içerisindeki tüm bloklardan (paragraf, tablo hücreleri, toggle gövdesi, kod blokları) taranarak milisaniyeler içinde bulunur.
 - **Pasaj & Kelime Vurgulama:** Arama terimi not başlığında ve not kartının üzerinde dikkat çekici sarı/turuncu rozetle (`🔍 İçerikte bulundu: ...[kelime]...`) canlı olarak vurgulanır.
 
-### 🔐 3. Bitwarden Seviyesinde Güvenlik & Kasa
+### 🔐 3. Güvenlik & Kasa
 - **Donanım Destekli AES-256-GCM Şifreleme:** Kilitli notlar cihazınızın yerel Keystore'u ile şifrelenir.
 - **Biyometrik Kilit & PIN Doğrulama:** Parmak izi veya yüz tanıma ile anında güvenli erişim.
 - **Arka Plana Geçince Otomatik Kilit (Vault Timeout):** Uygulamadan çıkıldığında veya başka bir uygulamaya geçildiğinde güvenlik oturumu sıfırlanır.
@@ -159,7 +159,7 @@ Buluta bağımlı olmayan **%100 Çevrimdışı (Offline-First)** mimarisi sayes
 
 ### 🛡️ 14. Google Play Uyumlu R8 DEX Optimizasyonu & Kod Karartma
 - R8 Code Shrinking ve Obfuscation (Kod Karartma) ile %35 daha hafif bundle (~13.7 MB).
-- Tersine mühendisliğe karşı askeri seviyede güvenlik; Room, Hilt, Coroutines ve Biometrics için özel ProGuard tutma kuralları.
+- Tersine mühendisliği zorlaştıran kod karartma; Room, Hilt, Coroutines ve Biometrics için özel ProGuard tutma kuralları.
 
 ### 🎨 15. OLED Koyu Tema & WCAG AAA Kontrast Standardı
 - Koyu temada göz yormayan, dinamik algılamalı yüksek kontrastlı butonlar (Derin mor + parlak lila metin).
@@ -217,9 +217,9 @@ flowchart TD
 ## 🚀 Projeyi Derleme & Çalıştırma / Building from Source
 
 ### Gereksinimler
-- **Android Studio:** Ladybug (2024.2+) veya daha yenisi
+- **Android Studio:** Ladybug (2024.2+) veya daha yenisi (güncel AGP 9.5.1 için güncel kararlı sürümü kullanın)
 - **JDK:** Java 17 veya Java 21
-- **Android SDK:** Compile SDK 35, Min SDK 26 (Android 8.0 Oreo ve üzeri)
+- **Android SDK:** Compile SDK 37, Min SDK 24 (Android 7.0 ve üzeri)
 
 ### Adım Adım Kurulum
 
@@ -245,7 +245,12 @@ flowchart TD
 
 ## 📋 Sürüm Notları / Changelog
 
-### v1.1.2 (En Son Sürüm / Latest)
+### v1.2.x (En Son Sürüm / Latest)
+- 🖥️ **Windows Masaüstü Uygulaması (Compose Desktop):** Android ile ortak `:shared` çekirdeği üzerinde çalışan masaüstü istemcisi; SQLCipher ile şifreli yerel veritabanı, OS anahtar deposu (Windows Credential Manager) ve şifreli medya depolama.
+- ☁️ **İsteğe Bağlı Google Drive Eşitleme:** Yalnızca `drive.appdata` kapsamı ve uçtan uca şifreli (E2EE) eşitleme; silmeler `deletedAt` (tombstone) ile yönetilir.
+- 🛡️ **Güvenlik sertleştirmesi:** Masaüstünde kod çalıştırmadan önce açık onay (kod değişirse yeniden onay), Wi-Fi eşleştirme kodu için en az 8 karakter ve deneme sınırı, kullanılmayan `FOREGROUND_SERVICE` izninin kaldırılması.
+
+### v1.1.2
 - 🪟 **Gelişmiş Saydam Cam Tasarımı (Frosted Glassmorphism):** Ana ekran kategori çubuğu, editör özellikler çubuğu ve alt araç çubuğu göze batmayan, matlaşmayan, gerçek yarı saydam cam zeminine kavuşturuldu.
 - ✨ **Çoklu Seçim & Dokunsal Yaylanma (Wiggle) Animasyonu:** Nota uzun basarak (`long-press`) toplu seçme modu onarıldı, kart seçildiğinde yaylanarak titreme animasyonu güçlendirildi ve koyu temadaki kontrast/renk uyumsuzlukları giderildi.
 - 📱 **Akıcı 3D Kapı Efekti & Otomatik Sekme Kaydırma:** Kategori sekmelerindeki kapı efekti sayfa kaydırma konumuna sürekli bağlanarak titreme ve basıklık sorunları yok edildi; seçili sekmeye ulaşıldığında menünün otomatik kayması sağlandı.
@@ -292,7 +297,13 @@ flowchart TD
 
 ## 🔒 Güvenlik & Gizlilik Politikası / Security & Privacy
 
-PureNoteIt, kullanıcı gizliliğini temel insan hakkı olarak kabul eder. Uygulama hiçbir kişisel verinizi toplamaz, satmaz veya harici sunuculara iletmez.
+PureNoteIt, kullanıcı gizliliğini temel insan hakkı olarak kabul eder. Uygulama hiçbir kişisel verinizi toplamaz, satmaz veya geliştirici sunucularına iletmez. İsteğe bağlı Google Drive eşitlemesi açılırsa veriler yalnızca sizin Drive hesabınızın gizli uygulama alanına ve şifreli olarak yazılır.
+
+**Şifreleme kapsamı (şeffaflık notu):**
+- Not veritabanı SQLCipher (AES-256) ile diskte şifrelidir; anahtar Android Keystore / OS anahtar deposunda korunur. Bu, cihaz kaybı veya dosya kopyalama senaryolarına karşı koruma sağlar; cihaz kilidi açıkken uygulamayı kullanan birine karşı değildir.
+- Kilitli notlar ek olarak PIN/biyometri ile korunur.
+- Fotoğraf, ses ve çizim dosyaları her iki platformda da diskte AES-256-GCM ile şifrelenir (Android'de Keystore ile sarılmış anahtar). Görüntüleme/oynatma için geçici çözülmüş kopyalar uygulamanın özel önbelleğinde tutulur ve uygulama her açıldığında silinir.
+- Bu proje bağımsız bir güvenlik denetiminden geçmemiştir.
 
 Detaylı ve Google Play uyumlu Gizlilik Politikası belgemiz için:
 👉 **[PRIVACY_POLICY.md](PRIVACY_POLICY.md)** dosyasını inceleyebilirsiniz.

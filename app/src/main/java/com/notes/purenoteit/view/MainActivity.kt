@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
     private val cloudSyncViewModel: CloudSyncViewModel by viewModels()
 
     private var activeIntent by mutableStateOf<Intent?>(null)
+    private var foregroundSyncJob: kotlinx.coroutines.Job? = null
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LanguageManager.wrapContext(newBase))
@@ -386,6 +387,9 @@ class MainActivity : AppCompatActivity() {
 
                                     composable<AppRoute.PasswordSettings> {
                                         PasswordSettingScreen(
+                                            onPasswordSaved = {
+                                                cloudSyncViewModel.triggerAutoSyncIfConnected(silent = true)
+                                            },
                                             onNavigateBack = {
                                                 if (navController.previousBackStackEntry != null) {
                                                     navController.popBackStack()
@@ -402,6 +406,24 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        cloudSyncViewModel.triggerAutoSyncIfConnected(silent = true)
+        foregroundSyncJob?.cancel()
+        foregroundSyncJob = lifecycleScope.launch {
+            while (true) {
+                delay(25_000L)
+                cloudSyncViewModel.triggerAutoSyncIfConnected(silent = true)
+            }
+        }
+    }
+
+    override fun onPause() {
+        foregroundSyncJob?.cancel()
+        foregroundSyncJob = null
+        super.onPause()
     }
 
     override fun onStop() {

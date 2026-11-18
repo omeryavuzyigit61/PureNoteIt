@@ -404,10 +404,10 @@ fun HomeScreen(
 
     // Segregate active notes and trashed notes (Feature 2)
     val activeNotes = remember(noteList) {
-        noteList.filter { it.status != "TRASH" }
+        noteList.filter { it.status != "TRASH" && it.status != "DELETED" && it.deletedAt == null }
     }
     val trashedNotes = remember(noteList) {
-        noteList.filter { it.status == "TRASH" }
+        noteList.filter { (it.status == "TRASH" || it.deletedAt != null) && it.status != "DELETED" }
     }
 
     // Dynamic Trash Retention Auto-Purge (Configurable in Settings)
@@ -416,7 +416,10 @@ fun HomeScreen(
         val retentionDays = prefs.get(Constants.KEY_TRASH_RETENTION_DAYS, Constants.DEFAULT_TRASH_RETENTION_DAYS)
         if (retentionDays > 0) {
             val threshold = System.currentTimeMillis() - (retentionDays.toLong() * 24L * 60L * 60L * 1000L)
-            val expiredNotes = trashedNotes.filter { it.date < threshold }
+            val expiredNotes = trashedNotes.filter { expired ->
+                val trashedAt = expired.deletedAt ?: expired.updatedAt.takeIf { it > 0L } ?: expired.date
+                trashedAt < threshold
+            }
             for (expired in expiredNotes) {
                 noteViewModel.deleteNoteById(expired.id)
             }
@@ -442,54 +445,36 @@ fun HomeScreen(
             }.distinct()
     }
 
-    // Extract all sub-page titles & IDs across active notes (Notion Tarzı Hiyerarşik Gizleme)
-    val subpageIds = remember(activeNotes) {
-        activeNotes.flatMap { note ->
+    // Extract all sub-page pointers & legacy fallbacks across active notes (Notion Tarzı Hiyerarşik Gizleme)
+    val subpageRefs = remember(activeNotes) {
+        val decryptedDescriptions = activeNotes.mapNotNull { note ->
             try {
-                val rawDesc = if (SecurityUtil.isEncryptedPayload(note.description)) {
+                if (SecurityUtil.isEncryptedPayload(note.description)) {
                     if (SecurityUtil.isVaultUnlocked) {
-                        (SecurityUtil.decryptSafe(note.description ?: "") as? AppResult.Success)?.data ?: ""
+                        (SecurityUtil.decryptSafe(note.description ?: "") as? AppResult.Success)?.data
                     } else {
-                        ""
+                        null
                     }
                 } else {
-                    note.description ?: ""
+                    note.description
                 }
-                val blocks = BlockParser.parse(rawDesc)
-                blocks.filter { it.type == BlockType.SUB_PAGE }.mapNotNull { it.subPageNoteId }
             } catch (_: Exception) {
-                emptyList()
+                null
             }
-        }.toSet()
-    }
-    val subpageTitles = remember(activeNotes) {
-        activeNotes.flatMap { note ->
-            try {
-                val rawDesc = if (SecurityUtil.isEncryptedPayload(note.description)) {
-                    if (SecurityUtil.isVaultUnlocked) {
-                        (SecurityUtil.decryptSafe(note.description ?: "") as? AppResult.Success)?.data ?: ""
-                    } else {
-                        ""
-                    }
-                } else {
-                    note.description ?: ""
-                }
-                val blocks = BlockParser.parse(rawDesc)
-                blocks.filter { it.type == BlockType.SUB_PAGE && it.subPageNoteId == null && it.content.isNotBlank() }
-                    .map { it.content.trim().lowercase() }
-            } catch (_: Exception) {
-                emptyList()
-            }
-        }.toSet()
+        }
+        BlockParser.collectSubPageHierarchyRefs(decryptedDescriptions)
     }
 
     // Ekranda gösterilen ana/kök notlar (Notion tarzı alt sayfalar ana ekranda gizlendiği için sadece ekranda listelenenler)
-    val activeRootNotes = remember(activeNotes, subpageIds, subpageTitles) {
-        activeNotes.filter { note ->
-            val isSubpageByMetadata = note.richBlocksJson?.contains("\"isSubPage\":true") == true || note.richBlocksJson?.contains("\"parentNoteId\"") == true
-            val isSubpageById = note.id in subpageIds
-            val isSubpageByTitle = note.title?.trim()?.lowercase() in subpageTitles
-            !(isSubpageByMetadata || isSubpageById || isSubpageByTitle)
+    val activeRootNotes = remember(activeNotes, subpageRefs) {
+        activeNotes.filterNot { note ->
+            BlockParser.isSubPageNote(
+                noteId = note.id,
+                noteSyncUuid = note.syncUuid,
+                noteTitle = note.title,
+                richBlocksJson = note.richBlocksJson,
+                refs = subpageRefs
+            )
         }
     }
 
@@ -592,10 +577,13 @@ fun HomeScreen(
                 text.contains(selectedHashtag!!, ignoreCase = true)
             }
             // Notion Hiyerarşik Gizleme: Alt sayfalar ana ekranda gizlenir; yalnızca ana not içerisinden (veya arama yapıldığında) erişilir!
-            val isSubpageByMetadata = note.richBlocksJson?.contains("\"isSubPage\":true") == true || note.richBlocksJson?.contains("\"parentNoteId\"") == true
-            val isSubpageById = note.id in subpageIds
-            val isSubpageByTitle = note.title?.trim()?.lowercase() in subpageTitles
-            val isSubpage = isSubpageByMetadata || isSubpageById || isSubpageByTitle
+            val isSubpage = BlockParser.isSubPageNote(
+                noteId = note.id,
+                noteSyncUuid = note.syncUuid,
+                noteTitle = note.title,
+                richBlocksJson = note.richBlocksJson,
+                refs = subpageRefs
+            )
             val matchesSubpageHierarchy = if (searchQuery.isBlank()) !isSubpage else true
 
             val matchesSmartFilter = when (selectedSmartFilter) {
@@ -622,7 +610,7 @@ fun HomeScreen(
     }
 
     // Filter notes
-    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageTitles, subpageIds, selectedSmartFilter, lockedCategoryIds) {
+    val filteredNotes = remember(activeNotes, selectedCategory, searchQuery, selectedHashtag, subpageRefs, selectedSmartFilter, lockedCategoryIds) {
         computeFilteredNotesForCategory(selectedCategory)
     }
 
@@ -656,6 +644,7 @@ fun HomeScreen(
                     subtitle = context.getString(R.string.biometric_prompt_subtitle),
                     negativeButtonText = context.getString(R.string.enter_pin),
                     onUnlocked = {
+                        noteViewModel.migrateUnlockedLegacyEncryptedNotes()
                         onNavigateToNoteWithScope(note.id, originScope)
                     },
                     onFallbackToPin = {
@@ -1337,8 +1326,7 @@ fun HomeScreen(
                                 activeNotes,
                                 searchQuery,
                                 selectedHashtag,
-                                subpageTitles,
-                                subpageIds,
+                                subpageRefs,
                                 selectedSmartFilter,
                                 lockedCategoryIds
                             ) {
@@ -1387,8 +1375,7 @@ fun HomeScreen(
                                 activeNotes,
                                 searchQuery,
                                 selectedHashtag,
-                                subpageTitles,
-                                subpageIds,
+                                subpageRefs,
                                 selectedSmartFilter,
                                 lockedCategoryIds
                             ) {
@@ -1830,6 +1817,7 @@ fun HomeScreen(
                                 SecurityUtil.lockVault()
                             } else {
                                 SecurityUtil.unlockVault()
+                                noteViewModel.migrateUnlockedLegacyEncryptedNotes()
                             }
                             val targetId = pendingUnlockNoteId
                             val targetScope = pendingUnlockOriginScope
@@ -1980,10 +1968,10 @@ fun HomeScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val trashed = targetNote.copy(status = "TRASH")
+                        val trashed = targetNote.copy(status = "TRASH", deletedAt = System.currentTimeMillis())
                         trashed.id = targetNote.id
                         noteViewModel.saveNote(trashed, contentForLinks = null)
-                        context.showToastShort("\"$safeTitle\" Çöp Kutusu'na taşındı (30 gün saklanır)")
+                        context.showToastShort("\"$safeTitle\" Çöp Kutusu'na taşındı")
                         notePendingTrash = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
@@ -2124,7 +2112,7 @@ fun HomeScreen(
         TrashBinSheet(
             trashedNotes = trashedNotes,
             onRestoreNote = { note ->
-                val restored = note.copy(status = "TODO")
+                val restored = note.copy(status = "TODO", deletedAt = null)
                 restored.id = note.id
                 noteViewModel.saveNote(restored, null)
                 context.showToastShort("\"${note.title ?: "Not"}\" geri yüklendi!")
@@ -2134,7 +2122,7 @@ fun HomeScreen(
                 context.showToastShort("Not kalıcı olarak silindi")
             },
             onEmptyTrash = {
-                trashedNotes.forEach { noteViewModel.deleteNoteById(it.id) }
+                noteViewModel.emptyTrash(trashedNotes)
                 context.showToastShort("Çöp kutusu boşaltıldı")
             },
             onDismiss = { showTrashBinSheet = false }

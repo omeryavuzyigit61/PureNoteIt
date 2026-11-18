@@ -7,8 +7,10 @@ import com.notes.purenoteit.domain.model.CodeExecutionOutput
 import com.notes.purenoteit.domain.model.DataError
 import com.notes.purenoteit.domain.model.Note
 import com.notes.purenoteit.domain.model.NoteLink
+import com.notes.purenoteit.domain.model.StreamItem
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
+import com.notes.purenoteit.sync.RemoteMediaUsageSummary
 
 enum class SidebarSection {
     ALL,
@@ -28,7 +30,11 @@ enum class SplitViewMode {
 enum class DesktopViewMode {
     CARDS,
     LIST,
-    BOARD
+    BOARD,
+    CALENDAR,
+    GRAPH,
+    WHITEBOARD,
+    STREAM
 }
 
 enum class SyncTransportMode {
@@ -58,10 +64,13 @@ data class DesktopUiState(
     val searchQuery: String = "",
     val categories: List<Category> = emptyList(),
     val allActiveNotes: List<Note> = emptyList(),
+    val rootActiveNotes: List<Note> = emptyList(),
     val trashedNotes: List<Note> = emptyList(),
     val filteredNotes: List<Note> = emptyList(),
     val noteLinks: List<NoteLink> = emptyList(),
+    val streamItems: List<StreamItem> = emptyList(),
     val subPageTree: List<SubPageTreeNode> = emptyList(),
+    val showSubPagesInVisualModes: Boolean = true,
     val selectedNoteSyncUuid: String? = null,
     val editorTitle: String = "",
     val editorIcon: String = "📝",
@@ -77,7 +86,16 @@ data class DesktopUiState(
     val showCreateCategoryDialog: Boolean = false,
     val showCreateSubPageDialog: Boolean = false,
     val showEmojiPickerDialog: Boolean = false,
+    val showTemplateGalleryDialog: Boolean = false,
+    val showCategoryManagementDialog: Boolean = false,
+    val showZenReadingMode: Boolean = false,
+    val showExportDialog: Boolean = false,
+    val showReminderDialog: Boolean = false,
     val activeDrawingBlockId: String? = null,
+    val isRecordingAudio: Boolean = false,
+    val recordingDurationMs: Long = 0L,
+    val recordingAmplitude: Float = 0f,
+    val playingAudioMediaPath: String? = null,
     val codeRunStates: Map<String, CodeBlockRunState> = emptyMap(),
     val showSyncDialog: Boolean = false,
     val syncTransportMode: SyncTransportMode = SyncTransportMode.GOOGLE_DRIVE,
@@ -85,6 +103,8 @@ data class DesktopUiState(
     val hasStoredPassphrase: Boolean = false,
     val isSyncing: Boolean = false,
     val lastSyncSummary: String? = null,
+    val driveMediaUsage: RemoteMediaUsageSummary? = null,
+    val isCleaningCloudMedia: Boolean = false,
     val lanServerRunning: Boolean = false,
     val lanServerUrl: String? = null,
     val lanRemoteUrl: String = "",
@@ -93,7 +113,17 @@ data class DesktopUiState(
     val autoLockMinutes: Int = 5,
     val vaultCooldownSeconds: Int = 0,
     val vaultLockError: String? = null,
-    val showVaultSecurityDialog: Boolean = false
+    val showVaultSecurityDialog: Boolean = false,
+    val language: String = "tr",
+    val trashRetentionDays: Int = 30,
+    val hideLockedNotes: Boolean = false,
+    val showSettingsDialog: Boolean = false,
+    val isNotePinSet: Boolean = false,
+    val isNoteVaultUnlocked: Boolean = false,
+    val notePinCooldownSeconds: Int = 0,
+    val notePinError: String? = null,
+    val showNotePinUnlockDialog: Boolean = false,
+    val showNotePinSetupDialog: Boolean = false
 ) {
     val selectedNote: Note?
         get() = allActiveNotes.firstOrNull { it.syncUuid == selectedNoteSyncUuid }
@@ -106,13 +136,32 @@ sealed interface DesktopUiEvent {
     data class UpdateSearchQuery(val query: String) : DesktopUiEvent
     data class SelectNote(val syncUuid: String) : DesktopUiEvent
     data object CreateNewNote : DesktopUiEvent
-    data class CreateNoteFromTemplate(val title: String, val icon: String, val blocks: List<NoteBlock>) : DesktopUiEvent
+    data class CreateNewNoteWithStatus(val status: String = "TODO") : DesktopUiEvent
+    data class CreateNoteFromTemplate(
+        val title: String,
+        val icon: String,
+        val blocks: List<NoteBlock>,
+        val reminderTime: Long? = null,
+        val preferredCategoryName: String? = null
+    ) : DesktopUiEvent
+    data object CreateDailyAgenda : DesktopUiEvent
     data class UpdateNoteStatus(val syncUuid: String, val status: String) : DesktopUiEvent
+    data class SetNoteReminder(val syncUuid: String, val reminderTime: Long?) : DesktopUiEvent
     data class CreateCategory(val name: String) : DesktopUiEvent
+    data class RenameCategory(val syncUuid: String, val name: String) : DesktopUiEvent
+    data class ToggleCategoryLock(val syncUuid: String) : DesktopUiEvent
     data class DeleteCategory(val syncUuid: String) : DesktopUiEvent
     data class TogglePinNote(val syncUuid: String) : DesktopUiEvent
     data class SoftDeleteNote(val syncUuid: String) : DesktopUiEvent
     data class RestoreNote(val syncUuid: String) : DesktopUiEvent
+    data class PermanentDeleteNote(val syncUuid: String) : DesktopUiEvent
+    data object EmptyTrash : DesktopUiEvent
+    data class ToggleNoteLock(val syncUuid: String) : DesktopUiEvent
+
+    data class AddStreamItem(val content: String) : DesktopUiEvent
+    data class DeleteStreamItem(val syncUuid: String) : DesktopUiEvent
+    data class ConvertStreamItemsToNote(val syncUuids: List<String>, val title: String) : DesktopUiEvent
+    data class OpenMediaExternally(val mediaPath: String) : DesktopUiEvent
 
     data class UpdateTitle(val title: String) : DesktopUiEvent
     data class UpdateIcon(val icon: String) : DesktopUiEvent
@@ -130,14 +179,24 @@ sealed interface DesktopUiEvent {
     data class OpenDrawingEditor(val blockId: String) : DesktopUiEvent
     data object CloseDrawingEditor : DesktopUiEvent
     data class SaveDrawingPng(val blockId: String, val pngBytes: ByteArray) : DesktopUiEvent
+    data class StartAudioRecording(val targetBlockId: String? = null) : DesktopUiEvent
+    data object StopAudioRecordingAndSave : DesktopUiEvent
+    data object CancelAudioRecording : DesktopUiEvent
+    data class PlayOrToggleAudio(val mediaPath: String) : DesktopUiEvent
 
     data class SetHomeViewMode(val mode: DesktopViewMode) : DesktopUiEvent
+    data object ToggleShowSubPagesInVisualModes : DesktopUiEvent
     data class SetSplitViewMode(val mode: SplitViewMode) : DesktopUiEvent
     data class SetQuickSwitcherVisible(val visible: Boolean) : DesktopUiEvent
     data class SetSlashPaletteVisible(val visible: Boolean) : DesktopUiEvent
     data class SetCreateCategoryDialogVisible(val visible: Boolean) : DesktopUiEvent
     data class SetCreateSubPageDialogVisible(val visible: Boolean) : DesktopUiEvent
     data class SetEmojiPickerDialogVisible(val visible: Boolean) : DesktopUiEvent
+    data class SetTemplateGalleryVisible(val visible: Boolean) : DesktopUiEvent
+    data class SetCategoryManagementVisible(val visible: Boolean) : DesktopUiEvent
+    data class SetZenReadingMode(val enabled: Boolean) : DesktopUiEvent
+    data class SetExportDialogVisible(val visible: Boolean) : DesktopUiEvent
+    data class SetReminderDialogVisible(val visible: Boolean) : DesktopUiEvent
 
     data class RunCodeBlock(val blockId: String, val language: String, val code: String) : DesktopUiEvent
     data class ConfirmBashExecution(val blockId: String) : DesktopUiEvent
@@ -152,6 +211,9 @@ sealed interface DesktopUiEvent {
     data object StopLanServer : DesktopUiEvent
     data class ConnectAndSyncLan(val remoteHttpUrl: String, val pairPinChars: CharArray, val e2eePassChars: CharArray) : DesktopUiEvent
     data object TriggerSyncNow : DesktopUiEvent
+    data object ForcePushAllToDrive : DesktopUiEvent
+    data object RefreshDriveUsage : DesktopUiEvent
+    data object CleanOrphanDriveMedia : DesktopUiEvent
 
     data class SetVaultSecurityDialogVisible(val visible: Boolean) : DesktopUiEvent
     data class UnlockVault(val passphraseChars: CharArray) : DesktopUiEvent
@@ -160,6 +222,17 @@ sealed interface DesktopUiEvent {
     data class UpdateAutoLockMinutes(val minutes: Int) : DesktopUiEvent
     data object LockVaultNow : DesktopUiEvent
     data object RecordUserActivity : DesktopUiEvent
+
+    data class SetSettingsDialogVisible(val visible: Boolean) : DesktopUiEvent
+    data class SetLanguage(val language: String) : DesktopUiEvent
+    data class SetTrashRetentionDays(val days: Int) : DesktopUiEvent
+    data class SetHideLockedNotes(val hide: Boolean) : DesktopUiEvent
+    data object RequestOpenNotePinUnlock : DesktopUiEvent
+    data object DismissNotePinUnlock : DesktopUiEvent
+    data class SubmitNotePinUnlock(val pinChars: CharArray) : DesktopUiEvent
+    data class SetNotePinSetupDialogVisible(val visible: Boolean) : DesktopUiEvent
+    data class SaveNotePin(val currentPinChars: CharArray?, val newPinChars: CharArray) : DesktopUiEvent
+    data object LockNoteVaultSession : DesktopUiEvent
 }
 
 sealed interface DesktopUiEffect {
@@ -190,7 +263,7 @@ fun AppError.toTurkishMessage(): String = when (this) {
     CodeExecutionError.ExecutionTimeout -> "Kod çalışması 10 saniye sınırını aştığı için güvenlik gereği sonlandırıldı."
     CodeExecutionError.JsEngineUnavailable -> "Node.js / JS çalıştırma ortamı bulunamadı."
     is CodeExecutionError.SecurityBlocked -> when (operation) {
-        "BASH_CONFIRMATION_REQUIRED" -> "Bash betiği çalıştırmadan önce açık kullanıcı onayı gereklidir."
+        "BASH_CONFIRMATION_REQUIRED" -> "Kodu çalıştırmadan önce açık kullanıcı onayı gereklidir."
         else -> "Güvenlik politikası engeli: '$operation' ifadesine izin verilmiyor."
     }
     is CodeExecutionError.RuntimeOrSyntax -> lineHint?.let { "Satır $it: $message" } ?: message

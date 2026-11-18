@@ -144,12 +144,88 @@ internal class AndroidSecureTokenStorageImpl @Inject constructor(
         withContext(ioDispatcher) {
             lock.withLock {
                 try {
-                    dataStore.edit { it.clear() }
+                    dataStore.edit { prefs ->
+                        prefs.remove(KEY_OAUTH_BUNDLE)
+                        prefs.remove(KEY_SYNC_PASSPHRASE)
+                    }
                     AppResult.Success(Unit)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
                     AppResult.Failure(DataError.Security.KEYSTORE_UNAVAILABLE)
+                }
+            }
+        }
+
+    override suspend fun saveVaultSecurityJson(json: String): AppResult<Unit, DataError.Security> =
+        withContext(ioDispatcher) {
+            lock.withLock {
+                val bytes = json.toByteArray(Charsets.UTF_8)
+                try {
+                    encryptAndPut(KEY_VAULT_SECURITY_JSON, bytes)
+                } finally {
+                    bytes.fill(0)
+                }
+            }
+        }
+
+    override suspend fun getVaultSecurityJson(): AppResult<String?, DataError.Security> =
+        withContext(ioDispatcher) {
+            lock.withLock {
+                when (val dec = readAndDecrypt(KEY_VAULT_SECURITY_JSON)) {
+                    is AppResult.Failure -> dec
+                    is AppResult.Success -> {
+                        val plain = dec.data ?: return@withLock AppResult.Success(null)
+                        try {
+                            AppResult.Success(String(plain, Charsets.UTF_8))
+                        } finally {
+                            plain.fill(0)
+                        }
+                    }
+                }
+            }
+        }
+
+    override suspend fun saveLocalVaultContentKey(keyChars: CharArray): AppResult<Unit, DataError.Security> =
+        withContext(ioDispatcher) {
+            val copy = keyChars.copyOf()
+            keyChars.fill('\u0000')
+            lock.withLock {
+                if (copy.isEmpty()) {
+                    copy.fill('\u0000')
+                    return@withLock AppResult.Failure(DataError.Security.KEY_REQUIRED)
+                }
+                val charBuf = java.nio.CharBuffer.wrap(copy)
+                val byteBuf = Charsets.UTF_8.encode(charBuf)
+                val plainBytes = ByteArray(byteBuf.remaining())
+                byteBuf.get(plainBytes)
+                byteBuf.array().fill(0)
+                try {
+                    encryptAndPut(KEY_LOCAL_VAULT_CONTENT_KEY, plainBytes)
+                } finally {
+                    copy.fill('\u0000')
+                    plainBytes.fill(0)
+                }
+            }
+        }
+
+    override suspend fun getLocalVaultContentKey(): AppResult<CharArray?, DataError.Security> =
+        withContext(ioDispatcher) {
+            lock.withLock {
+                when (val dec = readAndDecrypt(KEY_LOCAL_VAULT_CONTENT_KEY)) {
+                    is AppResult.Failure -> dec
+                    is AppResult.Success -> {
+                        val plainBytes = dec.data ?: return@withLock AppResult.Success(null)
+                        try {
+                            val charBuf = Charsets.UTF_8.decode(java.nio.ByteBuffer.wrap(plainBytes))
+                            val out = CharArray(charBuf.remaining())
+                            charBuf.get(out)
+                            if (charBuf.hasArray()) charBuf.array().fill('\u0000')
+                            AppResult.Success(if (out.isEmpty()) null else out)
+                        } finally {
+                            plainBytes.fill(0)
+                        }
+                    }
                 }
             }
         }
@@ -264,5 +340,7 @@ internal class AndroidSecureTokenStorageImpl @Inject constructor(
 
         private val KEY_OAUTH_BUNDLE = stringPreferencesKey("enc_oauth_bundle")
         private val KEY_SYNC_PASSPHRASE = stringPreferencesKey("enc_sync_passphrase")
+        private val KEY_VAULT_SECURITY_JSON = stringPreferencesKey("enc_vault_security_json")
+        private val KEY_LOCAL_VAULT_CONTENT_KEY = stringPreferencesKey("enc_local_vault_content_key")
     }
 }

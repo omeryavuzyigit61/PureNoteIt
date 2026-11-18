@@ -17,6 +17,7 @@ import com.notes.purenoteit.domain.model.ConsoleLevel
 import com.notes.purenoteit.domain.model.ConsoleLine
 import com.notes.purenoteit.domain.model.Note
 import com.notes.purenoteit.domain.model.NoteLink
+import com.notes.purenoteit.domain.model.StreamItem
 import com.notes.purenoteit.model.BlockParser
 import com.notes.purenoteit.model.BlockType
 import com.notes.purenoteit.model.NoteBlock
@@ -278,6 +279,41 @@ class DesktopUiRenderTest {
                 description = BlockParser.serialize(
                     listOf(NoteBlock(type = BlockType.PARAGRAPH, content = "Play Console paketi ve Google Drive senkronu doğrulandı."))
                 )
+            ),
+            Note(
+                id = 4,
+                title = "test",
+                icon = "📝",
+                status = "IN_REVIEW",
+                categorySyncUuid = "cat-1",
+                syncUuid = "n-4",
+                updatedAt = now - 259_200_000L,
+                description = BlockParser.serialize(
+                    listOf(
+                        NoteBlock(
+                            type = BlockType.IMAGE,
+                            content = """{"w":100,"h":545,"lock":true}""",
+                            mediaPath = "media/images/sample.jpg"
+                        )
+                    )
+                )
+            ),
+            Note(
+                id = 5,
+                title = "Aylık Bütçe Planı",
+                icon = "💰",
+                status = "TODO",
+                totalTasks = 5,
+                completedTasks = 1,
+                categorySyncUuid = "cat-1",
+                syncUuid = "n-5",
+                updatedAt = now - 345_600_000L,
+                description = BlockParser.serialize(
+                    listOf(
+                        NoteBlock(type = BlockType.CALLOUT, calloutIcon = "💡", content = "Tablo hücrelerini düzenleyebilirsiniz. Dipteki toplam otomatik güncellenir."),
+                        NoteBlock(type = BlockType.PARAGRAPH, content = "Aylık harcama takip tablosu.")
+                    )
+                )
             )
         )
 
@@ -312,6 +348,7 @@ class DesktopUiRenderTest {
                 isDarkTheme = true,
                 categories = categories,
                 allActiveNotes = notes,
+                rootActiveNotes = notes,
                 filteredNotes = notes,
                 homeViewMode = DesktopViewMode.CARDS
             )
@@ -349,6 +386,59 @@ class DesktopUiRenderTest {
                 allActiveNotes = notes,
                 filteredNotes = notes,
                 showCreateCategoryDialog = true
+            )
+        )
+
+        // 5. Thought Stream (Zaman Tüneli / Akış)
+        renderAndCheck(
+            "preview_stream.png",
+            DesktopUiState(
+                isDarkTheme = true,
+                categories = categories,
+                allActiveNotes = notes,
+                filteredNotes = notes,
+                homeViewMode = DesktopViewMode.STREAM,
+                streamItems = listOf(
+                    StreamItem(id = 1, content = "Telefonda yolda aklıma gelen ürün fikri", timestamp = now, syncUuid = "s-1"),
+                    StreamItem(id = 2, content = "Drive senkronunu doğrula ve test et", timestamp = now - 3_600_000L, isProcessed = true, mergedNoteSyncUuid = "n-3", syncUuid = "s-2")
+                )
+            )
+        )
+
+        // 6. Infinite Whiteboard (Sonsuz Tuval)
+        renderAndCheck(
+            "preview_whiteboard.png",
+            DesktopUiState(
+                isDarkTheme = true,
+                categories = categories,
+                allActiveNotes = notes,
+                filteredNotes = notes,
+                homeViewMode = DesktopViewMode.WHITEBOARD,
+                noteLinks = listOf(NoteLink(id = 1, sourceNoteId = 1, targetNoteId = 2, linkText = "Toplantı", syncUuid = "l-1", sourceSyncUuid = "n-1", targetSyncUuid = "n-2"))
+            )
+        )
+
+        // 7. Interactive Calendar (Takvim)
+        renderAndCheck(
+            "preview_calendar.png",
+            DesktopUiState(
+                isDarkTheme = true,
+                categories = categories,
+                allActiveNotes = notes.map { it.copy(reminderTime = System.currentTimeMillis()) },
+                filteredNotes = notes,
+                homeViewMode = DesktopViewMode.CALENDAR
+            )
+        )
+
+        // 8. 14-Template Full Gallery Modal
+        renderAndCheck(
+            "preview_templates_gallery.png",
+            DesktopUiState(
+                isDarkTheme = true,
+                categories = categories,
+                allActiveNotes = notes,
+                filteredNotes = notes,
+                showTemplateGalleryDialog = true
             )
         )
     }

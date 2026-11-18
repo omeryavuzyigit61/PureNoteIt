@@ -172,6 +172,7 @@ fun NotionBlockRow(
     onMoveUp: (() -> Unit)? = null,
     onMoveDown: (() -> Unit)? = null,
     onEditDrawing: ((String) -> Unit)? = null,
+    onInkChange: ((inkJson: String, previewPath: String?) -> Unit)? = null,
     onPreviewMedia: ((path: String, isDrawing: Boolean, onEditAction: (() -> Unit)?) -> Unit)? = null,
     onToggleExpand: (() -> Unit)? = null,
     onToggleBodyChange: ((String) -> Unit)? = null,
@@ -1707,7 +1708,13 @@ fun NotionBlockRow(
                 }
             }
 
-            BlockType.DRAWING -> {
+            BlockType.DRAWING -> if (block.inkJson.isNotEmpty() && onInkChange != null) {
+                InkBlockCanvas(
+                    inkJson = block.inkJson,
+                    mediaPathResolver = mediaPathResolver,
+                    onInkChange = onInkChange
+                )
+            } else {
                 val drawingPath = block.mediaPath
                 Box(
                     modifier = Modifier

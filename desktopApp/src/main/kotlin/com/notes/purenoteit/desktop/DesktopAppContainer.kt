@@ -8,7 +8,9 @@ import com.notes.purenoteit.desktop.data.db.DesktopSqliteDatabaseManager
 import com.notes.purenoteit.desktop.data.repository.DesktopNoteRepository
 import com.notes.purenoteit.desktop.data.repository.DesktopNoteRepositoryImpl
 import com.notes.purenoteit.desktop.data.runner.DesktopCodeRunnerImpl
+import com.notes.purenoteit.desktop.data.security.DesktopNoteVaultManager
 import com.notes.purenoteit.desktop.data.security.DesktopVaultSecurityManager
+import com.notes.purenoteit.desktop.data.settings.DesktopPreferencesStore
 import com.notes.purenoteit.desktop.data.storage.DesktopEncryptedMediaStorage
 import com.notes.purenoteit.desktop.data.sync.DesktopLocalSyncStoreImpl
 import com.notes.purenoteit.desktop.data.sync.LanWebSocketSyncServer
@@ -119,6 +121,20 @@ internal class DesktopAppContainer(
         clock = clock
     )
 
+    private val vaultSettingsCoordinator = SharedSyncFactory.createVaultSettingsSyncCoordinator(
+        remoteDataSource = driveDataSource,
+        vaultCrypto = vaultCrypto
+    )
+
+    private val preferencesStore = DesktopPreferencesStore(paths.preferencesFile)
+
+    private val noteVaultManager = DesktopNoteVaultManager(
+        pinSecurityFile = paths.pinSecurityFile,
+        vaultCrypto = vaultCrypto,
+        clock = clock,
+        ioDispatcher = Dispatchers.IO
+    )
+
     private val codeExecutor = DesktopCodeRunnerImpl(
         ioDispatcher = Dispatchers.IO,
         clock = clock
@@ -140,11 +156,16 @@ internal class DesktopAppContainer(
         oauthClientConfigProvider = clientConfigProvider,
         vaultSecurityManager = vaultSecurityManager,
         clock = clock,
-        mainDispatcher = Dispatchers.Main
+        mainDispatcher = Dispatchers.Main,
+        preferencesStore = preferencesStore,
+        noteVaultManager = noteVaultManager,
+        vaultSettingsCoordinator = vaultSettingsCoordinator,
+        cacheDir = paths.cacheDir
     )
 
     override fun close() {
         stateHolder.close()
+        noteVaultManager.close()
         lanSyncServer.close()
         databaseManager.close()
     }

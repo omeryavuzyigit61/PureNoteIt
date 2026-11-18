@@ -11,6 +11,7 @@ import com.notes.purenoteit.domain.repository.CategoryRepository
 import com.notes.purenoteit.domain.repository.CodeExecutionRepository
 import com.notes.purenoteit.domain.repository.KnowledgeRepository
 import com.notes.purenoteit.domain.repository.NoteRepository
+import com.notes.purenoteit.domain.storage.EncryptedMediaStore
 import com.notes.purenoteit.domain.storage.MediaPathResolver
 import com.notes.purenoteit.security.SecureTokenStorage
 import com.notes.purenoteit.sync.LocalSyncStore
@@ -47,6 +48,12 @@ abstract class RepositoryModule {
     internal abstract fun bindMediaPathResolver(
         impl: AndroidMediaPathResolverImpl
     ): MediaPathResolver
+
+    @Binds
+    @Singleton
+    internal abstract fun bindEncryptedMediaStore(
+        impl: AndroidMediaPathResolverImpl
+    ): EncryptedMediaStore
 
     @Binds
     @Singleton

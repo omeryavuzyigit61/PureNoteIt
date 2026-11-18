@@ -1,17 +1,21 @@
 <tr-TR>
-PureNoteIt v1.1.2 ile arayüz akıcılığı ve ergonomi yenilendi!
+PureNoteIt v1.2.4: PC ve telefon artık birebir uyumlu!
 
-🪟 Gelişmiş Saydam Cam Tasarımı: Kategori, editör ve alt dock çubuklarında daha berrak ve ferah cam efekti.
-✨ Çoklu Seçim & Titreme Animasyonu: Uzun basarak not seçme, yaylanma animasyonu ve koyu tema kontrastı optimize edildi.
-📱 Kusursuz 3D Kapı Efekti: Sekme geçişlerindeki titremeler giderildi, otomatik kaydırma eklendi.
-🎯 Ergonomik Menü: Sol üst menü butonu ince çizgiler ve 48dp geniş dokunma alanıyla yenilendi.
+🖥️ PC'de çizim şekilleri, geri/ileri al ve ses kaydı
+📋 PC'de Görev Panosu (4 sütun)
+⚡ Yalnızca Kaydet/Geri'de eşitleme: anlık, tekrarsız
+🗑️ Çöp süresi PC ile telefonda eşit
+🔒 Şifreli medya ve PIN eşitleme
+✨ Modern ikonlar, daha temiz kartlar
 </tr-TR>
 
 <en-US>
-PureNoteIt v1.1.2 brings refined UI smoothness and ergonomics!
+PureNoteIt v1.2.4: PC and phone now in perfect sync!
 
-🪟 Enhanced Transparent Glass: Crystal-clear glassmorphism across category bar, editor, and bottom dock.
-✨ Multi-Select & Wiggle Animation: Restored long-press note selection, tactile spring feedback, and dark theme contrast.
-📱 Seamless 3D Door Flip: Fixed tab transition flickers and enabled auto-reveal scrolling.
-🎯 Ergonomic Menu: Slimmer Notion-style drawer icon with an expanded 48dp touch target.
+🖥️ PC drawing shapes, undo/redo and voice recording
+📋 Task Board on PC (4 columns)
+⚡ Sync on Save/Back only: instant, no duplicates
+🗑️ Trash retention matches on PC and phone
+🔒 Encrypted media and PIN sync
+✨ Modern icons, cleaner cards
 </en-US>

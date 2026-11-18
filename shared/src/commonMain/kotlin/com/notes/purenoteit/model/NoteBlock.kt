@@ -40,7 +40,9 @@ data class NoteBlock(
     var toggleBody: String = "",
     var codeLanguage: String = "kotlin",
     var subPageNoteId: Int? = null,
-    var subPageSyncUuid: String? = null
+    var subPageSyncUuid: String? = null,
+    /** Vector ink payload (see [InkCodec]) for pen-first DRAWING blocks; empty for legacy PNG-only drawings. */
+    var inkJson: String = ""
 )
 
 data class SearchSnippetMatch(
@@ -54,6 +56,12 @@ data class NoteRichMetadata(
     val isSubPage: Boolean = false,
     val parentNoteId: Int? = null,
     val parentSyncUuid: String? = null
+)
+
+data class SubPageHierarchyRefs(
+    val syncUuids: Set<String> = emptySet(),
+    val legacyIdToTitle: Map<Int, String> = emptyMap(),
+    val titleFallbacks: Set<String> = emptySet()
 )
 
 object BlockParser {
@@ -88,7 +96,7 @@ object BlockParser {
         return blocksToJson(blocks)
     }
 
-    fun buildSubPageMetadataJson(parentNoteId: Int, parentSyncUuid: String? = null): String {
+    fun buildSubPageMetadataJson(parentNoteId: Int?, parentSyncUuid: String? = null): String {
         return json.encodeToString(
             NoteRichMetadata(
                 isSubPage = true,
@@ -105,6 +113,69 @@ object BlockParser {
         } catch (_: Exception) {
             null
         }
+    }
+
+    /**
+     * Checks whether [rawJson] marks a note as a child subpage without false-positives on explicit null parent IDs.
+     */
+    fun isSubPageMetadata(rawJson: String?): Boolean {
+        if (rawJson.isNullOrBlank()) return false
+        val parsed = parseRichMetadata(rawJson)
+        if (parsed != null) {
+            return parsed.isSubPage || parsed.parentNoteId != null || !parsed.parentSyncUuid.isNullOrBlank()
+        }
+        return rawJson.contains("\"isSubPage\":true") ||
+            Regex(""""parentNoteId"\s*:\s*\d+""").containsMatchIn(rawJson)
+    }
+
+    /**
+     * Indexes all `SUB_PAGE` block pointers across decrypted descriptions so root note filtering
+     * prefers cross-device `subPageSyncUuid` and guards legacy `subPageNoteId` against collisions.
+     */
+    fun collectSubPageHierarchyRefs(descriptions: Iterable<String?>): SubPageHierarchyRefs {
+        val uuids = LinkedHashSet<String>()
+        val legacyIds = LinkedHashMap<Int, String>()
+        val titles = LinkedHashSet<String>()
+        for (rawDesc in descriptions) {
+            if (rawDesc.isNullOrBlank() || !rawDesc.startsWith(PREFIX)) continue
+            for (blk in parse(rawDesc)) {
+                if (blk.type != BlockType.SUB_PAGE) continue
+                val subUuid = blk.subPageSyncUuid?.takeIf { it.isNotBlank() }
+                if (subUuid != null) {
+                    uuids += subUuid
+                } else if (blk.subPageNoteId != null && blk.subPageNoteId!! > 0) {
+                    legacyIds[blk.subPageNoteId!!] = blk.content.trim()
+                } else if (blk.subPageNoteId == null && blk.content.isNotBlank()) {
+                    titles += blk.content.trim().lowercase()
+                }
+            }
+        }
+        return SubPageHierarchyRefs(syncUuids = uuids, legacyIdToTitle = legacyIds, titleFallbacks = titles)
+    }
+
+    /**
+     * Determines whether a note should be treated as a child subpage in root note lists.
+     * Legacy integer IDs only match when metadata confirms subpage status or titles match.
+     */
+    fun isSubPageNote(
+        noteId: Int,
+        noteSyncUuid: String,
+        noteTitle: String?,
+        richBlocksJson: String?,
+        refs: SubPageHierarchyRefs
+    ): Boolean {
+        val byMetadata = isSubPageMetadata(richBlocksJson)
+        if (byMetadata) return true
+        if (noteSyncUuid.isNotBlank() && noteSyncUuid in refs.syncUuids) return true
+        val legacyTitle = if (noteId > 0) refs.legacyIdToTitle[noteId] else null
+        if (legacyTitle != null) {
+            val cleanNoteTitle = noteTitle.orEmpty().trim()
+            if (legacyTitle.isBlank() || cleanNoteTitle.equals(legacyTitle, ignoreCase = true)) {
+                return true
+            }
+        }
+        val cleanLowerTitle = noteTitle.orEmpty().trim().lowercase()
+        return cleanLowerTitle.isNotBlank() && cleanLowerTitle in refs.titleFallbacks && byMetadata
     }
 
     fun parse(raw: String?): List<NoteBlock> {
@@ -222,22 +293,66 @@ object BlockParser {
         return null
     }
 
-    fun toPlainTextSummary(blocks: List<NoteBlock>, maxLines: Int = 4): String {
+    private fun isLikelyMetadataJson(text: String): Boolean {
+        val trimmed = text.trim()
+        return trimmed.startsWith("{") && trimmed.endsWith("}")
+    }
+
+    private fun cleanHumanContent(block: NoteBlock): String =
+        if (isLikelyMetadataJson(block.content)) "" else block.content.trim()
+
+    fun toPlainTextSummary(
+        blocks: List<NoteBlock>,
+        maxLines: Int = 4,
+        includeDecorations: Boolean = true
+    ): String {
         return blocks
-            .filter { it.type != BlockType.DIVIDER && (it.content.isNotBlank() || it.tableData.isNotEmpty()) }
+            .filter { block ->
+                when (block.type) {
+                    BlockType.DIVIDER, BlockType.PAGE_RELATIONS -> false
+                    BlockType.TABLE -> block.tableData.isNotEmpty()
+                    BlockType.IMAGE, BlockType.DRAWING, BlockType.AUDIO ->
+                        !block.mediaPath.isNullOrBlank() || cleanHumanContent(block).isNotBlank()
+                    else -> block.content.isNotBlank()
+                }
+            }
             .take(maxLines)
             .joinToString("\n") { block ->
                 when (block.type) {
-                    BlockType.TODO -> if (block.isChecked) "☑ ${block.content}" else "☐ ${block.content}"
+                    BlockType.TODO -> if (includeDecorations) {
+                        if (block.isChecked) "☑ ${block.content}" else "☐ ${block.content}"
+                    } else {
+                        block.content
+                    }
                     BlockType.BULLET_LIST -> "• ${block.content}"
-                    BlockType.CALLOUT -> "${block.calloutIcon} ${block.content}"
-                    BlockType.TOGGLE -> "▶ ${block.content}"
-                    BlockType.TABLE -> "📊 Tablo (${if (block.tableData.isNotEmpty()) block.tableData.size - 1 else 0} satır)"
-                    BlockType.WEB_BOOKMARK -> "🌐 ${block.content}"
-                    BlockType.SUB_PAGE -> "📄 ${block.content}"
-                    BlockType.CODE -> "💻 Kod (${block.codeLanguage}): ${block.content.take(30)}"
+                    BlockType.CALLOUT -> if (includeDecorations && block.calloutIcon.isNotBlank()) {
+                        "${block.calloutIcon} ${block.content}"
+                    } else {
+                        block.content
+                    }
+                    BlockType.TOGGLE -> if (includeDecorations) "▶ ${block.content}" else block.content
+                    BlockType.TABLE -> {
+                        val rows = (block.tableData.size - 1).coerceAtLeast(0)
+                        if (includeDecorations) "📊 Tablo ($rows satır)" else "Tablo ($rows satır)"
+                    }
+                    BlockType.WEB_BOOKMARK -> if (includeDecorations) "🌐 ${block.content}" else block.content
+                    BlockType.SUB_PAGE -> if (includeDecorations) "📄 ${block.content}" else block.content
+                    BlockType.CODE -> if (includeDecorations) {
+                        "💻 Kod (${block.codeLanguage}): ${block.content.take(30)}"
+                    } else {
+                        "Kod (${block.codeLanguage}): ${block.content.take(30)}"
+                    }
                     BlockType.MATH -> "∑ ${block.content}"
-                    BlockType.TABLE_OF_CONTENTS -> "📑 İçindekiler Tablosu"
+                    BlockType.TABLE_OF_CONTENTS -> if (includeDecorations) "📑 İçindekiler Tablosu" else "İçindekiler"
+                    BlockType.IMAGE -> cleanHumanContent(block).ifBlank {
+                        if (includeDecorations) "🖼️ Görsel" else "Görsel"
+                    }
+                    BlockType.DRAWING -> cleanHumanContent(block).ifBlank {
+                        if (includeDecorations) "✏️ Çizim" else "Çizim"
+                    }
+                    BlockType.AUDIO -> cleanHumanContent(block).ifBlank {
+                        if (includeDecorations) "🎙️ Ses Kaydı" else "Ses Kaydı"
+                    }
                     else -> block.content
                 }
             }
