@@ -91,7 +91,7 @@ class VaultPinSyncProtocol(
                 iterations = SyncedVaultSecurityDocument.DEFAULT_PIN_KDF_ITERATIONS,
                 keyBitLength = 256
             )
-            val keyString = String(vaultKeyChars)
+            val keyString = vaultKeyChars.concatToString()
             val wrappedRes = vaultCrypto.encryptWithPassphrase(keyString, pinCopy)
             val wrappedEnvelope = when (wrappedRes) {
                 is AppResult.Failure -> {

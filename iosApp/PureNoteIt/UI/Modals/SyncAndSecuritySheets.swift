@@ -45,9 +45,9 @@ struct CloudSyncSheet: View {
                     .padding(.vertical, 4)
 
                     if let msg = store.syncStatusMessage {
-                        Text(msg)
+                        Label(msg, systemImage: store.isSyncError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                             .font(.caption)
-                            .foregroundStyle(PureColors.emeraldGreen)
+                            .foregroundStyle(store.isSyncError ? .red : PureColors.emeraldGreen)
                     }
 
                     if store.isSyncing {

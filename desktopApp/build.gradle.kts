@@ -156,6 +156,14 @@ compose.desktop {
                 menuGroup = "PureNoteIt"
                 upgradeUuid = "a4d7c2e0-8f3b-4c51-9b12-6e1f7c8a9d20"
             }
+            macOS {
+                bundleID = "com.purenoteit.desktop"
+                dockName = "PureNoteIt"
+                iconFile.set(project.file("src/main/resources/purenoteit.icns"))
+            }
+            linux {
+                iconFile.set(project.file("src/main/resources/purenoteit_icon.png"))
+            }
         }
     }
 }

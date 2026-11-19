@@ -23,10 +23,13 @@ import org.jetbrains.skia.Image as SkiaImage
 import java.awt.Dimension
 import java.awt.Image as AwtImage
 import java.awt.RenderingHints
+import java.awt.Taskbar
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 
-fun main() = application {
+fun main() {
+    configureMacOsDesktopEnvironment()
+    application {
     val container = remember { DesktopAppContainer() }
     val windowIcon = remember { loadDesktopWindowIcon() }
     val windowState = rememberWindowState(
@@ -95,6 +98,30 @@ fun main() = application {
             stateHolder = container.stateHolder,
             mediaPathResolver = container.mediaPathResolver
         )
+    }
+    }
+}
+
+private fun configureMacOsDesktopEnvironment() {
+    val isMac = System.getProperty("os.name").orEmpty().contains("Mac", ignoreCase = true)
+    if (!isMac) return
+
+    System.setProperty("apple.awt.application.name", "PureNoteIt")
+    System.setProperty("apple.awt.application.appearance", "system")
+
+    // When packaged as a native .app bundle, macOS loads Contents/Resources/PureNoteIt.icns natively
+    // with full Retina multi-resolution support. For dev runs (./gradlew :desktopApp:run), set Dock icon via Taskbar.
+    if (System.getProperty("jpackage.app-path").isNullOrBlank()) {
+        runCatching {
+            if (Taskbar.isTaskbarSupported() && Taskbar.getTaskbar().isSupported(Taskbar.Feature.ICON_IMAGE)) {
+                val dockImage = DesktopAppContainer::class.java
+                    .getResourceAsStream("/purenoteit_icon.png")
+                    ?.use(ImageIO::read)
+                if (dockImage != null) {
+                    Taskbar.getTaskbar().iconImage = dockImage
+                }
+            }
+        }
     }
 }
 

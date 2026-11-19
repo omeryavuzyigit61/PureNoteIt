@@ -230,6 +230,7 @@ final class PureNoteStore: ObservableObject {
     @Published var isDriveConnected: Bool = false
     @Published var isSyncing: Bool = false
     @Published var syncStatusMessage: String? = nil
+    @Published var isSyncError: Bool = false
     @Published var customIosOAuthClientId: String = ""
     @Published var toastMessage: String? = nil
 
@@ -936,12 +937,14 @@ final class PureNoteStore: ObservableObject {
     func connectAndSyncDrive() async {
         let cid = resolvedIosOAuthClientId()
         guard !cid.isEmpty else {
+            isSyncError = true
             syncStatusMessage = isTurkish
                 ? "Önce Google iOS OAuth Client ID girin."
                 : "Enter your Google iOS OAuth Client ID first."
             return
         }
         isSyncing = true
+        isSyncError = false
         syncStatusMessage = nil
         let (ok, err) = await oauthManager.authorize(
             clientId: cid,
@@ -950,7 +953,9 @@ final class PureNoteStore: ObservableObject {
         )
         if !ok {
             isSyncing = false
+            isSyncError = true
             syncStatusMessage = err
+            await refreshDriveStatus()
             return
         }
         isDriveConnected = true
@@ -961,10 +966,12 @@ final class PureNoteStore: ObservableObject {
         let cid = resolvedIosOAuthClientId()
         guard !cid.isEmpty,
               let redirect = IosOAuthPkceManager.computeGoogleRedirectUri(clientId: cid) else {
+            isSyncError = true
             syncStatusMessage = isTurkish ? "iOS OAuth Client ID eksik." : "Missing iOS OAuth Client ID."
             return
         }
         isSyncing = true
+        isSyncError = false
         do {
             let res = try await SharedIosSyncBridge.shared.runGoogleDriveSync(
                 localStore: localSyncStore,
@@ -977,22 +984,27 @@ final class PureNoteStore: ObservableObject {
             )
             if res.success {
                 reloadAll()
+                isSyncError = false
                 syncStatusMessage = isTurkish
                     ? "Eşitlendi ↑\(res.pushedEntities) kayıt, ↓\(res.pulledNotes) not, 📎\(res.mediaDownloaded + res.mediaUploaded) medya"
                     : "Synced ↑\(res.pushedEntities) pushed, ↓\(res.pulledNotes) notes"
                 showToast(syncStatusMessage ?? "Sync OK")
             } else {
+                isSyncError = true
                 syncStatusMessage = res.errorMessage
             }
         } catch {
+            isSyncError = true
             syncStatusMessage = error.localizedDescription
         }
+        await refreshDriveStatus()
         isSyncing = false
     }
 
     func disconnectDrive() async {
         _ = try? await SharedIosSyncBridge.shared.clearAllTokens(tokenStorage: tokenStorage)
         isDriveConnected = false
+        isSyncError = false
         syncStatusMessage = isTurkish ? "Google Drive oturumu kapatıldı." : "Google Drive disconnected."
     }
 }

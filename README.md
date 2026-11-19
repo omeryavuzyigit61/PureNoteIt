@@ -11,6 +11,7 @@
   </p>
 
   <p align="center">
+    <a href="#-indir--download">İndir</a> •
     <a href="#-özellikler--key-features">Özellikler</a> •
     <a href="#-ekran-görüntüleri--screenshots">Ekran Görüntüleri</a> •
     <a href="#-teknoloji-yığını--tech-stack">Teknoloji</a> •
@@ -18,6 +19,15 @@
     <a href="#-kurulum--building">Kurulum</a> •
     <a href="PRIVACY_POLICY.md">Gizlilik Politikası</a> •
     <a href="LICENSE">Lisans</a>
+  </p>
+
+  <p align="center">
+    <a href="https://github.com/omeryavuzyigit61/PureNoteIt/releases/download/v1.2.5/PureNoteIt-1.2.5-macOS-x64.dmg">
+      <img src="https://img.shields.io/badge/Download%20for%20macOS-v1.2.5%20(.dmg)-FF900F?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS" />
+    </a>
+    <a href="https://github.com/omeryavuzyigit61/PureNoteIt/releases/latest">
+      <img src="https://img.shields.io/badge/GitHub%20Releases-v1.2.5-24292F?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Releases" />
+    </a>
   </p>
 
   <p align="center">
@@ -40,6 +50,19 @@
 **PureNoteIt**, Notion'ın dinamik blok modülerliğini, Obsidian'ın çift yönlü bağlantı ve bilgi grafiğini (`[[Bağlantı]]`), Bitwarden'ın askeri standarttaki **AES-256-GCM** yerel ve bulut şifrelemesini **Kotlin Multiplatform (`:shared`)** ortak çekirdeği üzerinde **Android**, **iOS (Liquid Glass)**, **macOS** ve **Windows** uygulamalarında birleştiren yeni nesil bir kişisel bilgi işletim sistemidir.
 
 **%100 Çevrimdışı Öncelikli (Offline-First)** çalışır; isteğe bağlı olarak **Google Drive `appDataFolder`** üzerinden tüm cihazlarınız arasında uçtan uca şifreli (`ENC_P3:` / `AutoSyncKeyCoordinator`) eşitleme sunar. Hiçbir reklam veya kullanıcı takibi içermez.
+
+---
+
+## ⬇️ İndir / Download
+
+| Platform | Paket | Uyumluluk & Not |
+| :--- | :--- | :--- |
+| **🍎 macOS** | [**PureNoteIt-1.2.5-macOS-x64.dmg**](https://github.com/omeryavuzyigit61/PureNoteIt/releases/download/v1.2.5/PureNoteIt-1.2.5-macOS-x64.dmg) | Bağımsız kurulum (Java gerekmez). Intel Mac'lerde doğal, **Apple Silicon (M1/M2/M3/M4)** Mac'lerde **Rosetta 2** ile çalışır. |
+| **📦 Tüm Sürümler** | [**GitHub Releases**](https://github.com/omeryavuzyigit61/PureNoteIt/releases/latest) | Sürüm notları ve güncel kurulum paketleri. |
+
+> **macOS İlk Açılış Notu (İmzasız / Ad-Hoc Paket):** Uygulama Apple Developer Notarization olmadan paylaşıldığı için ilk açılışta macOS *"Doğrulanmamış geliştirici"* uyarısı gösterebilir.
+> 1. `.dmg` dosyasını açıp **PureNoteIt.app** uygulamasını **Applications** klasörüne sürükleyin.
+> 2. İlk açılışta uyarı çıkarsa **Sistem Ayarları → Gizlilik ve Güvenlik → "Yine de Aç"** *(System Settings → Privacy & Security → Open Anyway)* seçeneğine tıklayın *(veya Terminal'de `xattr -cr /Applications/PureNoteIt.app` çalıştırın)*.
 
 ---
 
