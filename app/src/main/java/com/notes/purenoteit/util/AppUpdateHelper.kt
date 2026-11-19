@@ -42,17 +42,17 @@ object AppUpdateHelper {
     private const val MIN_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L // 12 saatte bir otomatik kontrol
 
     private val DEFAULT_RELEASE_NOTES_TR = listOf(
-        "🖥️ PC'de Çizim & Ses: Şekil araçları, geri/ileri al ve mikrofon kaydı artık masaüstünde de var.",
-        "📋 Görev Panosu: Yapılacaklar, Devam Ediyor, İnceleniyor ve Tamamlandı sütunları PC'de de kullanılabilir.",
-        "⚡ Akıllı Eşitleme: Notlar yalnızca Kaydet veya Geri'de eşitlenir; kopya ve gereksiz bildirim kalmaz.",
-        "🔒 Güvenlik: Şifreli medya, PIN ve çöp saklama süresi cihazlar arasında birebir eşitlenir."
+        "⚡ Hızlandırılmış Drive Eşitleme: Paralel indirme/yükleme, toplu medya önbelleği ve çok çekirdekli şifre çözme.",
+        "🔑 Token Önbelleği & Erken İptal: Daha az sistem kilidi ve hata anında gereksiz ağ yükünü durduran fail-fast akışı.",
+        "🔐 Yeni Cihaz Kasa Akışı: Temiz kurulumda ilk seferde doğrudan PIN, sonrasında sorunsuz parmak izi açılışı.",
+        "🖥️ PC & Telefon Uyumu: Çizim şekilleri, ses kaydı, 4 sütunlu görev panosu ve birebir eşitleme iyileştirmeleri."
     )
 
     private val DEFAULT_RELEASE_NOTES_EN = listOf(
-        "🖥️ Drawing & Audio on PC: Shape tools, undo/redo and microphone recording now on desktop too.",
-        "📋 Task Board: To Do, In Progress, In Review and Completed columns are now on PC as well.",
-        "⚡ Smart Sync: Notes sync only on Save or Back; no duplicates and no noisy notifications.",
-        "🔒 Security: Encrypted media, PIN and trash retention stay in perfect sync across devices."
+        "⚡ Faster Drive Sync: Parallel delta/media transfers, bulk fileId cache and multi-core decryption.",
+        "🔑 Token Cache & Fail-Fast: Lower lock contention and instant cancellation on network or crypto errors.",
+        "🔐 Smart New-Device Vault: Direct PIN prompt on fresh install before enabling seamless fingerprint unlock.",
+        "🖥️ PC & Phone Parity: Desktop drawing shapes, voice recording, 4-column Task Board and sync refinements."
     )
 
     fun getAppUpdateManager(context: Context): AppUpdateManager {
@@ -62,7 +62,7 @@ object AppUpdateHelper {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val pInfo = getPackageInfo(context)
-            pInfo.versionName ?: "1.2.1"
+            pInfo.versionName ?: "1.2.5"
         } catch (e: Exception) {
             "1.2.1"
         }

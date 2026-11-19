@@ -421,13 +421,68 @@ class SyncEngineAndConflictTest {
         assertNull(res.conflictCopy)
     }
 
+    @Test
+    fun `coklu medya yukleme ve indirme paralel batch ve prefetchMediaIndex ile eksiksiz calismalidir`() = runTest {
+        var now = 10_000L
+        val clock = AppClock { now }
+        val remote = FakeRemoteDrive()
+        val phoneStore = InMemorySyncStore(deviceId = "phone-A")
+        val pcStore = InMemorySyncStore(deviceId = "pc-B")
+
+        val phoneEngine = SharedSyncFactory.createSyncEngine(phoneStore, remote, clock)
+        val pcEngine = SharedSyncFactory.createSyncEngine(pcStore, remote, clock)
+
+        // Create 10 distinct canonical media blobs (spans 2 batches of MEDIA_BATCH_SIZE = 8)
+        val keys = (1..10).map { idx ->
+            val raw = "media-payload-number-$idx-purenoteit".encodeToByteArray()
+            val key = "media/images/${sha256Hex(raw)}.jpg"
+            phoneStore.media[key] = raw
+            key
+        }
+        phoneStore.notes["multi-media-note"] = Note(
+            id = 1,
+            title = "Galeri Notu",
+            images = keys,
+            syncUuid = "multi-media-note",
+            updatedAt = now,
+            syncVersion = 1L
+        )
+
+        val pushRes = phoneEngine.synchronize(masterPassphrase) as AppResult.Success
+        assertEquals(10, pushRes.data.mediaUploaded)
+        assertEquals(10, remote.blobs.size)
+        assertEquals(1, remote.prefetchCalls.get())
+
+        now = 20_000L
+        val pullRes = pcEngine.synchronize(masterPassphrase) as AppResult.Success
+        assertEquals(10, pullRes.data.mediaDownloaded)
+        assertEquals(2, remote.prefetchCalls.get())
+        keys.forEach { key ->
+            assertArrayEquals(phoneStore.media[key], pcStore.media[key])
+        }
+
+        phoneEngine.resetSessionCaches()
+        assertEquals(1, remote.invalidateCalls.get())
+    }
+
     private fun assertNullIfMissing(bytes: ByteArray?) {
         assertTrue(bytes == null)
     }
 
     private class FakeRemoteDrive : RemoteSyncDataSource {
         val deltas = mutableListOf<RemoteEncryptedChange>()
-        val blobs = mutableMapOf<String, ByteArray>()
+        val blobs = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
+        val prefetchCalls = java.util.concurrent.atomic.AtomicInteger(0)
+        val invalidateCalls = java.util.concurrent.atomic.AtomicInteger(0)
+
+        override suspend fun prefetchMediaIndex(): AppResult<Unit, DataError.Network> {
+            prefetchCalls.incrementAndGet()
+            return AppResult.Success(Unit)
+        }
+
+        override suspend fun invalidateCaches() {
+            invalidateCalls.incrementAndGet()
+        }
 
         override suspend fun pullChanges(sinceCursor: String?): AppResult<RemoteSyncPullPage, DataError.Network> {
             val fromIdx = sinceCursor?.toIntOrNull() ?: 0

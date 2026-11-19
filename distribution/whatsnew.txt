@@ -1,21 +1,17 @@
 <tr-TR>
-PureNoteIt v1.2.4: PC ve telefon artık birebir uyumlu!
+PureNoteIt v1.2.5: Google Drive eşitleme artık çok daha hızlı!
 
-🖥️ PC'de çizim şekilleri, geri/ileri al ve ses kaydı
-📋 PC'de Görev Panosu (4 sütun)
-⚡ Yalnızca Kaydet/Geri'de eşitleme: anlık, tekrarsız
-🗑️ Çöp süresi PC ile telefonda eşit
-🔒 Şifreli medya ve PIN eşitleme
-✨ Modern ikonlar, daha temiz kartlar
+⚡ İlk ve artımlı eşitlemede paralel delta indirme ve çok çekirdekli şifre çözme
+🖼️ Medya fileId önbelleği ile paralel fotoğraf/çizim indirme ve yükleme
+🔑 Bellek içi token önbelleği ve hata anında erken iptal (fail-fast)
+🔐 Yeni cihazda ilk açılışta doğrudan PIN, ardından sorunsuz parmak izi kasası
 </tr-TR>
 
 <en-US>
-PureNoteIt v1.2.4: PC and phone now in perfect sync!
+PureNoteIt v1.2.5: Google Drive sync is now significantly faster!
 
-🖥️ PC drawing shapes, undo/redo and voice recording
-📋 Task Board on PC (4 columns)
-⚡ Sync on Save/Back only: instant, no duplicates
-🗑️ Trash retention matches on PC and phone
-🔒 Encrypted media and PIN sync
-✨ Modern icons, cleaner cards
+⚡ Parallel initial & incremental delta downloads with multi-core decryption
+🖼️ Media fileId index cache with parallel photo/drawing uploads and downloads
+🔑 In-memory OAuth token cache and fail-fast error cancellation
+🔐 Direct PIN prompt on fresh installs before seamless fingerprint vault unlock
 </en-US>

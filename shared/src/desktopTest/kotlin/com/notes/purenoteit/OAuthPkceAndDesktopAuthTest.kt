@@ -421,6 +421,59 @@ class OAuthPkceAndDesktopAuthTest {
         assertFalse(isKeyringNotFoundMessage(null))
     }
 
+    @Test
+    fun `OAuthSyncTokenProvider bellek ici onbellek ile paralel cagrilarda storage okumalarini teke indirmeli ve invalidateCache ile sifirlamalidir`() =
+        runTest {
+            val readCount = AtomicInteger(0)
+            val baseStorage = InMemorySecureTokenStorage()
+            baseStorage.saveTokenBundle(
+                OAuthTokenBundle(
+                    accessToken = "cached-access-1",
+                    refreshToken = "keep-refresh",
+                    expiresAtEpochMillis = clockMillis + 300_000L
+                )
+            )
+            val countingStorage = object : SecureTokenStorage by baseStorage {
+                override suspend fun getTokenBundle(): AppResult<OAuthTokenBundle?, DataError.Security> {
+                    readCount.incrementAndGet()
+                    return baseStorage.getTokenBundle()
+                }
+            }
+            val protocol = OAuthPkceProtocol(
+                httpEngine = MockEngine { respond("", HttpStatusCode.InternalServerError) },
+                clock = testClock
+            )
+            val provider = OAuthSyncTokenProvider(
+                tokenStorage = countingStorage,
+                pkceProtocol = protocol,
+                configProvider = OAuthClientConfigProvider { defaultConfig },
+                clock = testClock
+            )
+
+            // Cold start with 12 concurrent requests must read SecureTokenStorage exactly once
+            val burst = (1..12).map { async { provider.getAccessToken() } }.awaitAll()
+            assertTrue(burst.all { it == AppResult.Success("cached-access-1") })
+            assertEquals(1, readCount.get())
+
+            // Subsequent calls hit lock-free memory cache without touching storage
+            repeat(10) {
+                assertEquals(AppResult.Success("cached-access-1"), provider.getAccessToken())
+            }
+            assertEquals(1, readCount.get())
+
+            // After invalidateCache (e.g. account disconnect/reconnect), storage is queried again
+            baseStorage.saveTokenBundle(
+                OAuthTokenBundle(
+                    accessToken = "cached-access-2",
+                    refreshToken = "keep-refresh-2",
+                    expiresAtEpochMillis = clockMillis + 300_000L
+                )
+            )
+            provider.invalidateCache()
+            assertEquals(AppResult.Success("cached-access-2"), provider.getAccessToken())
+            assertEquals(2, readCount.get())
+        }
+
     private class FakeOsKeyringClient : OsKeyringClient {
         private val store = mutableMapOf<Pair<String, String>, String>()
 

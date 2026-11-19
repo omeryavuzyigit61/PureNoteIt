@@ -463,6 +463,12 @@ object SecurityUtil {
         }
     }
 
+    /** True once a PIN unlock on this device has stored the hardware-wrapped vault key. */
+    fun hasBiometricVaultKey(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
+        return !prefs.getString(KEY_HW_WRAPPED_VAULT_KEY, null).isNullOrBlank()
+    }
+
     fun restoreBiometricVaultKey(context: Context) {
         if (sessionVaultKeyChars != null) return
         val prefs = context.getSharedPreferences(SHARED_PREFENCES_KEY, Context.MODE_PRIVATE)
@@ -547,6 +553,12 @@ object SecurityUtil {
         onUnlocked: () -> Unit,
         onFallbackToPin: () -> Unit
     ) {
+        // Fresh install / new device: the hardware-wrapped vault key only exists after the first PIN unlock.
+        // Until then a fingerprint prompt cannot restore the key, so skip it and ask for the PIN directly.
+        if (!hasBiometricVaultKey(activity)) {
+            onFallbackToPin()
+            return
+        }
         val biometricManager = BiometricManager.from(activity)
         val canStrongAuth = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
         if (canStrongAuth != BiometricManager.BIOMETRIC_SUCCESS) {

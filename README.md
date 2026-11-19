@@ -27,7 +27,7 @@
     <img src="https://img.shields.io/badge/KMP-Kotlin%20Multiplatform-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin Multiplatform" />
     <img src="https://img.shields.io/badge/Security-AES--256--GCM%20E2EE-175DDC?style=for-the-badge&logo=bitwarden&logoColor=white" alt="Security" />
     <img src="https://img.shields.io/badge/Sync-Google%20Drive%20appDataFolder-FF900F?style=for-the-badge&logo=googledrive&logoColor=white" alt="Google Drive E2EE Sync" />
-    <img src="https://img.shields.io/badge/Version-1.2.4-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-1.2.5-orange?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
   </p>
 
@@ -288,7 +288,11 @@ flowchart TD
 
 ## 📋 Sürüm Notları / Changelog
 
-### v1.2.4 (En Son Sürüm / Latest)
+### v1.2.5 (En Son Sürüm / Latest)
+- ⚡ **Çok Daha Hızlı Google Drive Eşitleme:** İlk ve artımlı eşitlemede paralel delta indirme, 4 çekirdekli paralel şifre çözme, toplu `fileId` önbelleği ile paralel medya indirme/yükleme, bellek içi OAuth token önbelleği ve hata anında erken iptal (`fail-fast`) eklendi.
+- 🔐 **Yeni Cihazda Akıllı Kasa Açılışı:** Temiz kurulum veya yeni cihazda donanım sarmallı anahtar oluşmadan önce parmak izi döngüsüne girmeden doğrudan PIN isteyen akış ve Türkçe/İngilizce kasa bilgilendirmeleri eklendi.
+
+### v1.2.4
 - 🖥️ **PC Çizim Stüdyosu & Ses Kaydı:** Şekil araçları (Çizgi, Kare, Daire, Üçgen, Ok, Yıldız), kalınlık kaydırıcısı, Geri/İleri Al ve RAM'den şifreli `PDM1` WAV mikrofon kaydı masaüstüne eklendi.
 - 📋 **4 Sütunlu Görev Panosu & Modern Kartlar:** Yapılacaklar, Devam Ediyor, İnceleniyor ve Tamamlandı sütunlu Kanban panosu, ayrıştırılmış *Son Kullanılanlar* şeridi ve modern Material vektör rozetleri masaüstünde yayına alındı.
 - ⚡ **Akıllı Eşitleme & Çöp Saklama Uyumu:** Notlar yalnızca *Kaydet* veya *Geri* adımlarında eşitlenerek çakışma ve gereksiz bildirimler önlendi; çöp saklama süresi ve not PIN'i cihazlar arasında birebir senkronlandı.

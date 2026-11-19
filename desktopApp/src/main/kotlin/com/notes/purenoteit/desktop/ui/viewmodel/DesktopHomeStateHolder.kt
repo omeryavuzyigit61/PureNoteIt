@@ -1430,6 +1430,7 @@ internal class DesktopHomeStateHolder(
             try {
                 when (val authRes = pkceManager.authorizeInteractive(config)) {
                     is AppResult.Success -> {
+                        driveSyncEngine.resetSessionCaches()
                         _uiState.update { it.copy(isDriveConnected = true, isSyncing = false) }
                         emitMessage("Google Drive hesabı bağlandı. Notlar şifrelenip eşitleniyor...")
                         triggerDriveSync(silent = false, fetchUsage = true)
@@ -1464,6 +1465,7 @@ internal class DesktopHomeStateHolder(
         autoSyncMonitorJob?.cancel()
         scope.launch {
             tokenStorage.clearAll()
+            driveSyncEngine.resetSessionCaches()
             _uiState.update {
                 it.copy(
                     isDriveConnected = false,

@@ -18,6 +18,15 @@ import com.notes.purenoteit.sync.model.SyncSummary
 import com.notes.purenoteit.sync.model.toDomain
 import com.notes.purenoteit.sync.model.toSyncDto
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import com.notes.purenoteit.sync.model.RemoteEncryptedChange
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
@@ -60,6 +69,104 @@ class SyncEngine(
         }
     }
 
+    /** Clears in-memory remote transport & auth token caches (call on account disconnect or switch). */
+    suspend fun resetSessionCaches() {
+        remoteDataSource.invalidateCaches()
+    }
+
+    private class FailFastAppException(val error: AppError) : Exception()
+
+    private suspend fun <T, R> mapParallelCpuFailFast(
+        items: List<T>,
+        block: suspend (T) -> AppResult<R, AppError>
+    ): AppResult<List<R>, AppError> {
+        if (items.isEmpty()) return AppResult.Success(emptyList())
+        if (items.size == 1) {
+            return when (val single = block(items[0])) {
+                is AppResult.Failure -> single
+                is AppResult.Success -> AppResult.Success(listOf(single.data))
+            }
+        }
+        return try {
+            val results = coroutineScope {
+                val gate = Semaphore(PARALLELISM)
+                items.map { item ->
+                    async(Dispatchers.Default) {
+                        gate.withPermit {
+                            when (val res = block(item)) {
+                                is AppResult.Success -> res.data
+                                is AppResult.Failure -> throw FailFastAppException(res.error)
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+            AppResult.Success(results)
+        } catch (e: FailFastAppException) {
+            if (!currentCoroutineContext().isActive) throw CancellationException()
+            AppResult.Failure(e.error)
+        }
+    }
+
+    private suspend fun decryptChangesParallel(
+        changes: List<RemoteEncryptedChange>,
+        keyChars: CharArray
+    ): AppResult<List<SyncDeltaPayload>, AppError> {
+        val activeChanges = changes.filter { !it.isRemoteDeleted && !it.encryptedEnvelope.isNullOrBlank() }
+        return mapParallelCpuFailFast(activeChanges) { change ->
+            val dec = vaultCrypto.decryptEnvelope(
+                encryptedText = change.encryptedEnvelope.orEmpty(),
+                passphrase = keyChars,
+                legacyFallbackSecret = null
+            )
+            when (dec) {
+                is AppResult.Failure -> AppResult.Failure(dec.error)
+                is AppResult.Success -> try {
+                    AppResult.Success(json.decodeFromString<SyncDeltaPayload>(dec.data))
+                } catch (_: Exception) {
+                    AppResult.Failure(DataError.Network.SERIALIZATION)
+                }
+            }
+        }
+    }
+
+    private suspend fun fetchMediaBatch(
+        keys: List<String>,
+        keyChars: CharArray
+    ): AppResult<List<Pair<String, ByteArray>>, AppError> {
+        return mapParallelCpuFailFast(keys) { mediaKey ->
+            val encrypted = when (val dl = remoteDataSource.downloadMediaBlob(mediaKey)) {
+                is AppResult.Failure -> return@mapParallelCpuFailFast AppResult.Failure(dl.error)
+                is AppResult.Success -> dl.data
+            }
+            val plain = when (val dec = vaultCrypto.decryptMediaBytesStrict(encrypted, keyChars)) {
+                is AppResult.Failure -> return@mapParallelCpuFailFast AppResult.Failure(dec.error)
+                is AppResult.Success -> dec.data
+            }
+            val expectedSha = extractSha256FromCanonicalKey(mediaKey)
+            if (expectedSha != null && sha256Hex(plain) != expectedSha) {
+                return@mapParallelCpuFailFast AppResult.Failure(DataError.Security.INTEGRITY_MISMATCH)
+            }
+            AppResult.Success(mediaKey to plain)
+        }
+    }
+
+    private suspend fun uploadMediaBatch(
+        items: List<Pair<String, ByteArray>>,
+        keyChars: CharArray
+    ): AppResult<List<String>, AppError> {
+        return mapParallelCpuFailFast(items) { (mediaKey, rawBytes) ->
+            val encBytes = when (val enc = vaultCrypto.encryptMediaBytes(rawBytes, keyChars)) {
+                is AppResult.Failure -> return@mapParallelCpuFailFast AppResult.Failure(enc.error)
+                is AppResult.Success -> enc.data
+            }
+            when (val up = remoteDataSource.uploadMediaBlob(mediaKey, encBytes)) {
+                is AppResult.Failure -> AppResult.Failure(up.error)
+                is AppResult.Success -> AppResult.Success(mediaKey)
+            }
+        }
+    }
+
     private suspend fun executeSyncInternal(keyChars: CharArray): AppResult<SyncSummary, AppError> {
         val initialCursorState = localStore.getSyncCursorState()
         val deviceId = initialCursorState.deviceId.ifBlank { sharedRandomUuid() }
@@ -75,24 +182,10 @@ class SyncEngine(
                 is AppResult.Success -> pageRes.data
             }
 
-            for (change in page.changes) {
-                if (change.isRemoteDeleted || change.encryptedEnvelope.isNullOrBlank()) continue
-                val decRes = vaultCrypto.decryptEnvelope(
-                    encryptedText = change.encryptedEnvelope,
-                    passphrase = keyChars,
-                    legacyFallbackSecret = null
-                )
-                val decryptedJson = when (decRes) {
-                    is AppResult.Failure -> return decRes
-                    is AppResult.Success -> decRes.data
-                }
-                val payload = try {
-                    json.decodeFromString<SyncDeltaPayload>(decryptedJson)
-                } catch (_: Exception) {
-                    return AppResult.Failure(DataError.Network.SERIALIZATION)
-                }
-                if (payload.deviceId != deviceId && !payload.isEmpty()) {
-                    pulledPayloads += payload
+            when (val decrypted = decryptChangesParallel(page.changes, keyChars)) {
+                is AppResult.Failure -> return decrypted
+                is AppResult.Success -> decrypted.data.forEach { payload ->
+                    if (payload.deviceId != deviceId && !payload.isEmpty()) pulledPayloads += payload
                 }
             }
 
@@ -152,27 +245,27 @@ class SyncEngine(
             notes = mergedNotesByUuid.values,
             streamItems = mergedStreamByUuid.values
         )
-        for (mediaKey in pulledMediaKeys) {
-            if (localStore.hasLocalMedia(mediaKey)) continue
-            val dlRes = remoteDataSource.downloadMediaBlob(mediaKey)
-            val encryptedBlob = when (dlRes) {
-                is AppResult.Failure -> return dlRes
-                is AppResult.Success -> dlRes.data
+        val missingMediaKeys = pulledMediaKeys.filter { !localStore.hasLocalMedia(it) }
+        if (missingMediaKeys.size >= 2) {
+            when (val prefetchRes = remoteDataSource.prefetchMediaIndex()) {
+                is AppResult.Failure -> return prefetchRes
+                is AppResult.Success -> Unit
             }
-            val decBytesRes = vaultCrypto.decryptMediaBytesStrict(encryptedBlob, keyChars)
-            val plainBytes = when (decBytesRes) {
-                is AppResult.Failure -> return decBytesRes
-                is AppResult.Success -> decBytesRes.data
+        }
+        for (batch in missingMediaKeys.chunked(MEDIA_BATCH_SIZE)) {
+            // Download + PBKDF2 decrypt + integrity check run in parallel (fail-fast); disk writes stay sequential.
+            val fetched = fetchMediaBatch(batch, keyChars)
+            val plainByKey = when (fetched) {
+                is AppResult.Failure -> return fetched
+                is AppResult.Success -> fetched.data
             }
-            val expectedSha = extractSha256FromCanonicalKey(mediaKey)
-            if (expectedSha != null && sha256Hex(plainBytes) != expectedSha) {
-                return AppResult.Failure(DataError.Security.INTEGRITY_MISMATCH)
-            }
-            when (val writeRes = localStore.writeLocalMediaBytes(mediaKey, plainBytes)) {
-                is AppResult.Failure -> return writeRes
-                is AppResult.Success -> {
-                    mediaDownloaded++
-                    downloadedMediaKeys += mediaKey
+            for ((mediaKey, plainBytes) in plainByKey) {
+                when (val writeRes = localStore.writeLocalMediaBytes(mediaKey, plainBytes)) {
+                    is AppResult.Failure -> return writeRes
+                    is AppResult.Success -> {
+                        mediaDownloaded++
+                        downloadedMediaKeys += mediaKey
+                    }
                 }
             }
         }
@@ -301,22 +394,26 @@ class SyncEngine(
         // Upload referenced canonical media blobs that haven't been uploaded yet
         val alreadyUploaded = initialCursorState.uploadedMediaKeys + downloadedMediaKeys
         val localMediaKeys = collectReferencedCanonicalMediaKeys(snapshot.notes, snapshot.streamItems)
+        val pendingUploadKeys = localMediaKeys.filter { it !in alreadyUploaded }
         val newlyUploadedKeys = mutableSetOf<String>()
         var mediaUploaded = 0
 
-        for (mediaKey in localMediaKeys) {
-            if (mediaKey in alreadyUploaded) continue
-            val rawBytes = localStore.readLocalMediaBytes(mediaKey) ?: continue
-            val encBytesRes = vaultCrypto.encryptMediaBytes(rawBytes, keyChars)
-            val encBytes = when (encBytesRes) {
-                is AppResult.Failure -> return encBytesRes
-                is AppResult.Success -> encBytesRes.data
+        if (pendingUploadKeys.size >= 2) {
+            when (val prefetchRes = remoteDataSource.prefetchMediaIndex()) {
+                is AppResult.Failure -> return prefetchRes
+                is AppResult.Success -> Unit
             }
-            when (val upRes = remoteDataSource.uploadMediaBlob(mediaKey, encBytes)) {
-                is AppResult.Failure -> return upRes
+        }
+        for (batch in pendingUploadKeys.chunked(MEDIA_BATCH_SIZE)) {
+            val readableItems = batch.mapNotNull { mediaKey ->
+                localStore.readLocalMediaBytes(mediaKey)?.let { rawBytes -> mediaKey to rawBytes }
+            }
+            if (readableItems.isEmpty()) continue
+            when (val uploaded = uploadMediaBatch(readableItems, keyChars)) {
+                is AppResult.Failure -> return uploaded
                 is AppResult.Success -> {
-                    newlyUploadedKeys += mediaKey
-                    mediaUploaded++
+                    newlyUploadedKeys += uploaded.data
+                    mediaUploaded += uploaded.data.size
                 }
             }
         }
@@ -470,6 +567,8 @@ class SyncEngine(
 
     companion object {
         private const val MAX_PULL_PAGES = 50
+        private const val PARALLELISM = 4
+        private const val MEDIA_BATCH_SIZE = 8
         private val CANONICAL_MEDIA_REGEX =
             Regex("^media/(images|drawings|audio|files)/[a-f0-9]{64}\\.[a-z0-9]{1,8}$")
     }

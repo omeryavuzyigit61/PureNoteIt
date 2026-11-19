@@ -87,11 +87,11 @@
     <string name="subpage_badge">Alt Sayfa</string>
     <string name="subpages_count">%1$d Alt Sayfa</string>
     <string name="locked_note_title">Korumalı Not (AES-256)</string>
-    <string name="locked_note_subtitle">Bu not şifrelenmiştir. Görüntülemek için parmak izinizi okutun veya PIN girin.</string>
+    <string name="locked_note_subtitle">Bu not şifrelenmiştir. Görüntülemek için parmak izinizi okutun veya PIN girin. Yeni bir cihazda ya da yeniden kurulumdan sonra ilk seferde PIN girmeniz gerekir; PIN ile açtıktan sonra parmak izi de çalışır.</string>
     <string name="unlock_button">Kasanın Kilidini Aç</string>
     <string name="go_back">Geri Dön</string>
     <string name="enter_pin">PIN Girin</string>
-    <string name="enter_pin_desc">Korumalı notu açmak için 6 haneli PIN kodunuzu girin.</string>
+    <string name="enter_pin_desc">Korumalı notu açmak için 6 haneli PIN kodunuzu girin. İlk seferlik PIN ile açtıktan sonra parmak izinizi kullanabilirsiniz.</string>
     <string name="biometric_prompt_title">Korumalı Not</string>
     <string name="biometric_prompt_subtitle">Devam etmek için parmak izinizi okutun</string>
     <string name="wrong_pin">Hatalı PIN!</string>

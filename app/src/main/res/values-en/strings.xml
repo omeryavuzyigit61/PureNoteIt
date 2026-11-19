@@ -87,11 +87,11 @@
     <string name="subpage_badge">Sub-page</string>
     <string name="subpages_count">%1$d Sub-pages</string>
     <string name="locked_note_title">Protected Note (AES-256)</string>
-    <string name="locked_note_subtitle">This note is encrypted. Scan your fingerprint or enter PIN to view.</string>
+    <string name="locked_note_subtitle">This note is encrypted. Scan your fingerprint or enter PIN to view. On a new device or after reinstalling, you need to enter your PIN the first time; after unlocking with the PIN, fingerprint works too.</string>
     <string name="unlock_button">Unlock Vault</string>
     <string name="go_back">Go Back</string>
     <string name="enter_pin">Enter PIN</string>
-    <string name="enter_pin_desc">Enter your 6-digit PIN code to unlock the protected note.</string>
+    <string name="enter_pin_desc">Enter your 6-digit PIN code to unlock the protected note. After the first PIN unlock you can use your fingerprint.</string>
     <string name="biometric_prompt_title">Protected Note</string>
     <string name="biometric_prompt_subtitle">Scan fingerprint to continue</string>
     <string name="wrong_pin">Incorrect PIN!</string>

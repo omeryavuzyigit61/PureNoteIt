@@ -1,0 +1,40 @@
+PureNoteIt; notlarınızı, kodlarınızı, çalışma planlarınızı ve günlük görevlerinizi tek yerde, sade ve güvenli biçimde yönetmeniz için geliştirilmiş kişisel not uygulamasıdır. Kalemi eline aldığın anda çizersin, yazarsın, bağlarsın.
+
+GİZLİLİK VE GÜVENLİK
+• Notlarınız cihazınızda şifreli veritabanında (SQLCipher) saklanır; resim, ses ve çizim dosyaları da şifrelidir (AES-256).
+• Hassas notlarınızı PIN ve parmak izi ile korunan Kasa'ya alın.
+• Bulut senkronu isteğe bağlıdır. Açarsanız veriler, yalnızca sizin parolanızla çözülebilen uçtan uca şifreli paketler olarak kendi Google Drive uygulama alanınıza yazılır. PureNoteIt'in kendi sunucusu yoktur; verileriniz bize ulaşmaz.
+• Reklam ve izleyici (tracker) yoktur.
+
+KALEMLE ÇİZİM
+• Not içinde doğrudan çizim: kalemi ekrana değdirdiğin an çizmeye başlarsın, parmakla sayfayı kaydırırsın.
+• Basınca duyarlı kalınlık, fosforlu kalem, çizgi silgisi ve geri alma.
+• İki parmakla yakınlaştırma ve kaydırma.
+
+ZENGİN BLOK EDİTÖRÜ
+• Başlıklar, yapılacaklar listesi, maddeli liste, alıntı kutusu, tablo ve açılır-kapanır bloklar.
+• Sözdizimi vurgulamalı kod blokları (Kotlin, Python, JavaScript, Java, C++ ve daha fazlası).
+• LaTeX matematik formülleri ve anlık önizleme.
+• İçindekiler tablosu ile uzun notlarda tek dokunuşla gezinme.
+• Ses kaydı ve resim ekleme.
+
+BAĞLANTILI DÜŞÜNME
+• Notları çift yönlü bağlayın (geri bağlantılar) ve bilgi grafiğinde ilişkileri görün.
+• Alt sayfalarla hiyerarşik dokümanlar oluşturun.
+
+ARAMA VE ÇEVİRİ
+• Başlıkların yanı sıra paragraf ve kod içeriğinde de anlık arama.
+• Kamera ile metin tarama (OCR): kitap, tahta veya belgedeki yazıyı düzenlenebilir nota çevirin. Tarama cihazınızda çalışır.
+
+HATIRLATICILAR VE WIDGET
+• Notlara hatırlatıcı ekleyin.
+• Ana ekran widget'ı ile önemli notlarınıza ve yapılacaklarınıza hızlı erişin.
+
+DIŞA AKTARMA VE YEDEK
+• Notları biçimlendirilmiş PDF veya Markdown olarak paylaşın.
+• Parolayla şifrelenmiş yedek alın ve geri yükleyin.
+
+WINDOWS UYGULAMASI
+• PureNoteIt'in Windows sürümü Google Drive senkronu ile aynı notlarınıza erişir.
+
+Sıfır reklam. Sıfır takipçi. Notlarınız sizin.

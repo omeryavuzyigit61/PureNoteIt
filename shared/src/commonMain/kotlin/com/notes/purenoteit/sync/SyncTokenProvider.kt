@@ -11,4 +11,7 @@ interface SyncTokenProvider {
     suspend fun getAccessToken(): AppResult<String, DataError.Network>
 
     suspend fun refreshAccessToken(expiredToken: String?): AppResult<String, DataError.Network>
+
+    /** Clears any in-memory cached access token (e.g. on account disconnect or switch). */
+    fun invalidateCache() {}
 }

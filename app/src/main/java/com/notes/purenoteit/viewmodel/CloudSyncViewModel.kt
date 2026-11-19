@@ -146,6 +146,7 @@ class CloudSyncViewModel @Inject constructor(
                         _effects.trySend(CloudSyncUiEffect.ShowMessage(mapErrorToRes(authRes.error)))
                     }
                     is AppResult.Success -> {
+                        syncEngine.resetSessionCaches()
                         _uiState.update { it.copy(isDriveConnected = true) }
                         _effects.trySend(CloudSyncUiEffect.ShowMessage(R.string.cloud_sync_connected_toast))
                         executeAutoKeySyncLocked()
@@ -257,6 +258,7 @@ class CloudSyncViewModel @Inject constructor(
     private fun disconnect() {
         viewModelScope.launch {
             tokenStorage.clearAll()
+            syncEngine.resetSessionCaches()
             _uiState.update {
                 it.copy(
                     isDriveConnected = false,

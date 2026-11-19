@@ -7,10 +7,13 @@ import com.notes.purenoteit.sync.SyncTokenProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
 
 /**
  * Shared [SyncTokenProvider] integrating [SecureTokenStorage] with [OAuthPkceProtocol].
- * Performs Mutex-guarded single-flight token refresh and wipes revoked sessions on `invalid_grant`.
+ * Uses an in-memory access-token cache (avoiding per-request Keyring/DataStore lock contention
+ * during parallel Drive transfers), performs Mutex-guarded single-flight token refresh, and
+ * wipes revoked sessions on `invalid_grant`.
  */
 class OAuthSyncTokenProvider(
     private val tokenStorage: SecureTokenStorage,
@@ -19,44 +22,95 @@ class OAuthSyncTokenProvider(
     private val clock: AppClock
 ) : SyncTokenProvider {
 
+    private val loadMutex = Mutex()
     private val refreshMutex = Mutex()
 
+    @Volatile
+    private var cachedBundle: OAuthTokenBundle? = null
+
+    override fun invalidateCache() {
+        cachedBundle = null
+    }
+
     override suspend fun getAccessToken(): AppResult<String, DataError.Network> {
-        val bundle = when (val read = tokenStorage.getTokenBundle()) {
-            is AppResult.Failure -> return AppResult.Failure(DataError.Network.UNAUTHORIZED)
-            is AppResult.Success -> read.data ?: return AppResult.Failure(DataError.Network.UNAUTHORIZED)
-        }
         val now = clock.nowMillis()
-        if (bundle.accessToken.isNotBlank() && now < bundle.expiresAtEpochMillis - EXPIRY_SKEW_MS) {
-            return AppResult.Success(bundle.accessToken)
+        cachedBundle?.let { cached ->
+            if (isUsable(cached, now)) {
+                return AppResult.Success(cached.accessToken)
+            }
         }
-        return refreshAccessToken(bundle.accessToken)
+
+        val expiredTokenToRefresh = loadMutex.withLock {
+            val nowLocked = clock.nowMillis()
+            cachedBundle?.let { cached ->
+                if (isUsable(cached, nowLocked)) {
+                    return AppResult.Success(cached.accessToken)
+                }
+            }
+            val bundle = when (val read = tokenStorage.getTokenBundle()) {
+                is AppResult.Failure -> {
+                    cachedBundle = null
+                    return AppResult.Failure(DataError.Network.UNAUTHORIZED)
+                }
+                is AppResult.Success -> read.data ?: run {
+                    cachedBundle = null
+                    return AppResult.Failure(DataError.Network.UNAUTHORIZED)
+                }
+            }
+            if (isUsable(bundle, nowLocked)) {
+                cachedBundle = bundle
+                return AppResult.Success(bundle.accessToken)
+            }
+            bundle.accessToken
+        }
+
+        return refreshAccessToken(expiredTokenToRefresh)
     }
 
     override suspend fun refreshAccessToken(expiredToken: String?): AppResult<String, DataError.Network> {
         return refreshMutex.withLock {
             try {
-                val currentBundle = when (val read = tokenStorage.getTokenBundle()) {
-                    is AppResult.Failure -> return@withLock AppResult.Failure(DataError.Network.UNAUTHORIZED)
-                    is AppResult.Success -> read.data ?: return@withLock AppResult.Failure(DataError.Network.UNAUTHORIZED)
+                val now = clock.nowMillis()
+                cachedBundle?.let { cached ->
+                    if (expiredToken != null &&
+                        cached.accessToken != expiredToken &&
+                        isUsable(cached, now)
+                    ) {
+                        return@withLock AppResult.Success(cached.accessToken)
+                    }
                 }
 
-                val now = clock.nowMillis()
+                val currentBundle = when (val read = tokenStorage.getTokenBundle()) {
+                    is AppResult.Failure -> {
+                        cachedBundle = null
+                        return@withLock AppResult.Failure(DataError.Network.UNAUTHORIZED)
+                    }
+                    is AppResult.Success -> read.data ?: run {
+                        cachedBundle = null
+                        return@withLock AppResult.Failure(DataError.Network.UNAUTHORIZED)
+                    }
+                }
+
                 if (expiredToken != null &&
                     currentBundle.accessToken != expiredToken &&
-                    now < currentBundle.expiresAtEpochMillis - EXPIRY_SKEW_MS
+                    isUsable(currentBundle, now)
                 ) {
+                    cachedBundle = currentBundle
                     return@withLock AppResult.Success(currentBundle.accessToken)
                 }
 
                 val refreshToken = currentBundle.refreshToken?.takeIf { it.isNotBlank() }
-                    ?: return@withLock AppResult.Failure(DataError.Network.UNAUTHORIZED)
+                    ?: run {
+                        cachedBundle = null
+                        return@withLock AppResult.Failure(DataError.Network.UNAUTHORIZED)
+                    }
                 val config = configProvider.getConfig()
                     ?: return@withLock AppResult.Failure(DataError.Network.UNAUTHORIZED)
 
                 val refreshRes = pkceProtocol.refreshAccessToken(config, refreshToken)
                 when (refreshRes) {
                     is AppResult.Failure -> {
+                        cachedBundle = null
                         if (refreshRes.error == DataError.Network.UNAUTHORIZED) {
                             tokenStorage.clearAll()
                         }
@@ -64,8 +118,14 @@ class OAuthSyncTokenProvider(
                     }
                     is AppResult.Success -> {
                         when (tokenStorage.saveTokenBundle(refreshRes.data)) {
-                            is AppResult.Failure -> AppResult.Failure(DataError.Network.UNAUTHORIZED)
-                            is AppResult.Success -> AppResult.Success(refreshRes.data.accessToken)
+                            is AppResult.Failure -> {
+                                cachedBundle = null
+                                AppResult.Failure(DataError.Network.UNAUTHORIZED)
+                            }
+                            is AppResult.Success -> {
+                                cachedBundle = refreshRes.data
+                                AppResult.Success(refreshRes.data.accessToken)
+                            }
                         }
                     }
                 }
@@ -74,6 +134,9 @@ class OAuthSyncTokenProvider(
             }
         }
     }
+
+    private fun isUsable(bundle: OAuthTokenBundle, nowMillis: Long): Boolean =
+        bundle.accessToken.isNotBlank() && nowMillis < bundle.expiresAtEpochMillis - EXPIRY_SKEW_MS
 
     companion object {
         private const val EXPIRY_SKEW_MS = 60_000L

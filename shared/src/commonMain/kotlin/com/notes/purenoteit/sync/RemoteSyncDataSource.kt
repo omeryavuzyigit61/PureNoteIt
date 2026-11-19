@@ -41,4 +41,11 @@ interface RemoteSyncDataSource {
 
     suspend fun pruneOrphanMediaBlobs(activeCanonicalMediaKeys: Set<String>): AppResult<Int, DataError.Network> =
         AppResult.Success(0)
+
+    /** Optional hint to prefetch remote media blob file IDs in bulk before multi-blob transfers. */
+    suspend fun prefetchMediaIndex(): AppResult<Unit, DataError.Network> =
+        AppResult.Success(Unit)
+
+    /** Clears in-memory transport caches (media fileId index, auth token cache) on account switch/logout. */
+    suspend fun invalidateCaches() {}
 }

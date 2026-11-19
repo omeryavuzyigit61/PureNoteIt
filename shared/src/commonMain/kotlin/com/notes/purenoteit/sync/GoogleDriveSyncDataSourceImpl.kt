@@ -23,7 +23,14 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
@@ -48,10 +55,110 @@ internal class GoogleDriveSyncDataSourceImpl(
 
     private val client = HttpClient(httpEngine)
     private val tokenRefreshMutex = Mutex()
+    private val mediaCacheMutex = Mutex()
+    private val mediaIdCache = mutableMapOf<String, String>()
+    private var mediaIndexLoadedAtMillis: Long = 0L
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
         isLenient = true
+    }
+
+    private class FailFastNetworkException(val error: DataError.Network) : Exception()
+
+    private suspend fun <T, R> mapParallelFailFast(
+        items: List<T>,
+        parallelism: Int,
+        block: suspend (T) -> AppResult<R, DataError.Network>
+    ): AppResult<List<R>, DataError.Network> {
+        if (items.isEmpty()) return AppResult.Success(emptyList())
+        if (items.size == 1) {
+            return when (val single = block(items[0])) {
+                is AppResult.Failure -> single
+                is AppResult.Success -> AppResult.Success(listOf(single.data))
+            }
+        }
+        return try {
+            val results = coroutineScope {
+                val gate = Semaphore(parallelism)
+                items.map { item ->
+                    async {
+                        gate.withPermit {
+                            when (val res = block(item)) {
+                                is AppResult.Success -> res.data
+                                is AppResult.Failure -> throw FailFastNetworkException(res.error)
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+            AppResult.Success(results)
+        } catch (e: FailFastNetworkException) {
+            if (!currentCoroutineContext().isActive) throw CancellationException()
+            AppResult.Failure(e.error)
+        }
+    }
+
+    override suspend fun invalidateCaches() {
+        mediaCacheMutex.withLock {
+            mediaIdCache.clear()
+            mediaIndexLoadedAtMillis = 0L
+        }
+        tokenProvider.invalidateCache()
+    }
+
+    override suspend fun prefetchMediaIndex(): AppResult<Unit, DataError.Network> {
+        val now = clock.nowMillis()
+        val isFresh = mediaCacheMutex.withLock {
+            mediaIndexLoadedAtMillis > 0L && (now - mediaIndexLoadedAtMillis) in 0L until MEDIA_INDEX_TTL_MS
+        }
+        if (isFresh) return AppResult.Success(Unit)
+
+        val fetched = LinkedHashMap<String, String>()
+        var pageToken: String? = null
+        var loop = 0
+
+        do {
+            val resp = executeWithAuthAndBackoff { token ->
+                client.get("$DRIVE_API_BASE/files") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    url {
+                        parameters.append("spaces", "appDataFolder")
+                        parameters.append("q", "trashed = false and name contains '$MEDIA_BLOB_PREFIX'")
+                        parameters.append("orderBy", "createdTime asc")
+                        parameters.append("fields", "files(id,name),nextPageToken")
+                        parameters.append("pageSize", "100")
+                        pageToken?.let { parameters.append("pageToken", it) }
+                    }
+                }
+            }
+            val parsed = when (resp) {
+                is AppResult.Failure -> return resp
+                is AppResult.Success -> decodeFileList(resp.data)
+                    ?: return AppResult.Failure(DataError.Network.SERIALIZATION)
+            }
+            for (item in parsed.files) {
+                val name = item.name.orEmpty()
+                if (name.startsWith(MEDIA_BLOB_PREFIX) && !fetched.containsKey(name)) {
+                    fetched[name] = item.id
+                }
+            }
+            pageToken = parsed.nextPageToken?.takeIf { it.isNotBlank() }
+            loop++
+        } while (pageToken != null && loop < MAX_INDEX_PAGES)
+
+        val indexComplete = pageToken == null
+        mediaCacheMutex.withLock {
+            if (indexComplete) {
+                mediaIdCache.clear()
+                mediaIdCache.putAll(fetched)
+                mediaIndexLoadedAtMillis = clock.nowMillis()
+            } else {
+                mediaIdCache.putAll(fetched)
+                mediaIndexLoadedAtMillis = 0L
+            }
+        }
+        return AppResult.Success(Unit)
     }
 
     override suspend fun pullChanges(sinceCursor: String?): AppResult<RemoteSyncPullPage, DataError.Network> {
@@ -98,21 +205,27 @@ internal class GoogleDriveSyncDataSourceImpl(
                     ?: return AppResult.Failure(DataError.Network.SERIALIZATION)
             }
 
-            for (fileMeta in parsedList.files) {
-                val downloaded = downloadTextFileContent(fileMeta.id)
-                when (downloaded) {
-                    is AppResult.Failure -> return downloaded
-                    is AppResult.Success -> {
-                        allChanges += RemoteEncryptedChange(
-                            remoteId = fileMeta.id,
-                            fileName = fileMeta.name,
-                            modifiedAt = parseIso8601ToMillis(fileMeta.modifiedTime),
-                            isRemoteDeleted = false,
-                            encryptedEnvelope = downloaded.data
+            // Parallel (bounded + fail-fast) downloads; results keep Drive's modifiedTime order.
+            val downloadedChanges = when (
+                val dlRes = mapParallelFailFast(parsedList.files, DOWNLOAD_PARALLELISM) { meta ->
+                    when (val contentRes = downloadTextFileContent(meta.id)) {
+                        is AppResult.Failure -> contentRes
+                        is AppResult.Success -> AppResult.Success(
+                            RemoteEncryptedChange(
+                                remoteId = meta.id,
+                                fileName = meta.name,
+                                modifiedAt = parseIso8601ToMillis(meta.modifiedTime),
+                                isRemoteDeleted = false,
+                                encryptedEnvelope = contentRes.data
+                            )
                         )
                     }
                 }
+            ) {
+                is AppResult.Failure -> return dlRes
+                is AppResult.Success -> dlRes.data
             }
+            allChanges += downloadedChanges
             pageToken = parsedList.nextPageToken
         } while (!pageToken.isNullOrBlank())
 
@@ -124,6 +237,14 @@ internal class GoogleDriveSyncDataSourceImpl(
             )
         )
     }
+
+    private data class PendingIncrementalChange(
+        val fileId: String,
+        val fileName: String?,
+        val modifiedAt: Long,
+        val isDeleted: Boolean,
+        val needsDownload: Boolean
+    )
 
     private suspend fun pullIncrementalChanges(sinceCursor: String): AppResult<RemoteSyncPullPage, DataError.Network> {
         val changesResp = executeWithAuthAndBackoff { token ->
@@ -146,26 +267,60 @@ internal class GoogleDriveSyncDataSourceImpl(
                 ?: return AppResult.Failure(DataError.Network.SERIALIZATION)
         }
 
-        val resultChanges = mutableListOf<RemoteEncryptedChange>()
+        val pendingChanges = mutableListOf<PendingIncrementalChange>()
+        val mediaUpdates = mutableListOf<Pair<String, String?>>()
         for (change in parsed.changes) {
             val fileName = change.file?.name
+            val fileId = change.fileId ?: change.file?.id
+            val isDeleted = change.removed || change.file?.trashed == true
+
+            if (fileName != null && fileName.startsWith(MEDIA_BLOB_PREFIX)) {
+                mediaUpdates += fileName to (if (isDeleted) null else fileId)
+            }
+
             val isDelta = fileName?.startsWith(DELTA_FILE_PREFIX) == true
             if (!change.removed && !isDelta) continue
+            if (fileId == null) continue
 
-            val fileId = change.fileId ?: change.file?.id ?: continue
-            val isDeleted = change.removed || change.file?.trashed == true
-            val envelopeText = if (!isDeleted && isDelta) {
-                when (val dl = downloadTextFileContent(fileId)) {
-                    is AppResult.Failure -> return dl
-                    is AppResult.Success -> dl.data
-                }
-            } else null
-
-            resultChanges += RemoteEncryptedChange(
-                remoteId = fileId,
+            pendingChanges += PendingIncrementalChange(
+                fileId = fileId,
                 fileName = fileName,
                 modifiedAt = parseIso8601ToMillis(change.file?.modifiedTime),
-                isRemoteDeleted = isDeleted,
+                isDeleted = isDeleted,
+                needsDownload = !isDeleted && isDelta
+            )
+        }
+
+        if (mediaUpdates.isNotEmpty()) {
+            mediaCacheMutex.withLock {
+                for ((name, id) in mediaUpdates) {
+                    if (id == null) {
+                        mediaIdCache.remove(name)
+                    } else {
+                        mediaIdCache[name] = id
+                    }
+                }
+            }
+        }
+
+        val toDownload = pendingChanges.filter { it.needsDownload }
+        val downloadedContents = when (
+            val dlRes = mapParallelFailFast(toDownload, DOWNLOAD_PARALLELISM) { entry ->
+                downloadTextFileContent(entry.fileId)
+            }
+        ) {
+            is AppResult.Failure -> return dlRes
+            is AppResult.Success -> dlRes.data
+        }
+
+        var dlIdx = 0
+        val resultChanges = pendingChanges.map { entry ->
+            val envelopeText = if (entry.needsDownload) downloadedContents[dlIdx++] else null
+            RemoteEncryptedChange(
+                remoteId = entry.fileId,
+                fileName = entry.fileName,
+                modifiedAt = entry.modifiedAt,
+                isRemoteDeleted = entry.isDeleted,
                 encryptedEnvelope = envelopeText
             )
         }
@@ -221,10 +376,28 @@ internal class GoogleDriveSyncDataSourceImpl(
         val remoteFileName = toSafeMediaBlobName(mediaKey)
             ?: return AppResult.Failure(DataError.Network.UNKNOWN)
 
-        val existingCheck = findFileIdByExactName(remoteFileName)
-        when (existingCheck) {
-            is AppResult.Failure -> return existingCheck
-            is AppResult.Success -> if (existingCheck.data != null) return AppResult.Success(Unit)
+        val now = clock.nowMillis()
+        val (cachedId, hasFreshCompleteIndex) = mediaCacheMutex.withLock {
+            val existing = mediaIdCache[remoteFileName]
+            val fresh = mediaIndexLoadedAtMillis > 0L && (now - mediaIndexLoadedAtMillis) in 0L until MEDIA_INDEX_TTL_MS
+            existing to fresh
+        }
+        if (cachedId != null) {
+            return AppResult.Success(Unit)
+        }
+
+        if (!hasFreshCompleteIndex) {
+            val existingCheck = findFileIdByExactName(remoteFileName)
+            when (existingCheck) {
+                is AppResult.Failure -> return existingCheck
+                is AppResult.Success -> {
+                    val existingId = existingCheck.data
+                    if (existingId != null) {
+                        mediaCacheMutex.withLock { mediaIdCache[remoteFileName] = existingId }
+                        return AppResult.Success(Unit)
+                    }
+                }
+            }
         }
 
         val metadataJson = json.encodeToString(
@@ -237,7 +410,13 @@ internal class GoogleDriveSyncDataSourceImpl(
 
         return when (val up = uploadMultipartRelated(metadataJson, "application/octet-stream", encryptedBytes)) {
             is AppResult.Failure -> up
-            is AppResult.Success -> AppResult.Success(Unit)
+            is AppResult.Success -> {
+                val createdId = decodeCreatedFile(up.data)?.id
+                if (!createdId.isNullOrBlank()) {
+                    mediaCacheMutex.withLock { mediaIdCache[remoteFileName] = createdId }
+                }
+                AppResult.Success(Unit)
+            }
         }
     }
 
@@ -245,10 +424,33 @@ internal class GoogleDriveSyncDataSourceImpl(
         val remoteFileName = toSafeMediaBlobName(mediaKey)
             ?: return AppResult.Failure(DataError.Network.UNKNOWN)
 
+        val cachedId = mediaCacheMutex.withLock { mediaIdCache[remoteFileName] }
+        if (cachedId != null) {
+            var wasNotFound = false
+            val cachedDownload = executeBinaryWithAuthAndBackoff(onNotFound = { wasNotFound = true }) { token ->
+                client.get("$DRIVE_API_BASE/files/$cachedId") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    url { parameters.append("alt", "media") }
+                }
+            }
+            if (cachedDownload is AppResult.Success) {
+                return cachedDownload
+            }
+            if (!wasNotFound) {
+                return cachedDownload
+            }
+            // Cached ID became stale (e.g., deleted/re-uploaded by another device); evict and re-lookup once.
+            mediaCacheMutex.withLock {
+                mediaIdCache.remove(remoteFileName)
+                mediaIndexLoadedAtMillis = 0L
+            }
+        }
+
         val fileId = when (val findRes = findFileIdByExactName(remoteFileName)) {
             is AppResult.Failure -> return findRes
             is AppResult.Success -> findRes.data ?: return AppResult.Failure(DataError.Network.UNKNOWN)
         }
+        mediaCacheMutex.withLock { mediaIdCache[remoteFileName] = fileId }
 
         return executeBinaryWithAuthAndBackoff { token ->
             client.get("$DRIVE_API_BASE/files/$fileId") {
@@ -402,7 +604,7 @@ internal class GoogleDriveSyncDataSourceImpl(
 
     override suspend fun pruneOrphanMediaBlobs(activeCanonicalMediaKeys: Set<String>): AppResult<Int, DataError.Network> {
         val activeBlobNames = activeCanonicalMediaKeys.mapNotNull { toSafeMediaBlobName(it) }.toSet()
-        val orphanIds = mutableListOf<String>()
+        val orphanEntries = mutableListOf<Pair<String, String>>()
         var pageToken: String? = null
         var loop = 0
 
@@ -426,7 +628,7 @@ internal class GoogleDriveSyncDataSourceImpl(
             for (item in parsed.files) {
                 val name = item.name.orEmpty()
                 if (name.startsWith(MEDIA_BLOB_PREFIX) && name !in activeBlobNames) {
-                    orphanIds += item.id
+                    orphanEntries += item.id to name
                 }
             }
             pageToken = parsed.nextPageToken?.takeIf { it.isNotBlank() }
@@ -434,14 +636,20 @@ internal class GoogleDriveSyncDataSourceImpl(
         } while (pageToken != null && loop < 25)
 
         var deletedCount = 0
-        for (fileId in orphanIds) {
+        for ((fileId, fileName) in orphanEntries) {
             val safeId = sanitizeFileSegment(fileId)
             when (val delRes = executeBinaryWithAuthAndBackoff { token ->
                 client.delete("$DRIVE_API_BASE/files/$safeId") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                 }
             }) {
-                is AppResult.Success -> deletedCount++
+                is AppResult.Success -> {
+                    deletedCount++
+                    mediaCacheMutex.withLock {
+                        mediaIdCache.remove(fileName)
+                        mediaIndexLoadedAtMillis = 0L
+                    }
+                }
                 is AppResult.Failure -> return delRes
             }
         }
@@ -507,13 +715,14 @@ internal class GoogleDriveSyncDataSourceImpl(
     private suspend fun executeWithAuthAndBackoff(
         requestBlock: suspend (accessToken: String) -> HttpResponse
     ): AppResult<String, DataError.Network> {
-        return when (val bytesRes = executeBinaryWithAuthAndBackoff(requestBlock)) {
+        return when (val bytesRes = executeBinaryWithAuthAndBackoff(requestBlock = requestBlock)) {
             is AppResult.Failure -> bytesRes
             is AppResult.Success -> AppResult.Success(bytesRes.data.decodeToString())
         }
     }
 
     private suspend fun executeBinaryWithAuthAndBackoff(
+        onNotFound: (() -> Unit)? = null,
         requestBlock: suspend (accessToken: String) -> HttpResponse
     ): AppResult<ByteArray, DataError.Network> {
         var token = when (val t = tokenProvider.getAccessToken()) {
@@ -594,6 +803,11 @@ internal class GoogleDriveSyncDataSourceImpl(
                         continue
                     }
                     return AppResult.Failure(DataError.Network.SERVER)
+                }
+
+                status == HttpStatusCode.NotFound -> {
+                    onNotFound?.invoke()
+                    return AppResult.Failure(DataError.Network.UNKNOWN)
                 }
 
                 else -> return AppResult.Failure(DataError.Network.UNKNOWN)
@@ -690,6 +904,9 @@ internal class GoogleDriveSyncDataSourceImpl(
     companion object {
         private const val DRIVE_API_BASE = "https://www.googleapis.com/drive/v3"
         private const val DRIVE_UPLOAD_BASE = "https://www.googleapis.com/upload/drive/v3"
+        private const val DOWNLOAD_PARALLELISM = 6
+        private const val MEDIA_INDEX_TTL_MS = 30_000L
+        private const val MAX_INDEX_PAGES = 25
         private const val DELTA_FILE_PREFIX = "sync_delta_"
         private const val MEDIA_BLOB_PREFIX = "media_blob_"
         private const val MAX_RETRY_ATTEMPTS = 3
